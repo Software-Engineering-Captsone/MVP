@@ -20,7 +20,6 @@ export default function DualAudience() {
                     <Link href="/auth" className="btn-pill btn-dark">Sign up as an athlete <span className="btn-dual-arrow">→</span></Link>
                 </div>
                 <div className="dual-card dual-card-dark fade-up" id="brands">
-                    <div className="dual-icon">📊</div>
                     <h3>For Brands</h3>
                     <p>Find athletes that match your audience. Browse real engagement data, send proposals, and run campaigns from a single dashboard.</p>
                     <ul className="dual-list">
