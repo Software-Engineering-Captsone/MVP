@@ -1,6 +1,7 @@
 import '@/styles/auth.css';
 import { AuthLeftPanel, AuthForm } from '@/components/auth';
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'NILHub — Sign In',
@@ -11,7 +12,9 @@ export default function AuthPage() {
   return (
     <div className="auth-page">
       <AuthLeftPanel />
-      <AuthForm />
+      <Suspense fallback={<div className="auth-right"><div className="auth-form-container">Loading...</div></div>}>
+        <AuthForm />
+      </Suspense>
     </div>
   );
 }
