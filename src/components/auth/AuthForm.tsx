@@ -83,8 +83,9 @@ export default function AuthForm() {
                 // Store token
                 localStorage.setItem('token', data.token);
                 setSuccessMessage('Sign in successful! Redirecting...');
+                const destination = data.user.role === 'athlete' ? '/athlete' : '/business';
                 setTimeout(() => {
-                    router.push('/dashboard');
+                    router.push(destination);
                 }, 1000);
             } else {
                 setFormError(data.error || 'Sign in failed');
@@ -118,9 +119,8 @@ export default function AuthForm() {
             const data = await response.json();
 
             if (response.ok) {
-                setSuccessMessage('Account pending approval. You will be notified once your account has been reviewed.');
+                setSuccessMessage('Please wait for verification.');
                 setActiveTab('signin');
-                // Clear signup form
                 setSignupFirstName('');
                 setSignupLastName('');
                 setSignupEmail('');

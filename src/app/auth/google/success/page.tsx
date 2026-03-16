@@ -11,7 +11,13 @@ function GoogleSuccessContent() {
   useEffect(() => {
     if (token) {
       localStorage.setItem('token', token);
-      router.replace('/dashboard');
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const destination = payload.role === 'athlete' ? '/athlete' : '/business';
+        router.replace(destination);
+      } catch {
+        router.replace('/auth?error=google_failed');
+      }
     } else {
       router.replace('/auth?error=google_failed');
     }
