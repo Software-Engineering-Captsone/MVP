@@ -1,8 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Seagull / NILINK Color Palette */
+  --seagull-50: #EFFAFC;
+  --seagull-100: #D7F0F6;
+  --seagull-200: #B4E2ED;
+  --seagull-300: #6CC3DA;
+  --seagull-400: #46ADCA;
+  --seagull-500: #2A90B0;
+  --seagull-600: #267594;
+  --seagull-700: #255F79;
+  --seagull-800: #264F64;
+  --seagull-900: #244355;
+  --seagull-950: #132A39;
+
+  --nilink-primary: #6CC3DA;
+  --nilink-primary-hover: #46ADCA;
+  --nilink-bg: #EFFAFC;
+  --nilink-border: #B4E2ED;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* box-sizing only — Tailwind v4 preflight handles the rest */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html {
@@ -13,7 +47,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sora), system-ui, sans-serif;
+  font-family: var(--font-sora), -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 a {
@@ -23,4 +57,13 @@ a {
 
 button {
   font: inherit;
+}
+
+/* Font utility classes */
+.font-bebas {
+  font-family: 'Bebas Neue', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.font-barlow {
+  font-family: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif;
 }
