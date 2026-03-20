@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       // Don't fail signup if email fails
     }
 
-    return NextResponse.json({ message: 'User created successfully. Please check your email to verify your account.', userId: user._id }, { status: 201 });
+    return NextResponse.json({ message: 'User created successfully. Pending for Approval.', userId: user._id }, { status: 201 });
   } catch (error) {
     console.error('Signup error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
