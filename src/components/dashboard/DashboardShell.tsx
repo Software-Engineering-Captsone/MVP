@@ -26,9 +26,6 @@ export function useDashboard() {
 
 // Define navigation structures with sections
 const athleteNavigation = {
-  EDITOR: [
-    { href: '/dashboard/profile', icon: User, label: 'Profile' },
-  ],
   DASHBOARD: [
     { href: '/dashboard', icon: Home, label: 'Overview' },
     { href: '/dashboard/opportunities', icon: Search, label: 'Opportunities', badge: '3' },
@@ -41,7 +38,6 @@ const athleteNavigation = {
 
 const businessNavigation = {
   EDITOR: [
-    { href: '/dashboard/profile', icon: Building2, label: 'Profile' },
     { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
   ],
   DASHBOARD: [
@@ -236,6 +232,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                         onClick={() => setIsProfileMenuOpen(false)}
                       />
                       <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                        <Link 
+                          href="/dashboard/profile"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 w-full text-left"
+                        >
+                          Profile
+                        </Link>
                         <Link 
                           href="/preview"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 w-full text-left"
