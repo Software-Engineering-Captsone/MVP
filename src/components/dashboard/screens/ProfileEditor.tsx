@@ -30,7 +30,7 @@ export function ProfileEditor() {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-6xl mb-2 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+            <h1 className="text-6xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
               PROFILE EDITOR
             </h1>
             <p className="text-gray-600">Build your professional NIL presence</p>
@@ -47,7 +47,7 @@ export function ProfileEditor() {
 
       {/* Profile Photo */}
       <div className="mb-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h2 className="text-2xl mb-4 tracking-tight text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>PROFILE PHOTO</h2>
+        <h2 className="text-2xl mb-4 tracking-wide text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>PROFILE PHOTO</h2>
         <div className="flex items-center gap-6">
           <div className="w-24 h-24 rounded-full bg-[#6CC3DA] flex items-center justify-center text-white text-3xl font-bold">MJ</div>
           <button className="flex items-center gap-2 px-6 py-3 rounded-lg font-bold hover:opacity-90 transition-opacity" style={{ backgroundColor: '#6CC3DA', color: '#ffffff' }}>
@@ -59,7 +59,7 @@ export function ProfileEditor() {
 
       {/* Basic Information */}
       <div className="mb-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h2 className="text-2xl mb-6 tracking-tight text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>BASIC INFORMATION</h2>
+        <h2 className="text-2xl mb-6 tracking-wide text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>BASIC INFORMATION</h2>
         <div className="grid grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-600">Full Name</label>
@@ -90,19 +90,19 @@ export function ProfileEditor() {
 
       {/* Bio */}
       <div className="mb-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h2 className="text-2xl mb-6 tracking-tight text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>BIO</h2>
+        <h2 className="text-2xl mb-6 tracking-wide text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>BIO</h2>
         <textarea name="bio" value={formData.bio} onChange={handleChange} rows={4} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] transition-colors resize-none text-gray-900" placeholder="Tell businesses about yourself..." />
       </div>
 
       {/* Achievements */}
       <div className="mb-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h2 className="text-2xl mb-6 tracking-tight text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>ACHIEVEMENTS</h2>
+        <h2 className="text-2xl mb-6 tracking-wide text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>ACHIEVEMENTS</h2>
         <textarea name="achievements" value={formData.achievements} onChange={handleChange} rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] transition-colors resize-none text-gray-900" placeholder="List your athletic achievements..." />
       </div>
 
       {/* Social Media */}
       <div className="mb-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <h2 className="text-2xl mb-6 tracking-tight text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>SOCIAL MEDIA</h2>
+        <h2 className="text-2xl mb-6 tracking-wide text-gray-900" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>SOCIAL MEDIA</h2>
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div>

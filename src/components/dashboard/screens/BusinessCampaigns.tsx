@@ -66,7 +66,7 @@ export function BusinessCampaigns() {
   const Column = ({ title, statusCampaigns, badgeColor }: { title: string; statusCampaigns: Campaign[]; badgeColor: string }) => (
     <div className="flex-1 bg-gray-50 rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{title}</h3>
+        <h3 className="text-xl font-bold tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>{title}</h3>
         <span className={`px-3 py-1 rounded-full text-sm font-bold text-black ${badgeColor}`}>{statusCampaigns.length}</span>
       </div>
       <div className="space-y-3">{statusCampaigns.map(c => <CampaignCard key={c.id} campaign={c} />)}</div>
@@ -79,7 +79,7 @@ export function BusinessCampaigns() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-5xl mb-2 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>CAMPAIGNS</h1>
+              <h1 className="text-5xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>CAMPAIGNS</h1>
               <p className="text-gray-600">Manage your sponsorship opportunities and track performance</p>
             </div>
             <button className="px-6 py-3 rounded-lg font-bold text-black hover:opacity-90 transition-opacity flex items-center gap-2" style={{ backgroundColor: '#6CC3DA' }}>

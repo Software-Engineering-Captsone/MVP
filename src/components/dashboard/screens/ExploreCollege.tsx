@@ -50,7 +50,7 @@ export function ExploreCollege() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-8">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+          <h1 className="text-5xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
             EXPLORE COLLEGES
           </h1>
           <p className="text-gray-600 mb-6">Discover athletes by searching colleges and universities</p>

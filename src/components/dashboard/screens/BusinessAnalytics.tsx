@@ -59,7 +59,7 @@ export function BusinessAnalytics() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 p-8">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>OVERALL ANALYTICS</h1>
+          <h1 className="text-5xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>OVERALL ANALYTICS</h1>
           <p className="text-gray-600 mb-6">Comprehensive insights across all campaigns and partnerships</p>
           <div className="flex gap-4">
             <div className="flex-1">
@@ -97,7 +97,7 @@ export function BusinessAnalytics() {
           {/* Charts Row 1 */}
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ENGAGEMENT TRENDS</h3>
+              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ENGAGEMENT TRENDS</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={engagementData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -110,7 +110,7 @@ export function BusinessAnalytics() {
               </ResponsiveContainer>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>REACH OVER TIME</h3>
+              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>REACH OVER TIME</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={engagementData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -126,7 +126,7 @@ export function BusinessAnalytics() {
 
           {/* Campaign Performance */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-2xl mb-4 tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>CAMPAIGN PERFORMANCE COMPARISON</h3>
+            <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>CAMPAIGN PERFORMANCE COMPARISON</h3>
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={campaignPerformance}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -145,7 +145,7 @@ export function BusinessAnalytics() {
           {/* Sport Distribution & Budget */}
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ATHLETES BY SPORT</h3>
+              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ATHLETES BY SPORT</h3>
               <div className="flex items-center">
                 <ResponsiveContainer width="50%" height={250}>
                   <PieChart>
@@ -169,7 +169,7 @@ export function BusinessAnalytics() {
               </div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>BUDGET ALLOCATION</h3>
+              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>BUDGET ALLOCATION</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={budgetAllocation} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -184,7 +184,7 @@ export function BusinessAnalytics() {
 
           {/* Demographics */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-2xl mb-6 tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>AUDIENCE DEMOGRAPHICS</h3>
+            <h3 className="text-2xl mb-6 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>AUDIENCE DEMOGRAPHICS</h3>
             <div className="grid grid-cols-2 gap-8">
               <div>
                 <h4 className="text-lg font-bold text-black mb-4">Age Distribution</h4>
@@ -218,7 +218,7 @@ export function BusinessAnalytics() {
 
           {/* Top Athletes Table */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-2xl mb-4 tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>TOP PERFORMING ATHLETES</h3>
+            <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>TOP PERFORMING ATHLETES</h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="border-b border-gray-200">

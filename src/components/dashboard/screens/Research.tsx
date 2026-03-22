@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Search, Filter, Heart, X, Users, Instagram, Music } from 'lucide-react';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 interface Athlete {
   id: number;
@@ -116,7 +117,7 @@ export function Research() {
       <div className="bg-white p-8" style={{ borderBottom: '1px solid #B4E2ED' }}>
         <div className="max-w-7xl mx-auto">
           <h1
-            className="text-5xl mb-2 tracking-tight"
+            className="text-5xl mb-2 tracking-wide leading-snug"
             style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}
           >
             RESEARCH ATHLETES
@@ -254,9 +255,7 @@ export function Research() {
                     >
                       {athlete.name}
                     </h3>
-                    {athlete.verified && (
-                      <span className="text-[#6CC3DA] text-lg">✓</span>
-                    )}
+                    {athlete.verified && <VerifiedBadge className="w-5 h-5 text-[#6CC3DA] shrink-0" />}
                   </div>
                   <p className="text-gray-600">{athlete.school}</p>
                 </div>
@@ -328,14 +327,12 @@ export function Research() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <h3
-                        className="text-4xl font-bold text-black"
+                        className="text-4xl font-bold text-black leading-snug"
                         style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
                       >
                         {selectedAthlete.name.toUpperCase()}
                       </h3>
-                      {selectedAthlete.verified && (
-                        <span className="text-[#6CC3DA] text-xl">✓</span>
-                      )}
+                      {selectedAthlete.verified && <VerifiedBadge className="w-6 h-6 text-[#6CC3DA] shrink-0" />}
                     </div>
                     <button
                       onClick={(e) => {

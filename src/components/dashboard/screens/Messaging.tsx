@@ -97,7 +97,7 @@ export function Messaging() {
       {/* Conversations List */}
       <div className="w-96 bg-white flex flex-col" style={{ borderRight: '1px solid #B4E2ED' }}>
         <div className="p-6 border-b border-gray-200">
-          <h1 className="text-4xl mb-4 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+          <h1 className="text-4xl mb-4 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
             MESSAGES
           </h1>
           <div className="relative">
@@ -163,7 +163,7 @@ export function Messaging() {
                 )}
               </div>
               <div>
-                <h2 className="text-2xl tracking-tight" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#6CC3DA' }}>
+                <h2 className="text-2xl tracking-wide" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#6CC3DA' }}>
                   {activeConversation.name.toUpperCase()}
                 </h2>
                 <p className="text-sm text-gray-600">

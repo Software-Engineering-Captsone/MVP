@@ -51,7 +51,7 @@ export function AthleteProfile() {
           </div>
 
           <div className="flex-1 pb-4">
-            <h1 className="text-7xl mb-2 tracking-tight leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: '#6CC3DA' }}>
+            <h1 className="text-7xl mb-2 tracking-wide leading-none" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, color: '#6CC3DA' }}>
               {athlete.name.toUpperCase()}
             </h1>
             <div className="flex items-center gap-6 text-lg text-gray-700 mb-4">
@@ -88,20 +88,20 @@ export function AthleteProfile() {
 
         {/* Bio Section */}
         <div className="bg-white border border-gray-200 rounded-xl p-8 mb-8 shadow-sm">
-          <h2 className="text-3xl mb-4 tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ABOUT</h2>
+          <h2 className="text-3xl mb-4 tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ABOUT</h2>
           <p className="text-gray-700 text-lg leading-relaxed">{athlete.bio}</p>
         </div>
 
         {/* Social Media Stats */}
         <div className="mb-8">
-          <h2 className="text-3xl mb-6 tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>SOCIAL MEDIA REACH</h2>
+          <h2 className="text-3xl mb-6 tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>SOCIAL MEDIA REACH</h2>
           <div className="grid grid-cols-2 gap-6">
             {/* Instagram */}
             <div className="bg-white border border-gray-200 rounded-xl p-6 hover:border-[#6CC3DA]/50 transition-all shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl"><Instagram className="w-6 h-6 text-white" /></div>
                 <div>
-                  <h3 className="text-2xl tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>INSTAGRAM</h3>
+                  <h3 className="text-2xl tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>INSTAGRAM</h3>
                   <p className="text-sm text-gray-600">{athlete.socialStats.instagram.handle}</p>
                 </div>
               </div>
@@ -128,7 +128,7 @@ export function AthleteProfile() {
                   <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" /></svg>
                 </div>
                 <div>
-                  <h3 className="text-2xl tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>TIKTOK</h3>
+                  <h3 className="text-2xl tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>TIKTOK</h3>
                   <p className="text-sm text-gray-600">{athlete.socialStats.tiktok.handle}</p>
                 </div>
               </div>
@@ -162,7 +162,7 @@ export function AthleteProfile() {
 
         {/* Achievements Section */}
         <div className="mb-8">
-          <h2 className="text-3xl mb-6 tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ACHIEVEMENTS & HONORS</h2>
+          <h2 className="text-3xl mb-6 tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ACHIEVEMENTS & HONORS</h2>
           <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
             <div className="grid grid-cols-2 gap-4">
               {athlete.achievements.map((achievement, index) => (
@@ -179,7 +179,7 @@ export function AthleteProfile() {
         <div className="mb-12 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-2xl mb-2 tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>DEAL AVAILABILITY</h3>
+              <h3 className="text-2xl mb-2 tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>DEAL AVAILABILITY</h3>
               <p className="text-gray-600">Let businesses know you&apos;re currently accepting new sponsorship opportunities</p>
             </div>
             <div className="flex items-center gap-4">

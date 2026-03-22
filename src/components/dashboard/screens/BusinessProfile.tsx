@@ -36,7 +36,7 @@ export function BusinessProfile() {
       <div className="bg-white border-b border-gray-200 p-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-5xl tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+            <h1 className="text-5xl tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
               BUSINESS PROFILE
             </h1>
             <button
@@ -58,11 +58,11 @@ export function BusinessProfile() {
                 <input
                   type="text" value={profile.companyName}
                   onChange={(e) => setProfile({ ...profile, companyName: e.target.value })}
-                  className="text-4xl font-bold border-b-2 border-[#6CC3DA] focus:outline-none text-gray-900 mb-2 w-full"
+                  className="text-4xl font-bold border-b-2 border-[#6CC3DA] focus:outline-none text-gray-900 mb-2 w-full leading-snug"
                   style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
                 />
               ) : (
-                <h2 className="text-4xl font-bold mb-2 text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                <h2 className="text-4xl font-bold mb-2 text-gray-900 leading-snug" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                   {profile.companyName.toUpperCase()}
                 </h2>
               )}
@@ -92,7 +92,7 @@ export function BusinessProfile() {
       <div className="max-w-5xl mx-auto p-8 space-y-8">
         {/* About */}
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-2xl mb-4 tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ABOUT</h3>
+          <h3 className="text-2xl mb-4 tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ABOUT</h3>
           {isEditing ? (
             <textarea
               value={profile.description}
@@ -109,7 +109,7 @@ export function BusinessProfile() {
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Megaphone className="w-6 h-6" style={{ color: '#6CC3DA' }} />
-            <h3 className="text-2xl tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ACTIVE CAMPAIGNS</h3>
+            <h3 className="text-2xl tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ACTIVE CAMPAIGNS</h3>
           </div>
           <div className="space-y-4">
             {campaigns.map(campaign => (
@@ -131,7 +131,7 @@ export function BusinessProfile() {
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <MessageSquare className="w-6 h-6" style={{ color: '#6CC3DA' }} />
-            <h3 className="text-2xl tracking-tight text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ATHLETE TESTIMONIALS</h3>
+            <h3 className="text-2xl tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ATHLETE TESTIMONIALS</h3>
           </div>
           <div className="grid grid-cols-3 gap-6">
             {testimonials.map(testimonial => (

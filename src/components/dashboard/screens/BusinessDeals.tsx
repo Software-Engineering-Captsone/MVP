@@ -1,249 +1,225 @@
 'use client';
 
 import { useState } from 'react';
-import { DollarSign, Calendar, CheckCircle2, X } from 'lucide-react';
+import { Search, MoreHorizontal, FileText } from 'lucide-react';
+import { mockAthletes } from '@/lib/mockData';
 
-interface Deal {
-  id: number;
-  athleteName: string;
-  athleteInitials: string;
-  sport: string;
-  campaignName: string;
+// Reusing same icons from Discovery
+const FootballIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <ellipse cx="12" cy="12" rx="10" ry="7" transform="rotate(-45 12 12)" />
+    <path d="M8 8l8 8" />
+    <path d="M11 9l2 2" />
+    <path d="M9 11l2 2" />
+    <path d="M13 11l2 2" />
+  </svg>
+);
+
+const BaseballIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 2A10 10 0 0 1 12 22" />
+    <path d="M12 2A10 10 0 0 0 12 22" />
+    <path d="M8 5a8 8 0 0 0 0 14" />
+    <path d="M16 5a8 8 0 0 1 0 14" />
+  </svg>
+);
+
+const sports = ['Football', 'Baseball', 'Softball', 'Cheerleading', 'Dance', 'Basketball', 'Beach Volleyball'];
+
+interface Invoice {
+  id: string;
   amount: number;
-  paymentSchedule: string;
-  deliverables: string[];
-  completedDeliverables: number;
-  startDate: string;
-  endDate: string;
-  status: 'Active' | 'Pending' | 'Completed';
+  number: string;
+  status: 'Unpaid' | 'Past Due' | 'Paid' | 'Draft';
+  athleteName: string;
+  email: string;
+  lastUpdated: string;
+  created: string;
 }
 
-export function BusinessDeals() {
-  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
-  const [deals, setDeals] = useState<Deal[]>([
-    {
-      id: 1, athleteName: 'Marcus Johnson', athleteInitials: 'MJ', sport: 'Basketball',
-      campaignName: 'Spring Training Fuel Campaign', amount: 2500,
-      paymentSchedule: '50% upfront, 50% upon completion',
-      deliverables: ['3 Instagram posts', '2 TikTok videos', '1 Product review'],
-      completedDeliverables: 2, startDate: 'Mar 1, 2026', endDate: 'Apr 30, 2026', status: 'Active',
-    },
-    {
-      id: 2, athleteName: 'Sarah Chen', athleteInitials: 'SC', sport: 'Soccer',
-      campaignName: 'Basketball Season Sponsorship', amount: 3500,
-      paymentSchedule: 'Monthly installments',
-      deliverables: ['4 Instagram posts', '3 Stories per week', '1 Live session'],
-      completedDeliverables: 4, startDate: 'Feb 15, 2026', endDate: 'May 15, 2026', status: 'Active',
-    },
-    {
-      id: 3, athleteName: 'Tyler Washington', athleteInitials: 'TW', sport: 'Football',
-      campaignName: 'Track & Field Partnership', amount: 1800,
-      paymentSchedule: 'Lump sum payment',
-      deliverables: ['2 Instagram posts', '1 TikTok video'],
-      completedDeliverables: 0, startDate: 'Apr 1, 2026', endDate: 'May 31, 2026', status: 'Pending',
-    },
-    {
-      id: 4, athleteName: 'Emily Rodriguez', athleteInitials: 'ER', sport: 'Volleyball',
-      campaignName: 'Summer Campaign', amount: 2200,
-      paymentSchedule: '50% upfront, 50% upon completion',
-      deliverables: ['3 Instagram posts', '2 Reels'],
-      completedDeliverables: 0, startDate: 'May 1, 2026', endDate: 'Jun 30, 2026', status: 'Pending',
-    },
-    {
-      id: 5, athleteName: 'Jordan Blake', athleteInitials: 'JB', sport: 'Track & Field',
-      campaignName: 'Fall Training Campaign', amount: 1500,
-      paymentSchedule: 'Lump sum payment',
-      deliverables: ['2 Instagram posts', '1 Story series'],
-      completedDeliverables: 3, startDate: 'Jan 1, 2026', endDate: 'Feb 28, 2026', status: 'Completed',
-    },
-    {
-      id: 6, athleteName: 'Aisha Patel', athleteInitials: 'AP', sport: 'Tennis',
-      campaignName: 'Winter Sponsorship', amount: 3000,
-      paymentSchedule: 'Monthly installments',
-      deliverables: ['4 Instagram posts', '3 TikTok videos', '2 Blog features'],
-      completedDeliverables: 9, startDate: 'Dec 1, 2025', endDate: 'Feb 15, 2026', status: 'Completed',
-    },
-  ]);
+const mockInvoices: Invoice[] = [
+  { id: '1', amount: 500, number: 'INV0938-09-001', status: 'Unpaid', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: 'Sep 2, 2026 02:29 AM', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '2', amount: 1500, number: 'INV0938-09-001', status: 'Past Due', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: '--', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '3', amount: 4500, number: 'INV0938-09-001', status: 'Paid', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: '--', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '4', amount: 2500, number: 'INV0938-09-001', status: 'Unpaid', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: '--', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '5', amount: 500, number: 'INV0938-09-001', status: 'Draft', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: 'Sep 2, 2026 02:29 AM', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '6', amount: 500, number: 'INV0938-09-001', status: 'Unpaid', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: 'Sep 2, 2026 02:29 AM', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '7', amount: 500, number: 'INV0938-09-001', status: 'Paid', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: 'Sep 2, 2026 02:29 AM', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '8', amount: 4500, number: 'INV0938-09-001', status: 'Paid', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: '--', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '9', amount: 1500, number: 'INV0938-09-001', status: 'Past Due', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: '--', created: 'Sep 2, 2026 02:29 AM' },
+  { id: '10', amount: 4500, number: 'INV0938-09-001', status: 'Paid', athleteName: 'Emalee Frost', email: 'emailsample@gmail.com', lastUpdated: '--', created: 'Sep 2, 2026 02:29 AM' },
+];
 
-  const activeDeals = deals.filter(d => d.status === 'Active');
-  const pendingDeals = deals.filter(d => d.status === 'Pending');
-  const completedDeals = deals.filter(d => d.status === 'Completed');
-  const totalValue = deals.reduce((sum, deal) => sum + deal.amount, 0);
-  const activeValue = activeDeals.reduce((sum, deal) => sum + deal.amount, 0);
-
-  const DealCard = ({ deal }: { deal: Deal }) => (
-    <div
-      onClick={() => setSelectedDeal(deal)}
-      className="bg-white border border-gray-200 rounded-lg p-4 mb-3 cursor-pointer hover:shadow-md transition-shadow"
-    >
-      <div className="flex items-start gap-3 mb-3">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: '#6CC3DA' }}>
-          {deal.athleteInitials}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-gray-900 truncate">{deal.athleteName}</h4>
-          <p className="text-xs text-gray-500">{deal.sport}</p>
-        </div>
-      </div>
-      <div className="mb-3">
-        <p className="text-sm font-medium text-gray-700 mb-1">{deal.campaignName}</p>
-        <div className="flex items-center gap-2">
-          <DollarSign className="w-4 h-4 text-green-600" />
-          <p className="text-lg font-bold text-green-600">${deal.amount.toLocaleString()}</p>
-        </div>
-      </div>
-      <div className="space-y-2 text-xs text-gray-600">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-3 h-3" />
-          <span>{deal.startDate} - {deal.endDate}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="w-3 h-3" />
-          <span>{deal.completedDeliverables}/{deal.deliverables.length} deliverables completed</span>
-        </div>
-      </div>
-      <div className="mt-3 pt-3 border-t border-gray-100">
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div className="h-2 rounded-full transition-all" style={{
-            width: `${Math.min((deal.completedDeliverables / deal.deliverables.length) * 100, 100)}%`,
-            backgroundColor: '#6CC3DA',
-          }}></div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const Column = ({ title, statusDeals, badgeColor }: { title: string; statusDeals: Deal[]; badgeColor: string }) => (
-    <div className="flex-1 bg-gray-50 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold tracking-tight text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-          {title}
-        </h3>
-        <span className={`px-3 py-1 rounded-full text-sm font-bold text-black ${badgeColor}`}>
-          {statusDeals.length}
-        </span>
-      </div>
-      <div className="space-y-3">
-        {statusDeals.map(deal => <DealCard key={deal.id} deal={deal} />)}
-      </div>
-    </div>
-  );
+const StatusBadge = ({ status }: { status: Invoice['status'] }) => {
+  const getStyles = () => {
+    switch (status) {
+      case 'Unpaid': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
+      case 'Past Due': return 'bg-red-50 text-red-500 border-red-200';
+      case 'Paid': return 'bg-green-50 text-green-600 border-green-200';
+      case 'Draft': return 'bg-gray-100 text-gray-500 border-gray-200';
+    }
+  };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
-            PAYMENTS &amp; DEALS
-          </h1>
-          <p className="text-gray-600 mb-6">Manage your athlete partnerships and payment schedules</p>
-          <div className="grid grid-cols-4 gap-6">
-            {[
-              { label: 'Total Deals', value: deals.length },
-              { label: 'Active Deals', value: activeDeals.length },
-              { label: 'Total Investment', value: `$${totalValue.toLocaleString()}` },
-              { label: 'Active Value', value: `$${activeValue.toLocaleString()}` },
-            ].map(stat => (
-              <div key={stat.label} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                <p className="text-sm text-gray-600 mb-2 font-bold">{stat.label}</p>
-                <p className="text-3xl font-bold text-black">{stat.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded border ${getStyles()} ml-3`}>
+      {status}
+    </span>
+  );
+};
 
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex gap-6 h-full">
-            <Column title="PENDING" statusDeals={pendingDeals} badgeColor="bg-red-100" />
-            <Column title="ACTIVE" statusDeals={activeDeals} badgeColor="bg-yellow-100" />
-            <Column title="COMPLETED" statusDeals={completedDeals} badgeColor="bg-green-100" />
-          </div>
-        </div>
-      </div>
+export function BusinessDeals() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSport, setActiveSport] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('Invoice');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
 
-      {/* Deal Detail Modal */}
-      {selectedDeal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-8" onClick={() => setSelectedDeal(null)}>
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: '#6CC3DA' }}>
-                  {selectedDeal.athleteInitials}
-                </div>
-                <div>
-                  <h2 className="text-3xl" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
-                    {selectedDeal.athleteName.toUpperCase()}
-                  </h2>
-                  <p className="text-gray-600">{selectedDeal.sport}</p>
-                </div>
-              </div>
-              <button onClick={() => setSelectedDeal(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <X className="w-6 h-6 text-gray-600" />
+  const filteredInvoices = mockInvoices.filter(i => {
+    if (statusFilter !== 'All' && i.status !== statusFilter) return false;
+    if (searchQuery && !i.athleteName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div className="h-full flex flex-col bg-white overflow-hidden text-[#1C1C1E]">
+      {/* Top Filter Bar */}
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search Athletes...."
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-300"
+          />
+        </div>
+        
+        <button className="flex items-center gap-2 px-4 py-2 bg-[#1C1C1E] text-white rounded-full text-sm font-medium hover:bg-[#2D2D2F] transition-colors shrink-0">
+          All Filters
+        </button>
+
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 pb-1">
+          {sports.map(sport => {
+            const isActive = activeSport === sport;
+            return (
+              <button
+                key={sport}
+                onClick={() => setActiveSport(isActive ? null : sport)}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  isActive 
+                    ? 'border-[#1C1C1E] bg-[#1C1C1E] text-white' 
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {sport === 'Football' && <FootballIcon className="w-4 h-4" />}
+                {(sport === 'Baseball' || sport === 'Softball') && <BaseballIcon className="w-4 h-4" />}
+                {sport !== 'Football' && sport !== 'Baseball' && sport !== 'Softball' && (
+                  <div className="w-4 h-4 rounded-full border border-current opacity-50 flex items-center justify-center text-[8px]">✦</div>
+                )}
+                {sport}
               </button>
-            </div>
-            <div className="p-6">
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-gray-500 uppercase mb-2">Campaign</h3>
-                <p className="text-xl font-bold text-gray-900">{selectedDeal.campaignName}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-5 h-5 text-green-600" />
-                    <h3 className="text-sm font-bold text-gray-500 uppercase">Deal Amount</h3>
-                  </div>
-                  <p className="text-3xl font-bold text-green-600">${selectedDeal.amount.toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-5 h-5" style={{ color: '#6CC3DA' }} />
-                    <h3 className="text-sm font-bold text-gray-500 uppercase">Duration</h3>
-                  </div>
-                  <p className="text-sm text-gray-700">{selectedDeal.startDate}<br />to {selectedDeal.endDate}</p>
-                </div>
-              </div>
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-gray-500 uppercase mb-2">Payment Schedule</h3>
-                <p className="text-gray-700">{selectedDeal.paymentSchedule}</p>
-              </div>
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-gray-500 uppercase">Deliverables</h3>
-                  <span className="text-sm font-bold" style={{ color: '#6CC3DA' }}>
-                    {selectedDeal.completedDeliverables}/{selectedDeal.deliverables.length} Completed
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {selectedDeal.deliverables.map((deliverable, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                        index < selectedDeal.completedDeliverables ? 'bg-[#6CC3DA]' : 'bg-gray-300'
-                      }`}>
-                        {index < selectedDeal.completedDeliverables && <CheckCircle2 className="w-4 h-4 text-white" />}
-                      </div>
-                      <span className={index < selectedDeal.completedDeliverables ? 'text-gray-900' : 'text-gray-500'}>
-                        {deliverable}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button className="flex-1 px-6 py-3 rounded-lg font-bold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: '#6CC3DA' }}>
-                  VIEW CONTRACT
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Title Area */}
+        <div className="px-6 py-5 shrink-0">
+          <h1 className="text-2xl font-bold">Deals</h1>
+        </div>
+
+        {/* Tab Sub-navigation */}
+        <div className="flex items-center gap-6 border-b border-gray-100 px-6 shrink-0">
+          {['Overview', 'Quotation', 'Invoice'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`text-sm font-medium py-3 border-b-2 transition-colors ${
+                activeTab === tab 
+                  ? 'border-gray-900 text-gray-900' 
+                  : 'border-transparent text-gray-400 hover:text-gray-700'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Actions Bar */}
+        <div className="flex items-center justify-between px-6 py-5 shrink-0">
+          <div className="flex items-center gap-4">
+            <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-sm bg-white hover:bg-gray-50">
+              Last 7 days <span className="text-[10px] ml-1">▼</span>
+            </button>
+            <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-sm bg-white hover:bg-gray-50">
+              Mar 15 - Mar 22 <span className="text-[10px] ml-1">▼</span>
+            </button>
+            
+            <div className="flex items-center ml-2 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 p-0.5">
+              {['All', 'Draft', 'Unpaid', 'Paid'].map(status => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    statusFilter === status ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {status} <span className="text-gray-400 font-normal ml-1">125</span>
                 </button>
-                <button className="flex-1 px-6 py-3 rounded-lg font-bold border-2 hover:bg-gray-50 transition-colors text-gray-700" style={{ borderColor: '#6CC3DA' }}>
-                  MESSAGE ATHLETE
-                </button>
-              </div>
+              ))}
             </div>
           </div>
+          
+          <button className="px-4 py-2 bg-[#1C1C1E] text-white rounded-lg text-sm font-medium hover:bg-[#2D2D2F] transition-colors">
+            Add Invoice
+          </button>
         </div>
-      )}
+
+        {/* Table View */}
+        <div className="flex-1 overflow-auto px-6 pb-6">
+          <table className="w-full text-sm text-left whitespace-nowrap">
+            <thead className="text-[11px] font-bold text-gray-500 uppercase bg-gray-100 sticky top-0 z-10">
+              <tr>
+                <th className="px-5 py-3 rounded-l-xl">AMOUNT</th>
+                <th className="px-5 py-3">INVOICE NUMBER</th>
+                <th className="px-5 py-3">ATHLETE NAME</th>
+                <th className="px-5 py-3">EMAIL</th>
+                <th className="px-5 py-3">LAST UPDATED</th>
+                <th className="px-5 py-3">CREATED</th>
+                <th className="px-5 py-3 rounded-r-xl w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredInvoices.map((invoice, idx) => (
+                <tr key={`${invoice.id}-${idx}`} className="group hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                  <td className="px-5 py-4 font-bold text-gray-900">${invoice.amount}</td>
+                  <td className="px-5 py-4 font-medium text-gray-700">
+                    {invoice.number}
+                    <StatusBadge status={invoice.status} />
+                  </td>
+                  <td className="px-5 py-4 font-medium text-gray-900">{invoice.athleteName}</td>
+                  <td className="px-5 py-4 text-gray-500">{invoice.email}</td>
+                  <td className="px-5 py-4 text-gray-500">{invoice.lastUpdated}</td>
+                  <td className="px-5 py-4 text-gray-500">{invoice.created}</td>
+                  <td className="px-5 py-4 text-gray-400">
+                    <button className="p-1 rounded hover:bg-gray-200 transition-colors">
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          <div className="mt-8 text-center pb-8">
+            <button className="text-sm font-bold text-blue-500 hover:text-blue-600 transition-colors">
+              Load More
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

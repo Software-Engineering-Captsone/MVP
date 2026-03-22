@@ -65,11 +65,11 @@ export function CollegeDetail() {
           </button>
 
           <div className="flex items-start gap-6 mb-6">
-            <div className="w-24 h-24 rounded-xl flex items-center justify-center text-5xl shadow-lg" style={{ backgroundColor: `${college.color}20` }}>
+            <div className="w-24 h-24 rounded-xl flex items-center justify-center text-5xl shadow-lg leading-snug" style={{ backgroundColor: `${college.color}20` }}>
               {college.logo}
             </div>
             <div className="flex-1">
-              <h1 className="text-5xl mb-2 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+              <h1 className="text-5xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
                 {college.name.toUpperCase()}
               </h1>
               <div className="flex items-center gap-4 text-lg text-gray-700 mb-3">

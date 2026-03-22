@@ -75,7 +75,7 @@ export function DealManagement() {
       {/* Header */}
       <div className="bg-white p-8" style={{ borderBottom: '1px solid #B4E2ED' }}>
         <div className="max-w-5xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+          <h1 className="text-5xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
             DEAL MANAGEMENT
           </h1>
           <p className="text-gray-600 mb-6">Track your sponsorship deals, deliverables, and payments</p>
