@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation';
 
-/** Legacy dev entry — dashboard is gated by auth and role from JWT. */
+export const metadata = {
+  title: 'Sign in — NILINK',
+  description: 'Sign in to open your dashboard.',
+};
+
+/** Legacy URL — use /auth. Dashboard uses your JWT role (athlete vs brand). */
 export default function PreviewPage() {
   redirect('/auth');
 }
