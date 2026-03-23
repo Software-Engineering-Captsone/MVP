@@ -164,11 +164,12 @@ export function AthleteCampaigns() {
                 >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={c.image}
-                        alt=""
-                        className="h-10 w-10 rounded-lg bg-gray-100 object-cover"
-                      />
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400"
+                        aria-hidden
+                      >
+                        <Megaphone className="h-5 w-5" strokeWidth={2} />
+                      </div>
                       <div>
                         <p className="font-bold text-gray-900">{c.name}</p>
                         <p className="text-xs text-gray-400">{c.subtitle}</p>
@@ -213,11 +214,6 @@ export function AthleteCampaigns() {
                 <X className="h-5 w-5" />
               </button>
               <div className="max-h-[90vh] overflow-auto p-6">
-                <img
-                  src={detail.campaign.image}
-                  alt=""
-                  className="mb-4 h-36 w-full rounded-xl object-cover"
-                />
                 <h2
                   className="text-2xl font-black uppercase tracking-wide text-nilink-ink"
                   style={{ fontFamily: "'Bebas Neue', sans-serif" }}

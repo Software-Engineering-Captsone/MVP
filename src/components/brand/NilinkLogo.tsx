@@ -14,7 +14,9 @@ export function NilinkLogoMark({
     'border border-white/15 text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)] [box-shadow:inset_0_1px_0_rgba(255,255,255,0.15)]';
   const light =
     'border border-transparent text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)] [box-shadow:inset_0_1px_0_rgba(255,255,255,0.15)]';
-  const inverse = 'border border-white/25 bg-white text-nilink-ink shadow-sm';
+  /* Softer than solid white so it doesn’t read like the sidebar’s stone-100 active pill */
+  const inverse =
+    'border border-white/35 bg-white/55 text-nilink-ink shadow-none backdrop-blur-[1px]';
   const variant = surface === 'light' ? light : surface === 'inverse' ? inverse : dark;
   return (
     <span className={`${base} ${variant} ${className}`} aria-hidden>

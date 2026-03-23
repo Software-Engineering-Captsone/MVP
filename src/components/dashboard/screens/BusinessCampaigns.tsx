@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Search, Eye, ChevronRight } from 'lucide-react';
+import { Plus, Search, Eye, ChevronRight, Megaphone } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { CreateCampaignOverlay, type CreateCampaignPayload } from './CreateCampaignOverlay';
 import { CampaignDetail } from './CampaignDetail';
@@ -314,9 +314,9 @@ export function BusinessCampaigns() {
           <button
             type="button"
             onClick={() => setShowCreateOverlay(true)}
-            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-nilink-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-nilink-accent-hover sm:ml-auto sm:w-auto"
+            className="focus-nilink inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-nilink-accent px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-nilink-accent-hover sm:ml-auto sm:w-auto"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 shrink-0" strokeWidth={2.25} />
             Create Campaign
           </button>
         </div>
@@ -343,11 +343,12 @@ export function BusinessCampaigns() {
                 >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={campaign.image}
-                        alt={campaign.name}
-                        className="w-10 h-10 rounded-lg object-cover bg-gray-100"
-                      />
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400"
+                        aria-hidden
+                      >
+                        <Megaphone className="h-5 w-5" strokeWidth={2} />
+                      </div>
                       <div>
                         <p className="font-bold text-gray-900">{campaign.name}</p>
                         <p className="text-xs text-gray-400">{campaign.subtitle}</p>

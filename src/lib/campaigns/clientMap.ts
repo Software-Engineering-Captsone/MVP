@@ -7,8 +7,6 @@ import type {
 
 const PLACEHOLDER_ATHLETE =
   'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=400&q=80';
-const DEFAULT_CAMPAIGN_IMAGE =
-  'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80';
 
 export type ApiCampaignRow = {
   id: string;
@@ -129,7 +127,7 @@ export function apiCampaignToUi(
     brief: c.brief || '',
     athleteCount: 0,
     candidateCount: candidates.length,
-    image: c.image || DEFAULT_CAMPAIGN_IMAGE,
+    image: typeof c.image === 'string' ? c.image : '',
     startDate: c.startDate || '',
     endDate: c.endDate || '',
     visibility: c.visibility === 'Private' ? 'Private' : 'Public',

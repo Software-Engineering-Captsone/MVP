@@ -1,15 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Calendar } from 'lucide-react';
+import { CheckCircle2, Calendar, Megaphone } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getBrandImageByName } from '@/lib/mockData';
 import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-import { authFetch } from '@/lib/authFetch';
-import { formatCampaignRelativePosted, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
 
 export function AthleteDashboard() {
   const { user } = useDashboard();
@@ -39,39 +36,6 @@ export function AthleteDashboard() {
       status: 'active',
     },
   ];
-
-  const [opportunityRows, setOpportunityRows] = useState<ApiCampaignRow[]>([]);
-  const [opportunitiesLoading, setOpportunitiesLoading] = useState(true);
-
-  const loadOpportunities = useCallback(async () => {
-    setOpportunitiesLoading(true);
-    try {
-      const res = await authFetch('/api/campaigns');
-      const data = (await res.json()) as { campaigns?: ApiCampaignRow[] };
-      if (!res.ok) {
-        setOpportunityRows([]);
-        return;
-      }
-      const rows = (data.campaigns ?? []).map((c) => ({
-        ...c,
-        createdAt:
-          typeof c.createdAt === 'string'
-            ? c.createdAt
-            : c.createdAt != null
-              ? String(c.createdAt)
-              : undefined,
-      }));
-      setOpportunityRows(rows.slice(0, 3));
-    } catch {
-      setOpportunityRows([]);
-    } finally {
-      setOpportunitiesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadOpportunities();
-  }, [loadOpportunities]);
 
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? 'there';
   const welcomeSubtitle = `Welcome back, ${firstName}. Here is your NIL activity.`;
@@ -209,83 +173,27 @@ export function AthleteDashboard() {
           </div>
         </div>
 
-        {/* New Opportunities */}
-        <div>
-          <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-100">
-            <h2
-              className="text-3xl tracking-wide text-nilink-ink"
-              style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-            >
-              OPPORTUNITIES
-            </h2>
-            <Link
-              href="/dashboard/campaigns"
-              className="text-sm font-bold text-nilink-accent transition-colors hover:text-nilink-ink"
-            >
-              EXPLORE
-            </Link>
+        {/* Campaigns live under Campaigns in the nav — keep home focused on deals & profile */}
+        <div className="flex flex-col justify-center rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-nilink-accent-soft text-nilink-accent">
+            <Megaphone className="h-6 w-6" strokeWidth={2.25} />
           </div>
-          <div className="flex flex-col">
-            {opportunitiesLoading && (
-              <p className="py-8 text-sm text-gray-400">Loading open campaigns…</p>
-            )}
-            {!opportunitiesLoading && opportunityRows.length === 0 && (
-              <p className="py-8 text-sm text-gray-500">
-                No open campaigns right now.{' '}
-                <Link href="/dashboard/campaigns" className="font-semibold text-nilink-accent hover:underline">
-                  Browse campaigns
-                </Link>
-              </p>
-            )}
-            {!opportunitiesLoading &&
-              opportunityRows.map((opp, i) => {
-                const brand = opp.brandDisplayName?.trim() || opp.name;
-                const typeLine = opp.goal?.trim() || opp.subtitle?.trim() || opp.packageName?.trim() || 'Campaign';
-                const compensation = opp.budget?.trim() || 'See brief';
-                const posted = formatCampaignRelativePosted(opp.createdAt ?? null);
-                const last = i === opportunityRows.length - 1;
-                return (
-                  <motion.div
-                    key={opp.id}
-                    layout
-                    initial={{ opacity: 0, x: 6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05, duration: 0.25 }}
-                    className={`py-5 flex items-center justify-between group ${!last ? 'border-b border-gray-100' : ''}`}
-                  >
-                    <div className="flex flex-1 items-start gap-4 pr-6">
-                      <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-100 bg-white">
-                        <img
-                          src={opp.image && opp.image.length > 0 ? opp.image : getBrandImageByName(brand)}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-lg font-bold text-gray-900">{brand}</h3>
-                        <p className="mt-0.5 line-clamp-1 text-sm font-medium text-gray-600">{opp.name}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-3">
-                          <span className="text-sm font-medium text-gray-500">{typeLine}</span>
-                          <span className="h-1 w-1 shrink-0 rounded-full bg-gray-300" />
-                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{posted}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      <span className="rounded-full bg-nilink-accent-soft px-3 py-1 text-sm font-bold text-nilink-accent">
-                        {compensation}
-                      </span>
-                      <Link
-                        href="/dashboard/campaigns"
-                        className="text-xs font-bold uppercase tracking-widest text-gray-400 transition-colors hover:text-nilink-ink"
-                      >
-                        Apply on Campaigns →
-                      </Link>
-                    </div>
-                  </motion.div>
-                );
-              })}
-          </div>
+          <h2
+            className="mb-2 text-3xl tracking-wide text-nilink-ink"
+            style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+          >
+            BRAND CAMPAIGNS
+          </h2>
+          <p className="mb-6 text-sm font-medium text-gray-500">
+            Browse open brand deals and submit your application in one place. Creating and managing campaigns is for brand
+            accounts only.
+          </p>
+          <Link
+            href="/dashboard/campaigns"
+            className="inline-flex w-fit items-center justify-center rounded-xl bg-nilink-accent px-6 py-3 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-nilink-accent-hover"
+          >
+            Browse open campaigns
+          </Link>
         </div>
       </div>
 

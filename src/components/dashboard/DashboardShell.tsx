@@ -45,22 +45,26 @@ type NavItem = { href: string; icon: LucideIcon; label: string; badge?: string }
 const athleteNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/dashboard/search', icon: Search, label: 'Explore' },
-  { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
   { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
   { href: '/dashboard/deals', icon: FileText, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
-  { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
 ];
 
 const businessNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
   { href: '/dashboard/search', icon: Search, label: 'Explore' },
+  { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
   { href: '/dashboard/deals', icon: CreditCard, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
-  { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
-  { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
 ];
+
+/** Inbox sits above profile (below main nav), not in the scrollable list. */
+const inboxNavItem: NavItem = {
+  href: '/dashboard/messages',
+  icon: MessageSquare,
+  label: 'Inbox',
+};
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -138,14 +142,20 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     email: sessionUser.email,
   };
 
+  const InboxIcon = inboxNavItem.icon;
+  const inboxActive = pathname.startsWith(inboxNavItem.href);
+
   return (
     <DashboardContext.Provider value={{ accountType, user: sessionUser, refreshUser }}>
       <div className="flex h-screen bg-nilink-page text-nilink-ink">
-        <aside className="group relative z-50 flex h-screen w-20 shrink-0 flex-col overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]">
-          <div className="flex h-[72px] shrink-0 items-center justify-center px-2 pb-4 pt-6 group-hover:justify-start group-hover:px-5">
+        <aside
+          className="group relative z-50 flex h-screen w-20 shrink-0 flex-col overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]"
+          onMouseLeave={() => setIsProfileMenuOpen(false)}
+        >
+          <div className="flex h-[72px] shrink-0 items-center px-3 pb-4 pt-6">
             <Link
               href="/dashboard"
-              className="flex w-full items-center justify-center gap-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar group-hover:justify-start group-hover:gap-3"
+              className="flex w-full items-center justify-start gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
             >
               <motion.div
                 whileHover={{ scale: 1.04 }}
@@ -158,7 +168,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </Link>
           </div>
 
-          <nav className="mt-6 min-h-0 flex-1 overflow-x-hidden overflow-y-auto border-t border-nilink-sidebar-muted px-2 py-4 scrollbar-hide group-hover:px-3">
+          <nav className="mt-6 min-h-0 flex-1 overflow-x-hidden overflow-y-auto border-t border-nilink-sidebar-muted px-3 py-4 scrollbar-hide">
             <ul className="mt-4 space-y-1.5">
               {navigation.map((item) => {
                 const isActive =
@@ -173,12 +183,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                       className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
                     >
                       <motion.div
-                        className={`group/link flex items-center text-sm font-medium tracking-wide transition-[width,height,min-height,padding,margin,border-radius] duration-200 ease-out justify-center group-hover:justify-start ${
+                        className={`group/link flex min-h-[44px] w-full items-center justify-start gap-2 rounded-xl px-2 py-2 text-sm font-medium tracking-wide transition-colors duration-200 ${
                           isActive
-                            ? 'mx-auto box-border size-12 shrink-0 rounded-[10px] bg-stone-100 p-1 text-zinc-700 shadow-sm group-hover:mx-0 group-hover:h-auto group-hover:min-h-11 group-hover:w-full group-hover:rounded-xl group-hover:p-2'
-                            : 'min-h-[44px] rounded-xl px-2 py-2 text-gray-400 hover:bg-white/[0.05] hover:text-white group-hover:px-3'
+                            ? 'bg-stone-100 text-zinc-700 shadow-sm'
+                            : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'
                         }`}
-                        whileHover={{ x: 2 }}
                         whileTap={{ scale: 0.99 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                       >
@@ -188,7 +197,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                             strokeWidth={isActive ? 2.25 : 2}
                           />
                         </span>
-                        <div className="relative flex min-w-0 max-w-0 items-center justify-between overflow-hidden opacity-0 transition-all duration-300 group-hover:ml-3 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:flex-1 group-hover:opacity-100 whitespace-nowrap">
+                        <div className="relative flex min-w-0 max-w-0 flex-1 items-center justify-between overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:opacity-100 whitespace-nowrap">
                           <span
                             className={
                               isActive
@@ -212,24 +221,63 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </ul>
           </nav>
 
-          <div className="mt-auto shrink-0 bg-nilink-sidebar p-3 group-hover:p-4">
-            <div className="border-t border-nilink-sidebar-muted pt-4">
+          <div className="mt-auto shrink-0 bg-nilink-sidebar px-3 pb-3 pt-3">
+            <ul className="space-y-1.5">
+              <li>
+                <Link
+                  href={inboxNavItem.href}
+                  className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
+                >
+                  <motion.div
+                    className={`group/link flex min-h-[44px] w-full items-center justify-start gap-2 rounded-xl px-2 py-2 text-sm font-medium tracking-wide transition-colors duration-200 ${
+                      inboxActive
+                        ? 'bg-stone-100 text-zinc-700 shadow-sm'
+                        : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'
+                    }`}
+                    whileTap={{ scale: 0.99 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                      <InboxIcon
+                        className={`h-5 w-5 ${inboxActive ? 'text-zinc-700' : 'text-current'}`}
+                        strokeWidth={inboxActive ? 2.25 : 2}
+                      />
+                    </span>
+                    <div className="relative flex min-w-0 max-w-0 flex-1 items-center justify-between overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:opacity-100 whitespace-nowrap">
+                      <span
+                        className={
+                          inboxActive
+                            ? 'font-medium text-zinc-700'
+                            : 'text-gray-400 group-hover/link:text-white'
+                        }
+                      >
+                        {inboxNavItem.label}
+                      </span>
+                    </div>
+                  </motion.div>
+                </Link>
+              </li>
+            </ul>
+
+            <div className="mt-3 border-t border-nilink-sidebar-muted pt-3">
               <div className="relative">
                 <motion.button
                   type="button"
                   aria-expanded={isProfileMenuOpen}
                   aria-haspopup="menu"
                   onClick={() => setIsProfileMenuOpen((open) => !open)}
-                  className="flex w-full min-h-[44px] items-center justify-center gap-0 rounded-xl border border-white/10 bg-white/[0.06] px-2 py-2 text-left outline-none transition-colors hover:bg-white/[0.1] focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar group-hover:justify-start group-hover:gap-3 group-hover:px-3"
+                  className="flex w-full min-h-[44px] items-center justify-start gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-2 py-2 text-left outline-none transition-colors hover:bg-white/[0.1] focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
                   whileTap={{ scale: 0.99 }}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 >
-                  <img
-                    src={userDisplay.avatar}
-                    alt=""
-                    className="pointer-events-none h-9 w-9 shrink-0 rounded-full border border-white/10 bg-gray-800 object-cover shadow-sm"
-                  />
-                  <div className="pointer-events-none max-w-0 min-w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:flex-1 group-hover:opacity-100 whitespace-nowrap">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                    <img
+                      src={userDisplay.avatar}
+                      alt=""
+                      className="pointer-events-none h-9 w-9 rounded-full border border-white/10 bg-gray-800 object-cover shadow-sm"
+                    />
+                  </span>
+                  <div className="pointer-events-none min-w-0 max-w-0 flex-1 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:opacity-100 whitespace-nowrap">
                     <p className="truncate text-sm font-semibold text-white">{userDisplay.name}</p>
                     <p className="truncate text-xs text-gray-400">{userDisplay.email}</p>
                   </div>

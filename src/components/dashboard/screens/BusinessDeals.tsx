@@ -72,7 +72,6 @@ const StatusBadge = ({ status }: { status: Invoice['status'] }) => {
 export function BusinessDeals() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSport, setActiveSport] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('Invoice');
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
   const filteredInvoices = mockInvoices.filter(i => {
@@ -131,23 +130,6 @@ export function BusinessDeals() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-3 pt-5">
           <DashboardPageHeader title="Deals" subtitle="Invoices, quotes, and athlete payments" />
-        </div>
-
-        {/* Tab Sub-navigation */}
-        <div className="dash-main-gutter-x flex shrink-0 items-center gap-6 border-b border-gray-100">
-          {['Overview', 'Quotation', 'Invoice'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`text-sm font-medium py-3 border-b-2 transition-colors ${
-                activeTab === tab 
-                  ? 'border-gray-900 text-gray-900' 
-                  : 'border-transparent text-gray-400 hover:text-gray-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
         </div>
 
         {/* Actions Bar */}

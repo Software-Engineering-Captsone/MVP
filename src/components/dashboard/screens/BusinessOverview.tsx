@@ -1,10 +1,12 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   TrendingUp, Target,
   Activity, ChevronRight,
-  DollarSign, BarChart3, ArrowUpRight, Instagram, Facebook, Heart
+  DollarSign, BarChart3, ArrowUpRight, Instagram, Facebook, Heart, Megaphone,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
@@ -13,6 +15,8 @@ import { mockAthletes } from '@/lib/mockData';
 import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
+import { authFetch } from '@/lib/authFetch';
+import { formatCampaignRelativePosted, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
 
 const TiktokIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -48,6 +52,39 @@ export function BusinessOverview() {
   const router = useRouter();
   const { toggleAthlete, isAthleteSaved } = useSavedMarketplace();
   const totalDeals = pipelineBarSegments.reduce((s, x) => s + x.count, 0);
+
+  const [campaignRows, setCampaignRows] = useState<ApiCampaignRow[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
+
+  const loadCampaigns = useCallback(async () => {
+    setCampaignsLoading(true);
+    try {
+      const res = await authFetch('/api/campaigns');
+      const data = (await res.json()) as { campaigns?: ApiCampaignRow[] };
+      if (!res.ok) {
+        setCampaignRows([]);
+        return;
+      }
+      const rows = (data.campaigns ?? []).map((c) => ({
+        ...c,
+        createdAt:
+          typeof c.createdAt === 'string'
+            ? c.createdAt
+            : c.createdAt != null
+              ? String(c.createdAt)
+              : undefined,
+      }));
+      setCampaignRows(rows.slice(0, 3));
+    } catch {
+      setCampaignRows([]);
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCampaigns();
+  }, [loadCampaigns]);
 
   return (
     <div className="h-full flex flex-col bg-nilink-surface overflow-auto text-nilink-ink">
@@ -150,6 +187,69 @@ export function BusinessOverview() {
             </div>
             <p className="text-[10px] text-gray-500 font-medium mt-2">{totalDeals} total deals tracked</p>
           </motion.div>
+        </div>
+
+        {/* ── Your campaigns (brand-owned) ─────────────────────────────── */}
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-nilink-accent" strokeWidth={2.25} />
+              <h2 className="text-xl font-bold text-nilink-ink">Your campaigns</h2>
+            </div>
+            <Link
+              href="/dashboard/campaigns"
+              className="text-sm font-semibold text-nilink-accent hover:text-nilink-accent-hover hover:underline"
+            >
+              Manage all
+            </Link>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            {campaignsLoading && (
+              <p className="py-6 text-center text-sm text-gray-400">Loading your campaigns…</p>
+            )}
+            {!campaignsLoading && campaignRows.length === 0 && (
+              <div className="py-6 text-center">
+                <p className="text-sm text-gray-500 mb-3">No campaigns yet. Create one to start collecting applications.</p>
+                <Link
+                  href="/dashboard/campaigns"
+                  className="inline-flex rounded-lg bg-nilink-accent px-4 py-2 text-sm font-semibold text-white hover:bg-nilink-accent-hover"
+                >
+                  Open Campaigns
+                </Link>
+              </div>
+            )}
+            {!campaignsLoading &&
+              campaignRows.length > 0 &&
+              campaignRows.map((c, i) => {
+                const posted = formatCampaignRelativePosted(c.createdAt ?? null);
+                const last = i === campaignRows.length - 1;
+                return (
+                  <div
+                    key={c.id}
+                    className={`flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between ${!last ? 'border-b border-gray-100' : ''}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 truncate">{c.name}</p>
+                      <p className="text-xs text-gray-500">
+                        <span className="font-semibold text-nilink-accent">{c.status}</span>
+                        {posted ? (
+                          <>
+                            {' '}
+                            · Posted {posted}
+                          </>
+                        ) : null}
+                      </p>
+                    </div>
+                    <Link
+                      href="/dashboard/campaigns"
+                      className="shrink-0 text-sm font-semibold text-nilink-accent hover:underline"
+                    >
+                      View →
+                    </Link>
+                  </div>
+                );
+              })}
+          </div>
         </div>
 
         {/* ── Recommended Athletes ──────────────────────────────────────── */}

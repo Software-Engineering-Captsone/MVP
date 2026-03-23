@@ -4,9 +4,6 @@
  */
 export const SEED_BRAND_USER_ID = 'seed-brand-nilink-demo';
 
-const U = (photoId: string) =>
-  `https://images.unsplash.com/${photoId}?w=800&q=85&auto=format&fit=crop`;
-
 /** Stable ids so we never duplicate seeds across restarts. */
 export const SEED_CAMPAIGN_IDS = [
   '64f0a1b2c3d4e5f6a7b8c9d1',
@@ -50,7 +47,7 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 0,
       packageDetails: ['2 Reels', '1 Story series', 'Usage rights 12 months'],
       platforms: ['Instagram', 'TikTok'],
-      image: U('photo-1584308666744-24d5c474f2ae'),
+      image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(2),
       updatedAt: daysAgoIso(2),
@@ -78,7 +75,7 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 5000,
       packageDetails: ['1 shoot day', '2 hero edits', 'B-roll for social'],
       platforms: ['Instagram', 'YouTube'],
-      image: U('photo-1492144534655-ae79c964c9d7'),
+      image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(5),
       updatedAt: daysAgoIso(5),
@@ -106,7 +103,7 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 2000,
       packageDetails: ['8 posts/mo', 'Campus tabling kit', 'Performance stipend'],
       platforms: ['Instagram', 'TikTok'],
-      image: U('photo-1576678927484-cc907957088c'),
+      image: '',
       status: 'Reviewing Candidates',
       createdAt: daysAgoIso(7),
       updatedAt: daysAgoIso(1),
@@ -134,7 +131,7 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 3000,
       packageDetails: ['3 Carousels', '2 Reels', 'Affiliate code'],
       platforms: ['Instagram'],
-      image: U('photo-1441986300917-64674bd600d8'),
+      image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(3),
       updatedAt: daysAgoIso(3),
@@ -162,7 +159,7 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 0,
       packageDetails: ['5 Stories', '1 Reel', 'Product shipment'],
       platforms: ['Instagram', 'TikTok'],
-      image: U('photo-1571019613454-1cb2f99b2d8b'),
+      image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(1),
       updatedAt: daysAgoIso(1),

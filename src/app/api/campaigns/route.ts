@@ -3,9 +3,6 @@ import { getAuthUserFromRequest } from '@/lib/campaigns/getAuthUser';
 import { createCampaign, listCampaignsForBrand, listOpenCampaignsForAthlete } from '@/lib/campaigns/repository';
 import { campaignToJSON } from '@/lib/campaigns/serialization';
 
-const DEFAULT_IMAGE =
-  'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80';
-
 export async function GET(request: NextRequest) {
   const user = getAuthUserFromRequest(request);
   if (!user) {
@@ -65,7 +62,7 @@ export async function POST(request: NextRequest) {
     followerMin: typeof body.followerMin === 'number' ? body.followerMin : Number(body.followerMin) || 0,
     packageDetails: Array.isArray(body.packageDetails) ? body.packageDetails : [],
     platforms: Array.isArray(body.platforms) ? body.platforms : [],
-    image: typeof body.image === 'string' && body.image ? body.image : DEFAULT_IMAGE,
+    image: typeof body.image === 'string' && body.image.trim() ? body.image.trim() : '',
     status,
   };
 

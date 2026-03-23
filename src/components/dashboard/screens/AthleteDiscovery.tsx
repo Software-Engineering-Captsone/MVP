@@ -287,9 +287,9 @@ export function AthleteDiscovery() {
                     <button
                       type="button"
                       onClick={() => setExpandedCategory(cat.id)}
-                      className="rounded-lg bg-nilink-accent px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-nilink-accent-hover"
+                      className="rounded-md bg-nilink-ink px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-800"
                     >
-                      See All
+                      See all
                     </button>
                   </div>
                   
