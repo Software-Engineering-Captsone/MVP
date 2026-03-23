@@ -2,6 +2,22 @@
 export const u = (photoId: string, width: string = '800') =>
   `https://images.unsplash.com/${photoId}?w=${width}&q=85&auto=format&fit=crop`;
 
+/**
+ * Landing hero background collage — mix of athlete-style deliverables (training, game day, content)
+ * and brand/product imagery so visitors see what creators post and what partners receive.
+ */
+export const heroLandingCollageUrls: readonly string[] = [
+  u('photo-1571019613454-1cb2f99b2d8b', '640'),
+  u('photo-1546519638-68e109498ffc', '640'),
+  u('photo-1595435934249-5df7ed86e1c0', '640'),
+  u('photo-1566577739112-5180d4bf9390', '640'),
+  u('photo-1552674605-db6ffd4facb5', '640'),
+  u('photo-1583454110551-21f2fa2afe61', '640'),
+  u('photo-1517836357463-d25dfeac3438', '640'),
+  u('photo-1441986300917-64674bd600d8', '640'),
+  u('photo-1544367567-0f2fcb009e0b', '640'),
+];
+
 export interface PlatformMetrics {
   handle: string;
   followers: string;
