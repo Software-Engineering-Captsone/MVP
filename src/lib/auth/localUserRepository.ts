@@ -88,19 +88,11 @@ export async function createLocalUser(input: CreateLocalUserInput): Promise<Stor
   return row;
 }
 
-type UserPatch = Partial<
-  Pick<
-    StoredUser,
-    | 'password'
-    | 'googleId'
-    | 'verified'
-    | 'verificationToken'
-    | 'verificationExpires'
-    | 'resetPasswordToken'
-    | 'resetPasswordExpires'
-    | 'name'
-  >
-> & {
+export type UserPatch = {
+  password?: string | null;
+  googleId?: string;
+  verified?: boolean;
+  name?: string;
   /** Pass `null` to remove optional token fields from the stored record. */
   verificationToken?: string | null;
   verificationExpires?: string | null;

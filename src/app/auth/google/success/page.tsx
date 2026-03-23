@@ -11,12 +11,7 @@ function GoogleSuccessContent() {
   useEffect(() => {
     if (token) {
       localStorage.setItem('token', token);
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        router.replace('/dashboard');
-      } catch {
-        router.replace('/auth?error=google_failed');
-      }
+      router.replace('/dashboard');
     } else {
       router.replace('/auth?error=google_failed');
     }
