@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import type { AthleteProfile } from './athleteProfile';
 
 /**
  * Server-only JSON persistence for users (no MongoDB).
@@ -20,6 +21,8 @@ export interface StoredUser {
   resetPasswordToken?: string;
   resetPasswordExpires?: string;
   createdAt: string;
+  /** Populated for `role === 'athlete'` via profile editor / API */
+  athleteProfile?: Partial<AthleteProfile>;
 }
 
 export interface LocalUsersSnapshot {

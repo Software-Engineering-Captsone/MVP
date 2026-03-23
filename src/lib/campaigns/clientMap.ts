@@ -12,6 +12,7 @@ const DEFAULT_CAMPAIGN_IMAGE =
 
 export type ApiCampaignRow = {
   id: string;
+  brandDisplayName?: string;
   name: string;
   subtitle?: string;
   packageName?: string;
@@ -29,6 +30,7 @@ export type ApiCampaignRow = {
   platforms?: string[];
   image?: string;
   status?: string;
+  createdAt?: string;
 };
 
 export type ApiApplicationRow = {
@@ -71,6 +73,24 @@ function formatApplied(iso?: string): string {
   } catch {
     return '—';
   }
+}
+
+/** Relative label for dashboard list rows (e.g. "3 days ago"). */
+export function formatCampaignRelativePosted(iso?: string | null): string {
+  if (!iso) return 'Recently';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'Recently';
+  const diff = Date.now() - then;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function mapApplicationsToCandidates(apps: ApiApplicationRow[]): Candidate[] {

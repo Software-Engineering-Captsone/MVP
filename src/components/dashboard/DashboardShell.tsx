@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, createContext, useContext, useEffect } from 'react';
+import { useState, createContext, useContext, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,11 +26,14 @@ export type DashboardUser = {
 interface DashboardContextValue {
   accountType: AccountType;
   user: DashboardUser | null;
+  /** Re-fetch `/api/auth/me` (e.g. after profile save). */
+  refreshUser: () => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextValue>({
   accountType: 'athlete',
   user: null,
+  refreshUser: async () => {},
 });
 
 export function useDashboard() {
@@ -51,12 +54,12 @@ const athleteNavigation: NavItem[] = [
 
 const businessNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
-  { href: '/dashboard/search', icon: Search, label: 'Explore' },
   { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
-  { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
+  { href: '/dashboard/search', icon: Search, label: 'Explore' },
   { href: '/dashboard/deals', icon: CreditCard, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
   { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
+  { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
 ];
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -65,6 +68,25 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
   const [booting, setBooting] = useState(true);
+
+  const mapMeUser = useCallback((raw: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+  }): DashboardUser => ({
+    id: raw.id,
+    email: raw.email,
+    name: raw.name,
+    role: raw.role === 'brand' ? 'brand' : 'athlete',
+  }), []);
+
+  const refreshUser = useCallback(async () => {
+    const res = await authFetch('/api/auth/me');
+    if (!res.ok) return;
+    const data = (await res.json()) as { user: DashboardUser };
+    if (data.user) setSessionUser(mapMeUser(data.user));
+  }, [mapMeUser]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -75,23 +97,25 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
 
     let cancelled = false;
-    void authFetch('/api/auth/me').then(async (res) => {
-      if (cancelled) return;
-      if (!res.ok) {
-        localStorage.removeItem('token');
-        router.replace('/auth');
-        return;
-      }
-      const data = (await res.json()) as { user: DashboardUser };
-      if (!cancelled) setSessionUser(data.user);
-    }).finally(() => {
-      if (!cancelled) setBooting(false);
-    });
+    void authFetch('/api/auth/me')
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          localStorage.removeItem('token');
+          router.replace('/auth');
+          return;
+        }
+        const data = (await res.json()) as { user: DashboardUser };
+        if (!cancelled) setSessionUser(mapMeUser(data.user));
+      })
+      .finally(() => {
+        if (!cancelled) setBooting(false);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, mapMeUser]);
 
   if (booting) {
     return (
@@ -115,7 +139,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   };
 
   return (
-    <DashboardContext.Provider value={{ accountType, user: sessionUser }}>
+    <DashboardContext.Provider value={{ accountType, user: sessionUser, refreshUser }}>
       <div className="flex h-screen bg-nilink-page text-nilink-ink">
         <aside className="group relative z-50 flex h-screen w-20 shrink-0 flex-col overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]">
           <div className="flex h-[72px] shrink-0 items-center justify-center px-2 pb-4 pt-6 group-hover:justify-start group-hover:px-5">
@@ -128,7 +152,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 whileTap={{ scale: 0.98 }}
                 className="shrink-0"
               >
-                <NilinkLogoMark surface="dark" />
+                <NilinkLogoMark surface="inverse" />
               </motion.div>
               <NilinkLogoText surface="dark" collapsible />
             </Link>

@@ -1,12 +1,18 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { CheckCircle2, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getBrandImageByName } from '@/lib/mockData';
 import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
+import { authFetch } from '@/lib/authFetch';
+import { formatCampaignRelativePosted, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
 
 export function AthleteDashboard() {
+  const { user } = useDashboard();
   const activeDeals = [
     {
       id: 1,
@@ -34,35 +40,47 @@ export function AthleteDashboard() {
     },
   ];
 
-  const opportunities = [
-    {
-      id: 1,
-      company: 'FitLife Nutrition',
-      type: 'Product Review',
-      compensation: '$800 - $1,200',
-      posted: '2 days ago',
-    },
-    {
-      id: 2,
-      company: 'Local Auto Dealership',
-      type: 'Commercial Shoot',
-      compensation: '$2,000 - $3,500',
-      posted: '5 days ago',
-    },
-    {
-      id: 3,
-      company: 'Study App Co',
-      type: 'Brand Ambassador',
-      compensation: '$1,500/month',
-      posted: '1 week ago',
-    },
-  ];
+  const [opportunityRows, setOpportunityRows] = useState<ApiCampaignRow[]>([]);
+  const [opportunitiesLoading, setOpportunitiesLoading] = useState(true);
+
+  const loadOpportunities = useCallback(async () => {
+    setOpportunitiesLoading(true);
+    try {
+      const res = await authFetch('/api/campaigns');
+      const data = (await res.json()) as { campaigns?: ApiCampaignRow[] };
+      if (!res.ok) {
+        setOpportunityRows([]);
+        return;
+      }
+      const rows = (data.campaigns ?? []).map((c) => ({
+        ...c,
+        createdAt:
+          typeof c.createdAt === 'string'
+            ? c.createdAt
+            : c.createdAt != null
+              ? String(c.createdAt)
+              : undefined,
+      }));
+      setOpportunityRows(rows.slice(0, 3));
+    } catch {
+      setOpportunityRows([]);
+    } finally {
+      setOpportunitiesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadOpportunities();
+  }, [loadOpportunities]);
+
+  const firstName = user?.name?.trim().split(/\s+/)[0] ?? 'there';
+  const welcomeSubtitle = `Welcome back, ${firstName}. Here is your NIL activity.`;
 
   return (
     <div className="dash-main-gutter-x min-h-full bg-nilink-page pb-8 pt-5 font-sans text-nilink-ink md:pb-10 md:pt-6">
       <DashboardPageHeader
         title="Dashboard"
-        subtitle="Welcome back, Marcus. Here is your NIL activity."
+        subtitle={welcomeSubtitle}
         className="mb-8"
         animate
       />
@@ -200,46 +218,73 @@ export function AthleteDashboard() {
             >
               OPPORTUNITIES
             </h2>
-            <span className="text-sm font-bold text-nilink-accent transition-colors hover:text-nilink-ink">
+            <Link
+              href="/dashboard/campaigns"
+              className="text-sm font-bold text-nilink-accent transition-colors hover:text-nilink-ink"
+            >
               EXPLORE
-            </span>
+            </Link>
           </div>
           <div className="flex flex-col">
-            {opportunities.map((opp, i) => (
-              <motion.div
-                key={opp.id}
-                layout
-                initial={{ opacity: 0, x: 6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.25 }}
-                className={`py-5 flex items-center justify-between group ${i !== opportunities.length - 1 ? 'border-b border-gray-100' : ''}`}
-              >
-                <div className="flex-1 pr-6 flex items-start gap-4">
-                  <div className="w-11 h-11 rounded-lg bg-white border border-gray-100 shrink-0 flex items-center justify-center overflow-hidden mt-0.5">
-                    <img src={getBrandImageByName(opp.company)} alt="" className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-gray-900">{opp.company}</h3>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-sm text-gray-500 font-medium">{opp.type}</span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">{opp.posted}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span className="text-sm font-bold text-nilink-accent bg-nilink-accent-soft px-3 py-1 rounded-full">
-                    {opp.compensation}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-xs font-bold text-gray-400 hover:text-nilink-ink uppercase tracking-widest transition-colors"
+            {opportunitiesLoading && (
+              <p className="py-8 text-sm text-gray-400">Loading open campaigns…</p>
+            )}
+            {!opportunitiesLoading && opportunityRows.length === 0 && (
+              <p className="py-8 text-sm text-gray-500">
+                No open campaigns right now.{' '}
+                <Link href="/dashboard/campaigns" className="font-semibold text-nilink-accent hover:underline">
+                  Browse campaigns
+                </Link>
+              </p>
+            )}
+            {!opportunitiesLoading &&
+              opportunityRows.map((opp, i) => {
+                const brand = opp.brandDisplayName?.trim() || opp.name;
+                const typeLine = opp.goal?.trim() || opp.subtitle?.trim() || opp.packageName?.trim() || 'Campaign';
+                const compensation = opp.budget?.trim() || 'See brief';
+                const posted = formatCampaignRelativePosted(opp.createdAt ?? null);
+                const last = i === opportunityRows.length - 1;
+                return (
+                  <motion.div
+                    key={opp.id}
+                    layout
+                    initial={{ opacity: 0, x: 6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.25 }}
+                    className={`py-5 flex items-center justify-between group ${!last ? 'border-b border-gray-100' : ''}`}
                   >
-                    Apply Now →
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+                    <div className="flex flex-1 items-start gap-4 pr-6">
+                      <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-100 bg-white">
+                        <img
+                          src={opp.image && opp.image.length > 0 ? opp.image : getBrandImageByName(brand)}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-bold text-gray-900">{brand}</h3>
+                        <p className="mt-0.5 line-clamp-1 text-sm font-medium text-gray-600">{opp.name}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-3">
+                          <span className="text-sm font-medium text-gray-500">{typeLine}</span>
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-gray-300" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{posted}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span className="rounded-full bg-nilink-accent-soft px-3 py-1 text-sm font-bold text-nilink-accent">
+                        {compensation}
+                      </span>
+                      <Link
+                        href="/dashboard/campaigns"
+                        className="text-xs font-bold uppercase tracking-widest text-gray-400 transition-colors hover:text-nilink-ink"
+                      >
+                        Apply on Campaigns →
+                      </Link>
+                    </div>
+                  </motion.div>
+                );
+              })}
           </div>
         </div>
       </div>

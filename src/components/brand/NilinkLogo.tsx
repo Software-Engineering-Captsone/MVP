@@ -1,21 +1,23 @@
 import Link from 'next/link';
 
-/** Gradient “N” mark — matches landing `.nav-logo-mark` (dark surfaces). */
+/** “N” mark — gradient on marketing surfaces; `inverse` = white tile + dark letter (e.g. dashboard sidebar). */
 export function NilinkLogoMark({
   surface = 'dark',
   className = '',
 }: {
-  surface?: 'dark' | 'light';
+  surface?: 'dark' | 'light' | 'inverse';
   className?: string;
 }) {
   const base =
-    'inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] text-sm font-bold tracking-[-0.04em] [box-shadow:inset_0_1px_0_rgba(255,255,255,0.15)]';
+    'inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] text-sm font-bold tracking-[-0.04em]';
   const dark =
-    'border border-white/15 text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)]';
+    'border border-white/15 text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)] [box-shadow:inset_0_1px_0_rgba(255,255,255,0.15)]';
   const light =
-    'border border-transparent text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)]';
+    'border border-transparent text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)] [box-shadow:inset_0_1px_0_rgba(255,255,255,0.15)]';
+  const inverse = 'border border-white/25 bg-white text-nilink-ink shadow-sm';
+  const variant = surface === 'light' ? light : surface === 'inverse' ? inverse : dark;
   return (
-    <span className={`${base} ${surface === 'light' ? light : dark} ${className}`} aria-hidden>
+    <span className={`${base} ${variant} ${className}`} aria-hidden>
       N
     </span>
   );

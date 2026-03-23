@@ -151,33 +151,28 @@ export function BusinessDeals() {
         </div>
 
         {/* Actions Bar */}
-        <div className="dash-main-gutter-x flex shrink-0 items-center justify-between py-5">
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-sm bg-white hover:bg-gray-50">
-              Last 7 days <span className="text-[10px] ml-1">▼</span>
-            </button>
-            <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-sm bg-white hover:bg-gray-50">
-              Mar 15 - Mar 22 <span className="text-[10px] ml-1">▼</span>
-            </button>
-            
-            <div className="flex items-center ml-2 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 p-0.5">
-              {['All', 'Draft', 'Unpaid', 'Paid'].map(status => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                    statusFilter === status ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {status} <span className="text-gray-400 font-normal ml-1">125</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          <button type="button" className="px-4 py-2 bg-nilink-accent text-white rounded-lg text-sm font-semibold hover:bg-nilink-accent-hover transition-colors">
-            Add Invoice
+        <div className="dash-main-gutter-x flex shrink-0 flex-wrap items-center gap-4 py-5">
+          <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
+            Last 7 days <span className="ml-1 text-[10px]">▼</span>
           </button>
+          <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
+            Mar 15 - Mar 22 <span className="ml-1 text-[10px]">▼</span>
+          </button>
+
+          <div className="ml-2 flex items-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+            {['All', 'Draft', 'Unpaid', 'Paid'].map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                  statusFilter === status ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {status} <span className="ml-1 font-normal text-gray-400">125</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Table View */}

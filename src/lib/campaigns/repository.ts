@@ -5,6 +5,7 @@ import {
   type StoredApplication,
   type StoredCampaign,
 } from './localCampaignStore';
+import { buildSeedCampaignTemplates, SEED_CAMPAIGN_IDS } from './seedCampaigns';
 import { validateApplicationInput, validateCampaignInput } from './validateWithMongoose';
 
 const OPEN_STATUSES = ['Open for Applications', 'Reviewing Candidates'] as const;
@@ -14,19 +15,48 @@ function idStr(doc: { _id?: unknown }): string {
   return String(doc._id);
 }
 
+/** Merge demo campaigns once per process when any seed id is missing (cheap read first). */
+async function ensureSeedCampaignsPresent(): Promise<void> {
+  const snap = await readLocalCampaignStore();
+  const idSet = new Set(snap.campaigns.map((c) => idStr(c)));
+  if (SEED_CAMPAIGN_IDS.every((id) => idSet.has(id))) return;
+
+  await mutateLocalCampaignStore((draft) => {
+    const ids = new Set(draft.campaigns.map((c) => idStr(c)));
+    for (const template of buildSeedCampaignTemplates()) {
+      const id = String(template._id ?? '');
+      if (!id || ids.has(id)) continue;
+      try {
+        const raw = validateCampaignInput(template as Record<string, unknown>);
+        const row = { ...raw, _id: idStr(raw) || id } as StoredCampaign;
+        draft.campaigns.push(row);
+        ids.add(row._id);
+      } catch (e) {
+        console.error('[campaigns] Seed campaign skipped:', id, e);
+      }
+    }
+  });
+}
+
 export async function listCampaignsForBrand(brandUserId: string): Promise<StoredCampaign[]> {
   const { campaigns } = await readLocalCampaignStore();
   return campaigns.filter((c) => c.brandUserId === brandUserId);
 }
 
 export async function listOpenCampaignsForAthlete(): Promise<StoredCampaign[]> {
+  await ensureSeedCampaignsPresent();
   const { campaigns } = await readLocalCampaignStore();
-  return campaigns.filter(
+  const open = campaigns.filter(
     (c) =>
       c.visibility === 'Public' &&
       c.acceptApplications === true &&
       OPEN_STATUSES.includes(c.status as (typeof OPEN_STATUSES)[number])
   );
+  return open.sort((a, b) => {
+    const ta = new Date(String(a.createdAt ?? 0)).getTime();
+    const tb = new Date(String(b.createdAt ?? 0)).getTime();
+    return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
+  });
 }
 
 export async function getCampaignById(campaignId: string): Promise<StoredCampaign | null> {

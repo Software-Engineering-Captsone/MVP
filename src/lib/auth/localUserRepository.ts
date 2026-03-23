@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { mergeAthleteProfile, type AthleteProfile } from './athleteProfile';
 import {
   mutateLocalUsersStore,
   readLocalUsersStore,
@@ -93,6 +94,8 @@ export type UserPatch = {
   googleId?: string;
   verified?: boolean;
   name?: string;
+  /** Merged into existing athlete profile (athlete accounts only). */
+  athleteProfile?: Partial<AthleteProfile>;
   /** Pass `null` to remove optional token fields from the stored record. */
   verificationToken?: string | null;
   verificationExpires?: string | null;
@@ -133,7 +136,11 @@ export async function updateLocalUser(id: string, patch: UserPatch): Promise<Sto
       const v = patch.resetPasswordExpires;
       next.resetPasswordExpires = typeof v === 'string' ? v : new Date(v).toISOString();
     }
-    if (patch.name !== undefined) next.name = patch.name;
+    if (patch.name !== undefined) next.name = patch.name.trim() || next.name;
+    if (patch.athleteProfile !== undefined) {
+      const merged = mergeAthleteProfile(next.athleteProfile);
+      next.athleteProfile = { ...merged, ...patch.athleteProfile };
+    }
     draft.users[idx] = next;
     updated = next;
   });
