@@ -4,13 +4,15 @@ import { useRouter } from 'next/navigation';
 import {
   TrendingUp, Target,
   Activity, ChevronRight,
-  DollarSign, BarChart3, ArrowUpRight, Instagram, Facebook
+  DollarSign, BarChart3, ArrowUpRight, Instagram, Facebook, Heart
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { mockAthletes } from '@/lib/mockData';
 import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
 
 const TiktokIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -44,26 +46,22 @@ const pipelineBarSegments = [
 
 export function BusinessOverview() {
   const router = useRouter();
+  const { toggleAthlete, isAthleteSaved } = useSavedMarketplace();
   const totalDeals = pipelineBarSegments.reduce((s, x) => s + x.count, 0);
 
   return (
     <div className="h-full flex flex-col bg-nilink-surface overflow-auto text-nilink-ink">
       {/* ── Title Area ── */}
-      <div className="px-6 py-6 shrink-0 border-b border-gray-100 mb-6">
-        <motion.h1
-          className="text-4xl font-black tracking-wide uppercase text-nilink-ink"
-          style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-        >
-          Dashboard
-        </motion.h1>
-        <p className="text-sm text-gray-500 mt-1 font-medium">Overview of your NIL programs and partnerships</p>
+      <div className="dash-main-gutter-x mb-6 shrink-0 border-b border-gray-100 py-5">
+        <DashboardPageHeader
+          title="Dashboard"
+          subtitle="Overview of your NIL programs and partnerships"
+          animate
+        />
       </div>
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 pb-8 relative z-20 space-y-8">
+      <div className="relative z-20 w-full flex-1 space-y-8 pb-8 dash-main-gutter-x">
 
         {/* ── KPI Strip ────────────────────────────────────────────────── */}
         <motion.div
@@ -194,9 +192,24 @@ export function BusinessOverview() {
                     alt={athlete.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleAthlete(athlete.id);
+                    }}
+                    title={isAthleteSaved(athlete.id) ? 'Remove from saved' : 'Save athlete'}
+                    className={`absolute right-3 top-12 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow-md transition-colors ${
+                      isAthleteSaved(athlete.id)
+                        ? 'bg-nilink-accent text-white'
+                        : 'bg-white/95 text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    <Heart className={`h-4 w-4 ${isAthleteSaved(athlete.id) ? 'fill-current' : ''}`} />
+                  </button>
                   <div className="absolute top-3 right-3 bg-nilink-accent-soft px-2.5 py-1 rounded-full text-[10px] font-black text-nilink-accent uppercase tracking-wider shadow-md border border-nilink-accent-border flex items-center gap-1">
                     <Target className="w-2.5 h-2.5" />
-                    {98 - parseInt(athlete.id)}% Match
+                    {98 - parseInt(athlete.id, 10)}% Match
                   </div>
                 </div>
                 <div className="flex items-center gap-1 mb-1">

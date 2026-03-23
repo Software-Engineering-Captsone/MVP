@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Building2, MapPin, Globe, Users, Star, Edit3, Save, Megaphone, Award, MessageSquare } from 'lucide-react';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 export function BusinessProfile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -33,18 +34,28 @@ export function BusinessProfile() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-8">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-5xl tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
-              BUSINESS PROFILE
-            </h1>
+      <div className="border-b border-gray-200 bg-white py-8 dash-main-gutter-x">
+        <div>
+          <div className="mb-6 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            <DashboardPageHeader
+              title="Business profile"
+              subtitle="How partners see your brand on NILINK"
+              className="min-w-0 flex-1"
+            />
             <button
+              type="button"
               onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg font-bold hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: '#6CC3DA', color: '#ffffff' }}
+              className="flex shrink-0 items-center gap-2 rounded-lg bg-nilink-ink px-6 py-3 font-bold text-white transition-colors hover:bg-gray-800"
             >
-              {isEditing ? <><Save className="w-5 h-5" /> SAVE CHANGES</> : <><Edit3 className="w-5 h-5" /> EDIT PROFILE</>}
+              {isEditing ? (
+                <>
+                  <Save className="h-5 w-5" /> SAVE CHANGES
+                </>
+              ) : (
+                <>
+                  <Edit3 className="h-5 w-5" /> EDIT PROFILE
+                </>
+              )}
             </button>
           </div>
 
@@ -89,7 +100,7 @@ export function BusinessProfile() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto p-8 space-y-8">
+      <div className="space-y-8 py-8 dash-main-gutter-x">
         {/* About */}
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <h3 className="text-2xl mb-4 tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ABOUT</h3>

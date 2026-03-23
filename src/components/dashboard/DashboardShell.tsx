@@ -33,7 +33,7 @@ type NavItem = { href: string; icon: LucideIcon; label: string; badge?: string }
 // Define navigation structure
 const athleteNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
-  { href: '/dashboard/search', icon: Search, label: 'Search' },
+  { href: '/dashboard/search', icon: Search, label: 'Explore' },
   { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
   { href: '/dashboard/deals', icon: FileText, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
@@ -42,7 +42,7 @@ const athleteNavigation: NavItem[] = [
 
 const businessNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
-  { href: '/dashboard/search', icon: Search, label: 'Search' },
+  { href: '/dashboard/search', icon: Search, label: 'Explore' },
   { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
   { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
   { href: '/dashboard/deals', icon: CreditCard, label: 'Deals' },
@@ -169,67 +169,69 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
           {/* Bottom Area */}
           <div className="mt-auto bg-nilink-sidebar p-3 group-hover:p-4">
-            {/* Profile Block */}
             <div className="border-t border-nilink-sidebar-muted pt-4">
-              <div className="flex w-full items-center justify-center gap-0 group-hover:justify-start group-hover:gap-3">
-                <motion.img
-                  src={userDisplay.avatar}
-                  alt={userDisplay.name}
-                  className="h-9 w-9 shrink-0 rounded-full border border-white/10 bg-gray-800 object-cover shadow-sm"
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-                />
-                <div className="max-w-0 min-w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:flex-1 group-hover:opacity-100 whitespace-nowrap">
-                  <p className="truncate text-sm font-semibold text-white">
-                    {userDisplay.name}
-                  </p>
-                  <p className="truncate text-xs text-gray-400">
-                    {userDisplay.email}
-                  </p>
-                </div>
-                <div className="relative max-w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[40px] group-hover:opacity-100">
-                  <motion.button 
-                    type="button"
-                    onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                    className="shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-nilink-sidebar-muted hover:text-white"
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </motion.button>
-                  
+              <div className="relative">
+                <motion.button
+                  type="button"
+                  aria-expanded={isProfileMenuOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setIsProfileMenuOpen((open) => !open)}
+                  className="flex w-full min-h-[44px] items-center justify-center gap-0 rounded-xl border border-white/10 bg-white/[0.06] px-2 py-2 text-left outline-none transition-colors hover:bg-white/[0.1] focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar group-hover:justify-start group-hover:gap-3 group-hover:px-3"
+                  whileTap={{ scale: 0.99 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                >
+                  <img
+                    src={userDisplay.avatar}
+                    alt=""
+                    className="h-9 w-9 shrink-0 rounded-full border border-white/10 bg-gray-800 object-cover shadow-sm pointer-events-none"
+                  />
+                  <div className="max-w-0 min-w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:flex-1 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
+                    <p className="truncate text-sm font-semibold text-white">{userDisplay.name}</p>
+                    <p className="truncate text-xs text-gray-400">{userDisplay.email}</p>
+                  </div>
+                  <MoreVertical
+                    className="h-4 w-4 shrink-0 text-gray-400 max-w-0 opacity-0 transition-all duration-300 group-hover:max-w-[20px] group-hover:opacity-100 pointer-events-none"
+                    aria-hidden
+                  />
+                </motion.button>
+
+                {isProfileMenuOpen && (
+                  <div
+                    className="fixed inset-0 z-40 cursor-pointer"
+                    aria-hidden
+                    onClick={() => setIsProfileMenuOpen(false)}
+                  />
+                )}
+                <AnimatePresence>
                   {isProfileMenuOpen && (
-                    <div 
-                      className="fixed inset-0 z-40"
-                      aria-hidden
-                      onClick={() => setIsProfileMenuOpen(false)}
-                    />
-                  )}
-                  <AnimatePresence>
-                    {isProfileMenuOpen && (
-                      <motion.div
-                        key="profile-menu"
-                        className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 origin-bottom-right"
-                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 4, scale: 0.98 }}
-                        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                    <motion.div
+                      key="profile-menu"
+                      role="menu"
+                      className="absolute bottom-full right-0 z-50 mb-2 w-48 origin-bottom-right rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+                      initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                    >
+                      <Link
+                        href="/dashboard/profile"
+                        role="menuitem"
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                        onClick={() => setIsProfileMenuOpen(false)}
                       >
-                        <Link 
-                          href="/dashboard/profile"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 w-full text-left"
-                        >
-                          Profile
-                        </Link>
-                        <Link 
-                          href="/preview"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 w-full text-left border-t border-gray-100"
-                        >
-                          Switch Account
-                        </Link>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                        Edit profile
+                      </Link>
+                      <Link
+                        href="/preview"
+                        role="menuitem"
+                        className="block w-full border-t border-gray-100 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                        onClick={() => setIsProfileMenuOpen(false)}
+                      >
+                        Switch account
+                      </Link>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </div>

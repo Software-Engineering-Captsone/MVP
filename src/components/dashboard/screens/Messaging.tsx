@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Search, Send, Paperclip, Image as ImageIcon, Phone, Video, MoreVertical, CheckCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getBrandImageByName } from '@/lib/mockData';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 interface Message {
   id: number;
@@ -98,10 +99,13 @@ export function Messaging() {
     <div className="h-full flex bg-nilink-surface text-nilink-ink">
       {/* Conversations List */}
       <div className="w-96 bg-white flex flex-col border-r border-nilink-accent-border shrink-0">
-        <div className="p-6 border-b border-gray-200">
-          <h1 className="text-4xl mb-4 tracking-wide leading-snug font-bebas text-nilink-ink">
-            MESSAGES
-          </h1>
+        <div className="border-b border-gray-200 py-6 dash-main-gutter-x">
+          <DashboardPageHeader
+            variant="panel"
+            title="Inbox"
+            subtitle="Sponsor and brand conversations"
+            className="mb-4"
+          />
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -158,7 +162,7 @@ export function Messaging() {
       {/* Message Thread */}
       {activeConversation ? (
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+          <div className="flex items-center justify-between border-b border-gray-200 bg-white py-6 dash-main-gutter-x">
             <div className="flex items-center gap-4">
               <div className="relative">
                 <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden">
@@ -184,7 +188,7 @@ export function Messaging() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-6 space-y-4 bg-nilink-page">
+          <div className="flex-1 space-y-4 overflow-auto bg-nilink-page py-6 dash-main-gutter-x">
             {activeConversation.messages.map((message, mi) => (
               <motion.div
                 key={message.id}
@@ -213,7 +217,7 @@ export function Messaging() {
             ))}
           </div>
 
-          <div className="bg-white border-t border-gray-200 p-6">
+          <div className="border-t border-gray-200 bg-white py-6 dash-main-gutter-x">
             <div className="flex items-end gap-3">
               <button type="button" className="p-3 hover:bg-gray-100 rounded-lg transition-colors"><Paperclip className="w-5 h-5 text-gray-600" /></button>
               <button type="button" className="p-3 hover:bg-gray-100 rounded-lg transition-colors"><ImageIcon className="w-5 h-5 text-gray-600" /></button>

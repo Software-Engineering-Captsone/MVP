@@ -35,6 +35,20 @@
   --nilink-accent-soft: #effafc;
   --nilink-accent-border: #b4e2ed;
   --nilink-surface: #ffffff;
+
+  /* Dashboard primary page heading — one system for all shell tabs */
+  --dash-heading-mark-h: 3px;
+  --dash-heading-mark-w: 3rem;
+  --dash-heading-mark-w-panel: 2.5rem;
+  --dash-heading-title-size: clamp(1.75rem, 1.4vw + 1.35rem, 2.25rem);
+  --dash-heading-title-size-panel: clamp(1.375rem, 1vw + 1.1rem, 1.75rem);
+  --dash-heading-title-leading: 1.08;
+  --dash-heading-title-tracking: 0.04em;
+  --dash-heading-gap-title: 0.625rem;
+  --dash-heading-subtitle-size: 0.6875rem;
+  --dash-heading-subtitle-leading: 1.45;
+  --dash-heading-subtitle-tracking: 0.1em;
+  --dash-heading-subtitle-color: #6b7280;
 }
 
 @theme inline {
@@ -82,6 +96,25 @@ button {
   font: inherit;
 }
 
+/* Consistent pointer on interactive elements */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="link"]:not([aria-disabled="true"]),
+a[href],
+summary,
+select,
+label,
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[disabled],
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* Font utility classes */
 .font-bebas {
   font-family: 'Bebas Neue', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -98,4 +131,71 @@ button {
 .focus-nilink:focus-visible {
   outline: 2px solid var(--nilink-accent);
   outline-offset: 2px;
+}
+
+/* ── Dashboard page header (Bebas title + caption) — shared by all main tabs */
+.dash-page-header {
+  position: relative;
+}
+
+.dash-page-header__mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--dash-heading-mark-w);
+  height: var(--dash-heading-mark-h);
+  border-radius: 0 9999px 9999px 0;
+  background: var(--nilink-accent-bright);
+}
+
+.dash-page-header--panel .dash-page-header__mark {
+  width: var(--dash-heading-mark-w-panel);
+}
+
+.dash-page-header__title {
+  margin: 0;
+  padding-top: var(--dash-heading-gap-title);
+  font-family: 'Bebas Neue', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 400;
+  font-size: var(--dash-heading-title-size);
+  line-height: var(--dash-heading-title-leading);
+  letter-spacing: var(--dash-heading-title-tracking);
+  text-transform: uppercase;
+  color: var(--nilink-ink);
+}
+
+.dash-page-header--panel .dash-page-header__title {
+  font-size: var(--dash-heading-title-size-panel);
+  letter-spacing: 0.035em;
+}
+
+.dash-page-header__title-accent {
+  color: var(--nilink-accent);
+}
+
+.dash-page-header__subtitle {
+  margin: 0.3125rem 0 0;
+  max-width: 42rem;
+  font-size: var(--dash-heading-subtitle-size);
+  line-height: var(--dash-heading-subtitle-leading);
+  letter-spacing: var(--dash-heading-subtitle-tracking);
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--dash-heading-subtitle-color);
+}
+
+.dash-page-header--panel .dash-page-header__subtitle {
+  max-width: none;
+}
+
+/* Main pane horizontal inset — matches athlete dashboard (p-8 md:p-10) for all shell tabs */
+.dash-main-gutter-x {
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+@media (min-width: 768px) {
+  .dash-main-gutter-x {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
 }

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, Calendar, CheckCircle2, Clock, ChevronDown, FileText } from 'lucide-react';
+import { DollarSign, Calendar, CheckCircle2 } from 'lucide-react';
 import { getBrandImageByName } from '@/lib/mockData';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 interface Deal {
   id: number;
@@ -72,77 +73,117 @@ export function DealManagement() {
     completed: deals.filter(d => d.status === 'completed').length,
   };
 
+  const totalEarnings = deals.reduce((sum, d) => sum + d.amount, 0);
+
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="bg-white p-8 border-b border-nilink-accent-border">
-        <div className="max-w-5xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-wide leading-snug text-nilink-ink font-bebas">
-            DEAL MANAGEMENT
-          </h1>
-          <p className="text-gray-600 mb-6">Track your sponsorship deals, deliverables, and payments</p>
+    <div className="flex h-full min-h-full flex-col bg-nilink-page font-sans text-nilink-ink">
+      {/* Header — aligned with athlete dashboard: ink typography, accent as a thin accent only */}
+      <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 bg-white py-8">
+        <div className="relative">
+          <DashboardPageHeader
+            title="Deals"
+            subtitle="Track sponsorships, deliverables, and payments"
+            className="mb-6"
+          />
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <p className="text-sm text-gray-600 mb-2 font-bold">Total Earnings</p>
-              <p className="text-3xl font-bold text-black">${deals.reduce((sum, d) => sum + d.amount, 0).toLocaleString()}</p>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <p className="text-sm text-gray-600 mb-2 font-bold">Active Deals</p>
-              <p className="text-3xl font-bold text-black">{tabCounts.active}</p>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <p className="text-sm text-gray-600 mb-2 font-bold">Completed</p>
-              <p className="text-3xl font-bold text-black">{tabCounts.completed}</p>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-4">
-            {(['active', 'pending', 'completed'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 rounded-lg font-bold transition-all ${
-                  activeTab === tab
-                    ? 'bg-nilink-accent text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+          {/* Stats — same language as athlete dashboard: dark hero tile + white metrics */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="relative overflow-hidden rounded-2xl bg-nilink-sidebar p-6 shadow-xl">
+              <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-nilink-accent-bright/15 blur-2xl" />
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Total earnings</p>
+              <p
+                className="mt-2 text-4xl font-black text-white"
+                style={{ fontFamily: "'Bebas Neue', sans-serif" }}
               >
-                {tab.toUpperCase()} ({tabCounts[tab]})
-              </button>
-            ))}
+                ${totalEarnings.toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Active</p>
+              <p
+                className="mt-2 text-4xl font-black text-nilink-ink"
+                style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+              >
+                {tabCounts.active}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Completed</p>
+              <p
+                className="mt-2 text-4xl font-black text-nilink-ink"
+                style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+              >
+                {tabCounts.completed}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Deals List */}
-      <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-5xl mx-auto space-y-4">
+      {/* Deals List — status chips sit with the list (same pattern as profile content filters) */}
+      <div className="flex-1 overflow-auto pb-8 pt-5 dash-main-gutter-x">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <p className="text-sm font-semibold text-gray-700">
+              Your deals{' '}
+              <span className="font-normal text-gray-400">
+                ({filteredDeals.length} {filteredDeals.length === 1 ? 'deal' : 'deals'})
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by deal status">
+              {(['active', 'pending', 'completed'] as const).map((tab) => {
+                const selected = activeTab === tab;
+                const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActiveTab(tab)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition sm:text-[13px] ${
+                      selected
+                        ? 'border-gray-900 bg-gray-900 text-white'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {label}{' '}
+                    <span className={selected ? 'text-white/80' : 'text-gray-400'}>({tabCounts[tab]})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-4">
           {filteredDeals.map((deal) => (
             <motion.div
               key={deal.id}
               layout
-              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer"
+              className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:border-gray-200 hover:shadow-md"
               onClick={() => setSelectedDeal(deal)}
               whileHover={{ y: -2 }}
               transition={{ type: 'spring', stiffness: 400, damping: 28 }}
             >
-              <div className="flex items-start justify-between mb-4">
+              <div className="mb-4 flex items-start justify-between">
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-white border border-gray-100 shrink-0 flex items-center justify-center overflow-hidden">
-                    <img src={getBrandImageByName(deal.brand)} alt="" className="w-full h-full object-cover" />
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-white">
+                    <img src={getBrandImageByName(deal.brand)} alt="" className="h-full w-full object-cover" />
                   </div>
                   <div>
-                  <h3 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                    {deal.brand.toUpperCase()}
-                  </h3>
-                  <p className="text-gray-600">{deal.type}</p>
+                    <h3
+                      className="text-2xl font-bold text-nilink-ink"
+                      style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                    >
+                      {deal.brand.toUpperCase()}
+                    </h3>
+                    <p className="text-gray-600">{deal.type}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-nilink-accent">
+                  <p
+                    className="text-2xl font-black text-nilink-ink"
+                    style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                  >
                     ${deal.amount.toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-500">{deal.paymentSchedule}</p>
@@ -150,86 +191,98 @@ export function DealManagement() {
               </div>
 
               <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-4 text-gray-500">
+                <div className="flex flex-wrap items-center gap-4 text-gray-500">
                   <span className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />{deal.startDate} - {deal.endDate}
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    {deal.startDate} - {deal.endDate}
                   </span>
                   <span className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {deal.deliverables.filter(d => d.completed).length}/{deal.deliverables.length} deliverables
+                    <CheckCircle2 className="h-4 w-4 text-gray-400" />
+                    {deal.deliverables.filter((d) => d.completed).length}/{deal.deliverables.length} deliverables
                   </span>
                 </div>
-                <div className="w-32 bg-gray-200 rounded-full h-2">
+                <div className="h-2 w-32 rounded-full bg-gray-100">
                   <div
-                    className="h-2 rounded-full bg-nilink-accent-bright"
+                    className="h-2 rounded-full bg-nilink-ink/80"
                     style={{
-                      width: `${(deal.deliverables.filter(d => d.completed).length / deal.deliverables.length) * 100}%`,
+                      width: `${(deal.deliverables.filter((d) => d.completed).length / deal.deliverables.length) * 100}%`,
                     }}
                   />
                 </div>
               </div>
             </motion.div>
           ))}
-        </div>
+          </div>
       </div>
 
       {/* Deal Detail Modal */}
       {selectedDeal && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-8"
+          className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/50 p-8"
           onClick={() => setSelectedDeal(null)}
         >
           <div
-            className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-auto"
+            className="max-h-[90vh] w-full max-w-2xl cursor-auto overflow-auto rounded-2xl border border-gray-100 bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-gray-200 p-6 flex items-start gap-4">
-              <div className="w-16 h-16 rounded-xl bg-gray-50 border border-gray-100 shrink-0 flex items-center justify-center overflow-hidden">
-                <img src={getBrandImageByName(selectedDeal.brand)} alt="" className="w-full h-full object-cover" />
+            <div className="flex items-start gap-4 border-b border-gray-100 p-6">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                <img src={getBrandImageByName(selectedDeal.brand)} alt="" className="h-full w-full object-cover" />
               </div>
               <div>
-              <h2 className="text-3xl font-bebas text-nilink-ink">
-                {selectedDeal.brand.toUpperCase()}
-              </h2>
-              <p className="text-gray-600">{selectedDeal.type}</p>
+                <h2 className="text-3xl text-nilink-ink" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                  {selectedDeal.brand.toUpperCase()}
+                </h2>
+                <p className="text-gray-600">{selectedDeal.type}</p>
               </div>
             </div>
 
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-5 h-5 text-green-600" />
-                    <h3 className="text-sm font-bold text-gray-500 uppercase">Deal Amount</h3>
+              <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-gray-100 bg-nilink-page p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-gray-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Deal amount</h3>
                   </div>
-                  <p className="text-3xl font-bold text-green-600">${selectedDeal.amount.toLocaleString()}</p>
+                  <p className="text-3xl font-black text-nilink-ink" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                    ${selectedDeal.amount.toLocaleString()}
+                  </p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-5 h-5 text-nilink-accent" />
-                    <h3 className="text-sm font-bold text-gray-500 uppercase">Duration</h3>
+                <div className="rounded-xl border border-gray-100 bg-nilink-page p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-gray-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Duration</h3>
                   </div>
-                  <p className="text-sm text-gray-700">{selectedDeal.startDate}<br />to {selectedDeal.endDate}</p>
+                  <p className="text-sm text-gray-700">
+                    {selectedDeal.startDate}
+                    <br />
+                    to {selectedDeal.endDate}
+                  </p>
                 </div>
               </div>
 
               <div className="mb-6">
-                <h3 className="text-sm font-bold text-gray-500 uppercase mb-2">Payment Schedule</h3>
+                <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Payment schedule</h3>
                 <p className="text-gray-700">{selectedDeal.paymentSchedule}</p>
               </div>
 
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-gray-500 uppercase">Deliverables</h3>
-                  <span className="text-sm font-bold text-nilink-accent">
-                    {selectedDeal.deliverables.filter(d => d.completed).length}/{selectedDeal.deliverables.length} Completed
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Deliverables</h3>
+                  <span className="text-sm font-bold text-nilink-ink">
+                    {selectedDeal.deliverables.filter((d) => d.completed).length}/{selectedDeal.deliverables.length}{' '}
+                    done
                   </span>
                 </div>
                 <div className="space-y-2">
                   {selectedDeal.deliverables.map((deliverable, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div className={`w-5 h-5 rounded flex items-center justify-center ${deliverable.completed ? 'bg-nilink-accent' : 'bg-gray-300'}`}>
-                        {deliverable.completed && <CheckCircle2 className="w-4 h-4 text-white" />}
+                    <div key={index} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3">
+                      <div
+                        className={`flex h-5 w-5 items-center justify-center rounded ${
+                          deliverable.completed ? 'bg-emerald-500' : 'bg-gray-200'
+                        }`}
+                      >
+                        {deliverable.completed && <CheckCircle2 className="h-4 w-4 text-white" />}
                       </div>
                       <span className={deliverable.completed ? 'text-gray-900' : 'text-gray-500'}>{deliverable.name}</span>
                     </div>
@@ -237,12 +290,18 @@ export function DealManagement() {
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <button type="button" className="flex-1 px-6 py-3 rounded-lg font-bold text-white bg-nilink-accent hover:bg-nilink-accent-hover transition-colors">
-                  VIEW CONTRACT
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl bg-nilink-ink px-6 py-3 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-gray-800"
+                >
+                  View contract
                 </button>
-                <button type="button" className="flex-1 px-6 py-3 rounded-lg font-bold border-2 border-nilink-accent text-nilink-accent hover:bg-nilink-accent-soft transition-colors">
-                  MESSAGE BRAND
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-bold uppercase tracking-wide text-nilink-ink transition-colors hover:bg-gray-50"
+                >
+                  Message brand
                 </button>
               </div>
             </div>

@@ -25,6 +25,7 @@ const BaseballIcon = ({ className }: { className?: string }) => (
 );
 
 import { Conversation, mockConversations, mockAthletes } from '@/lib/mockData';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 const sports = ['Football', 'Baseball', 'Softball', 'Cheerleading', 'Dance', 'Basketball', 'Beach Volleyball'];
 
@@ -47,9 +48,12 @@ export function BusinessMessages() {
   });
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden text-[#1C1C1E]">
+    <div className="flex h-full flex-col overflow-hidden bg-white text-[#1C1C1E]">
+      <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-3 pt-5">
+        <DashboardPageHeader title="Inbox" subtitle="Conversations with athletes" />
+      </div>
       {/* Top Filter Bar */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
+      <div className="dash-main-gutter-x flex shrink-0 items-center gap-3 border-b border-gray-100 py-4">
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -90,7 +94,7 @@ export function BusinessMessages() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-1 overflow-hidden p-4 lg:p-6 gap-6">
+      <div className="flex flex-1 flex-col gap-6 overflow-hidden py-4 dash-main-gutter-x lg:flex-row lg:py-6">
         {/* Left Column wrapper */}
         <div className={`w-full lg:w-[320px] flex-col shrink-0 h-full ${selectedChat ? 'hidden lg:flex' : 'flex'}`}>
           <div className="flex items-center justify-between mb-3 px-1 shrink-0">

@@ -4,6 +4,8 @@ import { mockAthletes, mockBrands } from '@/lib/mockData';
 /**
  * When `NEXT_PUBLIC_MARKETPLACE_DATA_SOURCE=api`, callers load marketplace rows from `/api/marketplace/*`.
  * Otherwise (default), bundled mock data is used — ideal for local development without a database.
+ *
+ * Saved lists use the same pattern via `savedFetch.ts` + `NEXT_PUBLIC_SAVED_DATA_SOURCE=api`.
  */
 export function marketplaceUsesMockData(): boolean {
   return process.env.NEXT_PUBLIC_MARKETPLACE_DATA_SOURCE !== 'api';

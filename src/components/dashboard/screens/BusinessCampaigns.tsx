@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import {
-  Plus, Search, Filter, ArrowUpRight, TrendingUp, Users, Eye, Edit3, XCircle,
+  Plus, Search, ArrowUpRight, TrendingUp, Users, Eye, Edit3, XCircle,
   ChevronRight, Calendar, Video, FileText, Image as ImageIcon, Zap, Package
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { CreateCampaignOverlay } from './CreateCampaignOverlay';
 import { CampaignDetail } from './CampaignDetail';
 import { u } from '@/lib/mockData';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 /* ── Types ──────────────────────────────────────────────────── */
 export type CampaignStatus =
@@ -414,79 +415,108 @@ export function BusinessCampaigns() {
       {/* ── Campaigns Home (list view) ── */}
       {!selectedCampaign && (
         <div className="h-full flex flex-col bg-white overflow-hidden text-[#1C1C1E]">
-        {/* ── Search & Filter Bar ── */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search campaigns..."
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
-            />
-          </div>
-          <div className="flex-1" />
-          <button
-            onClick={() => setShowCreateOverlay(true)}
-            className="px-5 py-2 bg-[#1C1C1E] text-white rounded-lg text-sm font-semibold hover:bg-[#2D2D2F] transition-colors flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Create Campaign
-          </button>
-        </div>
-
         {/* ── Title + Stats ── */}
-        <div className="px-6 py-6 shrink-0">
-          <h1
-            className="text-4xl font-black tracking-wide uppercase mb-6"
-            style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-          >
-            Campaigns
-          </h1>
+        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 py-6">
+          <DashboardPageHeader
+            title="Campaigns"
+            subtitle="Create, manage, and track NIL campaigns"
+            className="mb-6"
+          />
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          {/* Stats — light tint matched to value color */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
-              { label: 'Active', value: activeCampaigns.length, color: 'text-emerald-600' },
-              { label: 'Open for Apps', value: openCampaigns.length, color: 'text-nilink-accent' },
-              { label: 'Reviewing', value: reviewingCampaigns.length, color: 'text-amber-600' },
-              { label: 'Completed', value: completedCampaigns.length, color: 'text-gray-500' },
-            ].map(stat => (
-              <div key={stat.label} className="bg-gray-50 rounded-xl p-5 border border-gray-100">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{stat.label}</p>
-                <p className={`text-3xl font-black ${stat.color}`}>
+              {
+                label: 'Active',
+                value: activeCampaigns.length,
+                valueClass: 'text-emerald-700',
+                cardClass: 'border-emerald-200/80 bg-emerald-50/90',
+                labelClass: 'text-emerald-700/70',
+              },
+              {
+                label: 'Open for Apps',
+                value: openCampaigns.length,
+                valueClass: 'text-nilink-accent',
+                cardClass: 'border-nilink-accent-border bg-nilink-accent-soft',
+                labelClass: 'text-nilink-accent/80',
+              },
+              {
+                label: 'Reviewing',
+                value: reviewingCampaigns.length,
+                valueClass: 'text-amber-700',
+                cardClass: 'border-amber-200/80 bg-amber-50/90',
+                labelClass: 'text-amber-800/70',
+              },
+              {
+                label: 'Completed',
+                value: completedCampaigns.length,
+                valueClass: 'text-gray-600',
+                cardClass: 'border-gray-200 bg-gray-100/80',
+                labelClass: 'text-gray-500',
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className={`rounded-xl border p-5 shadow-sm ${stat.cardClass}`}
+              >
+                <p className={`mb-2 text-[11px] font-bold uppercase tracking-wider ${stat.labelClass}`}>
+                  {stat.label}
+                </p>
+                <p className={`text-3xl font-black ${stat.valueClass}`}>
                   {String(stat.value).padStart(2, '0')}
                 </p>
               </div>
             ))}
           </div>
+        </div>
 
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-2">
-            {['All', 'Active', 'Completed'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveFilter(tab)}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors border ${
-                  activeFilter === tab
-                    ? 'bg-[#1C1C1E] text-white border-[#1C1C1E]'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-            <div className="flex-1" />
-            <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <Filter className="w-3.5 h-3.5" />
-              Filter
-            </button>
+        {/* ── Search + filter chips + primary CTA ── */}
+        <div className="dash-main-gutter-x flex shrink-0 flex-col gap-3 border-b border-gray-100 py-4 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative w-full min-w-0 sm:max-w-xs sm:flex-1 sm:flex-none md:max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search campaigns..."
+              className="w-full rounded-full border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
+            />
           </div>
+
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
+            {(['All', 'Active', 'Completed'] as const).map((tab) => {
+              const on = activeFilter === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveFilter(tab)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors sm:text-[13px] ${
+                    on
+                      ? 'border-gray-400 bg-gray-100 text-gray-900'
+                      : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700'
+                  }`}
+                >
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="hidden flex-1 sm:block" aria-hidden />
+
+          <button
+            type="button"
+            onClick={() => setShowCreateOverlay(true)}
+            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1C1C1E] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2D2D2F] sm:ml-auto sm:w-auto"
+          >
+            <Plus className="h-4 w-4" />
+            Create Campaign
+          </button>
         </div>
 
         {/* ── Campaign Table ── */}
-        <div className="flex-1 overflow-auto px-6 pb-6">
+        <div className="flex-1 overflow-auto pb-6 dash-main-gutter-x">
           <table className="w-full text-sm text-left">
             <thead className="text-[11px] font-bold text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
               <tr>

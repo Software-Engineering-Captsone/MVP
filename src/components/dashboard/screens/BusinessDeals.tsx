@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Search, MoreHorizontal, FileText } from 'lucide-react';
 import { mockAthletes } from '@/lib/mockData';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 // Reusing same icons from Discovery
 const FootballIcon = ({ className }: { className?: string }) => (
@@ -83,7 +84,7 @@ export function BusinessDeals() {
   return (
     <div className="h-full flex flex-col bg-nilink-surface overflow-hidden text-nilink-ink">
       {/* Top Filter Bar */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
+      <div className="dash-main-gutter-x flex shrink-0 items-center gap-3 border-b border-gray-100 py-4">
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -124,14 +125,13 @@ export function BusinessDeals() {
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Title Area */}
-        <div className="px-6 py-5 shrink-0">
-          <h1 className="text-2xl font-bold">Deals</h1>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-3 pt-5">
+          <DashboardPageHeader title="Deals" subtitle="Invoices, quotes, and athlete payments" />
         </div>
 
         {/* Tab Sub-navigation */}
-        <div className="flex items-center gap-6 border-b border-gray-100 px-6 shrink-0">
+        <div className="dash-main-gutter-x flex shrink-0 items-center gap-6 border-b border-gray-100">
           {['Overview', 'Quotation', 'Invoice'].map(tab => (
             <button
               key={tab}
@@ -148,7 +148,7 @@ export function BusinessDeals() {
         </div>
 
         {/* Actions Bar */}
-        <div className="flex items-center justify-between px-6 py-5 shrink-0">
+        <div className="dash-main-gutter-x flex shrink-0 items-center justify-between py-5">
           <div className="flex items-center gap-4">
             <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-sm bg-white hover:bg-gray-50">
               Last 7 days <span className="text-[10px] ml-1">▼</span>
@@ -178,7 +178,7 @@ export function BusinessDeals() {
         </div>
 
         {/* Table View */}
-        <div className="flex-1 overflow-auto px-6 pb-6">
+        <div className="flex-1 overflow-auto pb-6 dash-main-gutter-x">
           <table className="w-full text-sm text-left whitespace-nowrap">
             <thead className="text-[11px] font-bold text-gray-500 uppercase bg-gray-100 sticky top-0 z-10">
               <tr>

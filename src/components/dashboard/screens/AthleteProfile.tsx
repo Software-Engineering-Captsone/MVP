@@ -19,6 +19,8 @@ import {
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { getAthleteById, mockAthletes, type ContentItem } from '@/lib/mockData';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
+import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
 
 const TiktokIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -73,8 +75,45 @@ function CreateOfferButton({ compact }: { compact?: boolean }) {
   );
 }
 
+function SaveAthleteControl({
+  athleteId,
+  compact,
+}: {
+  athleteId: string;
+  compact?: boolean;
+}) {
+  const { toggleAthlete, isAthleteSaved } = useSavedMarketplace();
+  const saved = isAthleteSaved(athleteId);
+  return (
+    <button
+      type="button"
+      onClick={() => toggleAthlete(athleteId)}
+      aria-label={saved ? 'Remove athlete from saved' : 'Save athlete'}
+      title={saved ? 'Remove from saved' : 'Save athlete'}
+      className={
+        compact
+          ? `inline-flex shrink-0 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition sm:text-sm sm:px-4 ${
+              saved
+                ? 'border-nilink-accent bg-nilink-accent-soft text-nilink-accent'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`
+          : `inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold shadow-sm transition ${
+              saved
+                ? 'border-nilink-accent bg-nilink-accent-soft text-nilink-accent'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`
+      }
+    >
+      <Heart className={`h-4 w-4 ${saved ? 'fill-current' : ''}`} />
+      {!compact && <span>{saved ? 'Saved' : 'Save'}</span>}
+    </button>
+  );
+}
+
 export function AthleteProfile() {
   const searchParams = useSearchParams();
+  const { accountType } = useDashboard();
+  const showSaveForBrand = accountType === 'business';
   const idParam = searchParams.get('id');
 
   const athlete = useMemo(() => {
@@ -136,7 +175,8 @@ export function AthleteProfile() {
 
   return (
     <div className="min-h-full bg-nilink-page pb-16">
-      <div className="mx-auto max-w-4xl px-5 pt-4 sm:px-8 sm:pt-6">
+      <div className="pt-4 sm:pt-6 dash-main-gutter-x">
+        <div className="mx-auto w-full max-w-4xl">
         <div className="mb-5">
           <Link
             href="/dashboard/search"
@@ -203,7 +243,10 @@ export function AthleteProfile() {
                 </div>
               </div>
 
-              <CreateOfferButton />
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {showSaveForBrand ? <SaveAthleteControl athleteId={athlete.id} /> : null}
+                <CreateOfferButton />
+              </div>
             </div>
           </div>
         </div>
@@ -232,7 +275,10 @@ export function AthleteProfile() {
                 </p>
               </div>
             </div>
-            <CreateOfferButton compact />
+            <div className="flex shrink-0 items-center gap-2">
+              {showSaveForBrand ? <SaveAthleteControl athleteId={athlete.id} compact /> : null}
+              <CreateOfferButton compact />
+            </div>
           </div>
         </div>
 
@@ -437,6 +483,7 @@ export function AthleteProfile() {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

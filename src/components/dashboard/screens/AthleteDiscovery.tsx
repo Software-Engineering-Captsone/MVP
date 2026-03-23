@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { Search, Instagram, Facebook, X, Twitter } from 'lucide-react';
+import { Search, Instagram, Facebook, X, Twitter, Heart } from 'lucide-react';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { useDashboard } from '../DashboardShell';
 import { Athlete, Brand } from '@/lib/mockData';
 import { useMarketplaceCatalog } from '@/hooks/useMarketplaceCatalog';
+import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 // Custom icons for sports and tiktok
 const TiktokIcon = ({ className }: { className?: string }) => (
@@ -42,6 +44,7 @@ export function AthleteDiscovery() {
   const { accountType } = useDashboard();
   const isAthleteView = accountType === 'athlete';
   const { brands, athletes, loading, error } = useMarketplaceCatalog();
+  const { toggleAthlete, toggleBrand, isAthleteSaved, isBrandSaved } = useSavedMarketplace();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSport, setActiveSport] = useState<string | null>(null);
@@ -85,7 +88,7 @@ export function AthleteDiscovery() {
     else setSelectedAthlete(item);
   };
 
-  const handleBackToSearch = () => {
+  const handleBackToExplore = () => {
     setExpandedCategory(null);
     setSelectedAthlete(null);
     setSelectedBrand(null);
@@ -131,9 +134,19 @@ export function AthleteDiscovery() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden text-[#1C1C1E]">
+    <div className="flex h-full flex-col overflow-hidden bg-white text-[#1C1C1E]">
+      <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-3 pt-5">
+        <DashboardPageHeader
+          title="Explore"
+          subtitle={
+            isAthleteView
+              ? 'Discover brands to partner with'
+              : 'Discover athletes for your campaigns'
+          }
+        />
+      </div>
       {/* Top Filter Bar */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
+      <div className="dash-main-gutter-x flex shrink-0 items-center gap-3 border-b border-gray-100 py-4">
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -176,23 +189,23 @@ export function AthleteDiscovery() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main Grid Area */}
-        <div className={`flex-1 overflow-y-auto p-6 scrollbar-hide ${hasSelection ? 'max-w-[50%]' : ''}`}>
+        <div className={`flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x ${hasSelection ? 'max-w-[50%]' : ''}`}>
           {loading && (
             <div className="mb-4 text-xs text-gray-400">Loading marketplace…</div>
           )}
           
           {displayCategory ? (() => {
             const activeCat = isFiltering 
-              ? { id: 'search', title: 'Search Results', items: filteredItems }
+              ? { id: 'search', title: 'Results', items: filteredItems }
               : categories.find((c: any) => c.id === displayCategory);
             if (!activeCat) return null;
             
             return (
               <>
                 <div className="mb-4 text-sm text-gray-400">
-                  <span className="hover:text-gray-600 cursor-pointer" onClick={handleBackToSearch}>
-                    {isFiltering ? 'Clear Search' : 'Search'}
-                  </span> 
+                  <span className="hover:text-gray-600 cursor-pointer" onClick={handleBackToExplore}>
+                    {isFiltering ? 'Clear filters' : 'Explore'}
+                  </span>
                   {!isFiltering && ` / ${activeCat.title}`}
                 </div>
                 
@@ -216,6 +229,22 @@ export function AthleteDiscovery() {
                           alt={item.name}
                           className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                         />
+                        <button
+                          type="button"
+                          title={isAthleteView ? (isBrandSaved(item.id) ? 'Remove from saved' : 'Save brand') : (isAthleteSaved(item.id) ? 'Remove from saved' : 'Save athlete')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isAthleteView) toggleBrand(item.id);
+                            else toggleAthlete(item.id);
+                          }}
+                          className={`absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full shadow-md transition-colors ${
+                            (isAthleteView ? isBrandSaved(item.id) : isAthleteSaved(item.id))
+                              ? 'bg-nilink-accent text-white'
+                              : 'bg-white/95 text-gray-600 hover:bg-white'
+                          }`}
+                        >
+                          <Heart className={`h-4 w-4 ${(isAthleteView ? isBrandSaved(item.id) : isAthleteSaved(item.id)) ? 'fill-current' : ''}`} />
+                        </button>
                       </div>
                       <div className="flex items-center gap-1 mb-1">
                         <span className="font-bold text-gray-900 group-hover:text-nilink-accent transition-colors">{item.name}</span>
@@ -270,6 +299,22 @@ export function AthleteDiscovery() {
                             alt={item.name}
                             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                           />
+                          <button
+                            type="button"
+                            title={isAthleteView ? (isBrandSaved(item.id) ? 'Remove from saved' : 'Save brand') : (isAthleteSaved(item.id) ? 'Remove from saved' : 'Save athlete')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isAthleteView) toggleBrand(item.id);
+                              else toggleAthlete(item.id);
+                            }}
+                            className={`absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full shadow-md transition-colors ${
+                              (isAthleteView ? isBrandSaved(item.id) : isAthleteSaved(item.id))
+                                ? 'bg-nilink-accent text-white'
+                                : 'bg-white/95 text-gray-600 hover:bg-white'
+                            }`}
+                          >
+                            <Heart className={`h-4 w-4 ${(isAthleteView ? isBrandSaved(item.id) : isAthleteSaved(item.id)) ? 'fill-current' : ''}`} />
+                          </button>
                         </div>
                         <div className="flex items-center gap-1 mb-1">
                           <span className="font-bold text-gray-900 group-hover:text-nilink-accent transition-colors">{item.name}</span>
@@ -299,7 +344,7 @@ export function AthleteDiscovery() {
           <div className="flex-1 border-l border-gray-100 flex flex-col bg-gray-50/30 overflow-hidden">
             {isAthleteView && selectedBrand ? (
               // BRAND SIDEBAR
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x">
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
                   <button 
                     onClick={() => setSelectedBrand(null)}
@@ -347,7 +392,7 @@ export function AthleteDiscovery() {
               </div>
             ) : selectedAthlete ? (
               // ATHLETE SIDEBAR
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x">
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
                   <button 
                     onClick={() => setSelectedAthlete(null)}
@@ -429,9 +474,35 @@ export function AthleteDiscovery() {
 
             {/* Sticky Actions Footer */}
             <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3 shrink-0">
-              <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700">
-                {isAthleteView ? 'Save Brand' : 'Save Athlete'}
-              </button>
+              {isAthleteView && selectedBrand ? (
+                <button
+                  type="button"
+                  onClick={() => toggleBrand(selectedBrand.id)}
+                  title={isBrandSaved(selectedBrand.id) ? 'Remove from saved' : 'Save brand'}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    isBrandSaved(selectedBrand.id)
+                      ? 'border-nilink-accent bg-nilink-accent-soft text-nilink-accent'
+                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Heart className={`h-4 w-4 ${isBrandSaved(selectedBrand.id) ? 'fill-current' : ''}`} />
+                  {isBrandSaved(selectedBrand.id) ? 'Saved' : 'Save Brand'}
+                </button>
+              ) : selectedAthlete ? (
+                <button
+                  type="button"
+                  onClick={() => toggleAthlete(selectedAthlete.id)}
+                  title={isAthleteSaved(selectedAthlete.id) ? 'Remove from saved' : 'Save athlete'}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    isAthleteSaved(selectedAthlete.id)
+                      ? 'border-nilink-accent bg-nilink-accent-soft text-nilink-accent'
+                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Heart className={`h-4 w-4 ${isAthleteSaved(selectedAthlete.id) ? 'fill-current' : ''}`} />
+                  {isAthleteSaved(selectedAthlete.id) ? 'Saved' : 'Save Athlete'}
+                </button>
+              ) : null}
               {!isAthleteView && selectedAthlete ? (
                 <Link
                   href={`/dashboard/profile/view?id=${selectedAthlete.id}`}

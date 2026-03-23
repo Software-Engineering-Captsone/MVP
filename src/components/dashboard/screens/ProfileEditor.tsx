@@ -3,6 +3,7 @@
 import { Save, Upload, Instagram, Twitter, TrendingUp, Eye } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 export function ProfileEditor() {
   const [formData, setFormData] = useState({
@@ -26,23 +27,20 @@ export function ProfileEditor() {
   };
 
   return (
-    <div className="p-8 w-full bg-white min-h-full">
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-6xl mb-2 tracking-wide leading-snug font-bebas text-nilink-ink">
-              PROFILE EDITOR
-            </h1>
-            <p className="text-gray-600">Build your professional NIL presence</p>
-          </div>
-          <Link
-            href="/dashboard/profile/view"
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-nilink-accent rounded-lg font-bold hover:bg-nilink-accent hover:text-white transition-all"
-          >
-            <Eye className="w-5 h-5" />
-            VIEW PUBLIC PROFILE
-          </Link>
-        </div>
+    <div className="min-h-full w-full bg-white py-8 md:py-10 dash-main-gutter-x">
+      <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+        <DashboardPageHeader
+          title="Profile"
+          subtitle="Build your professional NIL presence"
+          className="min-w-0 flex-1"
+        />
+        <Link
+          href="/dashboard/profile/view"
+          className="flex shrink-0 items-center gap-2 rounded-lg border border-nilink-accent bg-white px-6 py-3 font-bold transition-all hover:bg-nilink-accent hover:text-white"
+        >
+          <Eye className="h-5 w-5" />
+          VIEW PUBLIC PROFILE
+        </Link>
       </div>
 
       {/* Profile Photo */}

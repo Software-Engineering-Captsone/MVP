@@ -287,11 +287,11 @@ export function Research() {
       {/* Athlete Preview Modal */}
       {selectedAthlete && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-8"
+          className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/50 p-8"
           onClick={() => setSelectedAthlete(null)}
         >
           <div
-            className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto"
+            className="max-h-[90vh] w-full max-w-4xl cursor-auto overflow-auto rounded-xl bg-white"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

@@ -7,6 +7,8 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { useDashboard } from '../DashboardShell';
 import { Athlete, Brand } from '@/lib/mockData';
 import { useMarketplaceCatalog } from '@/hooks/useMarketplaceCatalog';
+import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 // Custom icons for sports and tiktok
 const TiktokIcon = ({ className }: { className?: string }) => (
@@ -42,6 +44,7 @@ export function SavedAthletes() {
   const { accountType } = useDashboard();
   const isAthleteView = accountType === 'athlete';
   const { brands, athletes, loading, error } = useMarketplaceCatalog();
+  const { savedAthleteIds, savedBrandIds, removeAthlete, removeBrand, hydrated } = useSavedMarketplace();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSport, setActiveSport] = useState<string | null>(null);
@@ -50,7 +53,11 @@ export function SavedAthletes() {
   const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
 
+  const savedAthleteSet = new Set(savedAthleteIds);
+  const savedBrandSet = new Set(savedBrandIds);
+
   const filteredAthletes = athletes.filter(a => {
+    if (!savedAthleteSet.has(a.id)) return false;
     const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           a.school.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSport = activeSport ? a.sport === activeSport : true;
@@ -58,6 +65,7 @@ export function SavedAthletes() {
   });
 
   const filteredBrands = brands.filter(b => {
+    if (!savedBrandSet.has(b.id)) return false;
     const matchesSearch = b.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           b.industry.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesIndustry = activeIndustry ? b.industry === activeIndustry : true;
@@ -79,9 +87,19 @@ export function SavedAthletes() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden text-[#1C1C1E]">
+    <div className="flex h-full flex-col overflow-hidden bg-white text-[#1C1C1E]">
+      <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-3 pt-5">
+        <DashboardPageHeader
+          title="Saved"
+          subtitle={
+            isAthleteView
+              ? 'Brands you follow and want to remember'
+              : 'Athletes and brands you follow'
+          }
+        />
+      </div>
       {/* Top Filter Bar */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
+      <div className="dash-main-gutter-x flex shrink-0 items-center gap-3 border-b border-gray-100 py-4">
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -124,13 +142,30 @@ export function SavedAthletes() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main Grid Area */}
-        <div className={`flex-1 overflow-y-auto p-6 scrollbar-hide ${hasSelection ? 'max-w-[50%]' : ''}`}>
+        <div className={`flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x ${hasSelection ? 'max-w-[50%]' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">{isAthleteView ? 'Saved Brands' : 'Saved Athletes'}</h2>
             {loading && <span className="text-xs text-gray-400">Loading…</span>}
           </div>
 
           <div className={`grid gap-4 pb-8 ${hasSelection ? 'grid-cols-2' : 'grid-cols-4'}`}>
+            {hydrated && (isAthleteView ? savedBrandIds.length === 0 : savedAthleteIds.length === 0) ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 px-6 py-16 text-center">
+                <p className="text-sm font-medium text-gray-900">Nothing saved yet</p>
+                <p className="mt-2 text-sm text-gray-500">
+                  {isAthleteView
+                    ? 'Use Explore to open a brand and tap Save Brand.'
+                    : 'Use Explore or an athlete profile to save athletes you want to revisit.'}
+                </p>
+              </div>
+            ) : null}
+            {hydrated &&
+            (isAthleteView ? savedBrandIds.length > 0 : savedAthleteIds.length > 0) &&
+            (isAthleteView ? filteredBrands.length === 0 : filteredAthletes.length === 0) ? (
+              <div className="col-span-full rounded-xl border border-gray-100 bg-gray-50 px-6 py-10 text-center text-sm text-gray-600">
+                No saved {isAthleteView ? 'brands' : 'athletes'} match your search or filters.
+              </div>
+            ) : null}
             {isAthleteView ? (
               filteredBrands.map(brand => (
                 <div 
@@ -188,7 +223,7 @@ export function SavedAthletes() {
           <div className="flex-1 border-l border-gray-100 flex flex-col bg-gray-50/30 overflow-hidden">
             {isAthleteView && selectedBrand ? (
               // BRAND SIDEBAR
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x">
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
                   <button 
                     onClick={() => setSelectedBrand(null)}
@@ -236,7 +271,7 @@ export function SavedAthletes() {
               </div>
             ) : selectedAthlete ? (
               // ATHLETE SIDEBAR
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x">
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
                   <button 
                     onClick={() => setSelectedAthlete(null)}
@@ -318,7 +353,19 @@ export function SavedAthletes() {
 
             {/* Sticky Actions Footer */}
             <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3 shrink-0">
-              <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAthleteView && selectedBrand) {
+                    removeBrand(selectedBrand.id);
+                    setSelectedBrand(null);
+                  } else if (!isAthleteView && selectedAthlete) {
+                    removeAthlete(selectedAthlete.id);
+                    setSelectedAthlete(null);
+                  }
+                }}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700"
+              >
                 Remove from Saved
               </button>
               {!isAthleteView && selectedAthlete ? (

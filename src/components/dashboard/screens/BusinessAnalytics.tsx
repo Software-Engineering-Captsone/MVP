@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
 
 export function BusinessAnalytics() {
+  const { accountType } = useDashboard();
   const [dateRange, setDateRange] = useState('last30');
 
   const engagementData = [
@@ -57,10 +60,17 @@ export function BusinessAnalytics() {
 
   return (
     <div className="min-h-screen bg-nilink-page">
-      <div className="bg-white border-b border-gray-200 p-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-wide leading-snug font-bebas text-nilink-ink">OVERALL ANALYTICS</h1>
-          <p className="text-gray-600 mb-6">Comprehensive insights across all campaigns and partnerships</p>
+      <div className="border-b border-gray-100 bg-white py-8 dash-main-gutter-x">
+        <div>
+          <DashboardPageHeader
+            title="Analytics"
+            subtitle={
+              accountType === 'business'
+                ? 'Campaign reach, engagement, and partnership performance'
+                : 'Reach, engagement, and growth across your channels'
+            }
+            className="mb-6"
+          />
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-2 font-bold">Date Range</label>
@@ -72,8 +82,8 @@ export function BusinessAnalytics() {
         </div>
       </div>
 
-      <div className="p-8">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <div className="py-8 pb-12 dash-main-gutter-x">
+        <div className="space-y-8">
           {/* Key Metrics */}
           <div className="grid grid-cols-4 gap-6">
             {[

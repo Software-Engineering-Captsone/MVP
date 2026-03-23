@@ -4,6 +4,7 @@ import { CheckCircle2, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getBrandImageByName } from '@/lib/mockData';
 import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
+import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 export function AthleteDashboard() {
   const activeDeals = [
@@ -58,25 +59,13 @@ export function AthleteDashboard() {
   ];
 
   return (
-    <div className="p-8 md:p-10 bg-nilink-page min-h-full font-sans text-nilink-ink">
-      {/* Header */}
-      <motion.div
-        className="mb-12 relative"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-      >
-        <div className="absolute top-0 left-0 w-24 h-1 bg-nilink-accent-bright mb-6 rounded-r-full" />
-        <h1
-          className="text-5xl sm:text-6xl md:text-7xl mt-6 mb-1 tracking-normal leading-none text-nilink-ink"
-          style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-        >
-          DASHBOARD<span className="text-nilink-accent">.</span>
-        </h1>
-        <p className="text-gray-500 font-medium tracking-widest text-sm uppercase">
-          Welcome back, Marcus. Here is your NIL activity.
-        </p>
-      </motion.div>
+    <div className="dash-main-gutter-x min-h-full bg-nilink-page pb-8 pt-5 font-sans text-nilink-ink md:pb-10 md:pt-6">
+      <DashboardPageHeader
+        title="Dashboard"
+        subtitle="Welcome back, Marcus. Here is your NIL activity."
+        className="mb-8"
+        animate
+      />
 
       {/* Stats Grid */}
       <motion.div
@@ -164,7 +153,7 @@ export function AthleteDashboard() {
             >
               ACTIVE DEALS
             </h2>
-            <span className="text-sm font-bold text-nilink-accent hover:text-nilink-ink cursor-pointer transition-colors">
+            <span className="text-sm font-bold text-nilink-accent transition-colors hover:text-nilink-ink">
               VIEW ALL
             </span>
           </div>
@@ -176,7 +165,7 @@ export function AthleteDashboard() {
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05, duration: 0.25 }}
-                className={`py-5 flex items-center justify-between group cursor-pointer ${i !== activeDeals.length - 1 ? 'border-b border-gray-100' : ''}`}
+                className={`flex items-center justify-between py-5 group ${i !== activeDeals.length - 1 ? 'border-b border-gray-100' : ''}`}
               >
                 <div className="flex-1 flex items-start gap-4">
                   <div className="w-11 h-11 rounded-lg bg-white border border-gray-100 shrink-0 flex items-center justify-center overflow-hidden mt-0.5">
@@ -211,7 +200,7 @@ export function AthleteDashboard() {
             >
               OPPORTUNITIES
             </h2>
-            <span className="text-sm font-bold text-nilink-accent hover:text-nilink-ink cursor-pointer transition-colors">
+            <span className="text-sm font-bold text-nilink-accent transition-colors hover:text-nilink-ink">
               EXPLORE
             </span>
           </div>

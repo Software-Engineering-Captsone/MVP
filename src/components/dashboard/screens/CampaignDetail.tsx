@@ -97,7 +97,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
         className="relative w-[1100px] max-w-[95vw] h-[800px] max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden text-[#1C1C1E]"
       >
         {/* ── Header ── */}
-        <div className="px-6 py-5 border-b border-gray-100 shrink-0">
+        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div>
@@ -132,7 +132,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
         </div>
 
         {/* ── Tab Bar ── */}
-      <div className="flex items-center gap-6 border-b border-gray-100 px-6 shrink-0">
+      <div className="dash-main-gutter-x flex shrink-0 items-center gap-6 border-b border-gray-100">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -162,7 +162,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
       <div className="flex-1 overflow-auto">
         {/* ════════════════════ OVERVIEW ════════════════════ */}
         {activeTab === 'overview' && (
-          <div className="px-6 py-6 max-w-5xl">
+          <div className="py-6 dash-main-gutter-x">
             {/* Quick Stats */}
             <div className="grid grid-cols-4 gap-4 mb-6">
               {[
@@ -263,7 +263,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
         {activeTab === 'candidates' && (
           <div className="flex flex-col h-full">
             {/* Candidates Actions */}
-            <div className="flex items-center justify-between px-6 py-4 shrink-0">
+            <div className="dash-main-gutter-x flex shrink-0 items-center justify-between py-4">
               <div className="flex items-center gap-3">
                 <button
                   onClick={selectAll}
@@ -298,7 +298,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
             </div>
 
             {/* Candidates Table */}
-            <div className="flex-1 overflow-auto px-6 pb-6">
+            <div className="flex-1 overflow-auto pb-6 dash-main-gutter-x">
               {campaign.candidates.length > 0 ? (
                 <table className="w-full text-sm text-left">
                   <thead className="text-[11px] font-bold text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
@@ -375,7 +375,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
 
         {/* ════════════════════ ATHLETES ════════════════════ */}
         {activeTab === 'athletes' && (
-          <div className="px-6 py-6">
+          <div className="py-6 dash-main-gutter-x">
             {campaign.athletes.length > 0 ? (
               <div className="grid grid-cols-3 gap-4">
                 {campaign.athletes.map(athlete => (
@@ -439,7 +439,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
 
         {/* ════════════════════ DELIVERABLES ════════════════════ */}
         {activeTab === 'deliverables' && (
-          <div className="px-6 py-6">
+          <div className="py-6 dash-main-gutter-x">
             {campaign.deliverables.length > 0 ? (
               <table className="w-full text-sm text-left">
                 <thead className="text-[11px] font-bold text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
@@ -516,7 +516,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
 
         {/* ════════════════════ ACTIVITY ════════════════════ */}
         {activeTab === 'activity' && (
-          <div className="px-6 py-6 max-w-3xl">
+          <div className="py-6 dash-main-gutter-x">
             {campaign.activity.length > 0 ? (
               <div className="relative">
                 {/* Timeline Line */}
