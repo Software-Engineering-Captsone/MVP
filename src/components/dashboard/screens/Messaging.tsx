@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Search, Send, Paperclip, Image as ImageIcon, Phone, Video, MoreVertical, CheckCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { getBrandImageByName } from '@/lib/mockData';
 
 interface Message {
   id: number;
@@ -93,11 +95,11 @@ export function Messaging() {
   };
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex bg-nilink-surface text-nilink-ink">
       {/* Conversations List */}
-      <div className="w-96 bg-white flex flex-col" style={{ borderRight: '1px solid #B4E2ED' }}>
+      <div className="w-96 bg-white flex flex-col border-r border-nilink-accent-border shrink-0">
         <div className="p-6 border-b border-gray-200">
-          <h1 className="text-4xl mb-4 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+          <h1 className="text-4xl mb-4 tracking-wide leading-snug font-bebas text-nilink-ink">
             MESSAGES
           </h1>
           <div className="relative">
@@ -105,27 +107,31 @@ export function Messaging() {
             <input
               type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search conversations..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] transition-colors text-gray-900"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent transition-colors text-gray-900"
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-auto">
-          {filteredConversations.map(conv => (
-            <div
+          {filteredConversations.map((conv, i) => (
+            <motion.div
               key={conv.id}
               onClick={() => setSelectedConversation(conv.id)}
               className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
-                selectedConversation === conv.id ? 'bg-[#EFFAFC]' : 'hover:bg-gray-50'
+                selectedConversation === conv.id ? 'bg-nilink-accent-soft' : 'hover:bg-gray-50'
               }`}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.04, duration: 0.25 }}
+              layout
             >
               <div className="flex items-start gap-3">
                 <div className="relative flex-shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-[#6CC3DA] flex items-center justify-center text-white font-bold">
-                    {conv.initials}
+                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden">
+                    <img src={getBrandImageByName(conv.name)} alt="" className="w-full h-full object-cover" />
                   </div>
                   {conv.online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -139,31 +145,31 @@ export function Messaging() {
                   </p>
                 </div>
                 {conv.unreadCount > 0 && (
-                  <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: '#6CC3DA' }}>
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold bg-nilink-accent">
                     {conv.unreadCount}
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
 
       {/* Message Thread */}
       {activeConversation ? (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <div className="bg-white border-b border-gray-200 p-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-[#6CC3DA] flex items-center justify-center text-white font-bold">
-                  {activeConversation.initials}
+                <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden">
+                  <img src={getBrandImageByName(activeConversation.name)} alt="" className="w-full h-full object-cover" />
                 </div>
                 {activeConversation.online && (
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
                 )}
               </div>
               <div>
-                <h2 className="text-2xl tracking-wide" style={{ fontFamily: "'Barlow Condensed', sans-serif", color: '#6CC3DA' }}>
+                <h2 className="text-2xl tracking-wide font-barlow text-nilink-ink">
                   {activeConversation.name.toUpperCase()}
                 </h2>
                 <p className="text-sm text-gray-600">
@@ -172,57 +178,66 @@ export function Messaging() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><Phone className="w-5 h-5 text-gray-600" /></button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><Video className="w-5 h-5 text-gray-600" /></button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><MoreVertical className="w-5 h-5 text-gray-600" /></button>
+              <button type="button" className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><Phone className="w-5 h-5 text-gray-600" /></button>
+              <button type="button" className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><Video className="w-5 h-5 text-gray-600" /></button>
+              <button type="button" className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><MoreVertical className="w-5 h-5 text-gray-600" /></button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-6 space-y-4 bg-gray-50">
-            {activeConversation.messages.map(message => (
-              <div key={message.id} className={`flex ${message.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+          <div className="flex-1 overflow-auto p-6 space-y-4 bg-nilink-page">
+            {activeConversation.messages.map((message, mi) => (
+              <motion.div
+                key={message.id}
+                className={`flex ${message.sender === 'me' ? 'justify-end' : 'justify-start'}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: mi * 0.02, duration: 0.22 }}
+                layout
+              >
                 <div className={`max-w-md px-4 py-3 rounded-2xl ${
                   message.sender === 'me'
-                    ? 'bg-[#6CC3DA] text-white rounded-br-sm'
+                    ? 'bg-nilink-accent text-white rounded-br-sm shadow-sm'
                     : 'bg-white border border-gray-200 text-gray-900 rounded-bl-sm'
                 }`}>
                   <p className="text-sm">{message.text}</p>
                   <div className="flex items-center justify-end gap-1 mt-1">
-                    <span className={`text-xs ${message.sender === 'me' ? 'text-blue-100' : 'text-gray-500'}`}>
+                    <span className={`text-xs ${message.sender === 'me' ? 'text-white/80' : 'text-gray-500'}`}>
                       {message.timestamp}
                     </span>
                     {message.sender === 'me' && (
-                      <CheckCheck className={`w-4 h-4 ${message.read ? 'text-blue-100' : 'text-blue-200'}`} />
+                      <CheckCheck className={`w-4 h-4 ${message.read ? 'text-white/80' : 'text-white/60'}`} />
                     )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
 
           <div className="bg-white border-t border-gray-200 p-6">
             <div className="flex items-end gap-3">
-              <button className="p-3 hover:bg-gray-100 rounded-lg transition-colors"><Paperclip className="w-5 h-5 text-gray-600" /></button>
-              <button className="p-3 hover:bg-gray-100 rounded-lg transition-colors"><ImageIcon className="w-5 h-5 text-gray-600" /></button>
+              <button type="button" className="p-3 hover:bg-gray-100 rounded-lg transition-colors"><Paperclip className="w-5 h-5 text-gray-600" /></button>
+              <button type="button" className="p-3 hover:bg-gray-100 rounded-lg transition-colors"><ImageIcon className="w-5 h-5 text-gray-600" /></button>
               <div className="flex-1">
                 <textarea
                   value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyPress={handleKeyPress}
                   placeholder="Type a message..." rows={1}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] resize-none text-gray-900"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent resize-none text-gray-900"
                 />
               </div>
-              <button
+              <motion.button
+                type="button"
                 onClick={handleSendMessage} disabled={!messageInput.trim()}
-                className="p-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: '#6CC3DA' }}
+                className="p-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-nilink-accent text-white hover:bg-nilink-accent-hover"
+                whileHover={{ scale: messageInput.trim() ? 1.05 : 1 }}
+                whileTap={{ scale: messageInput.trim() ? 0.97 : 1 }}
               >
                 <Send className="w-5 h-5 text-white" />
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="flex-1 flex items-center justify-center bg-nilink-page">
           <p className="text-gray-500">Select a conversation to start messaging</p>
         </div>
       )}

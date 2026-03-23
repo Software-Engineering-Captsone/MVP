@@ -2,13 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import {
-  TrendingUp, Target, Users, ArrowRight,
-  Activity, Bookmark, ChevronRight,
+  TrendingUp, Target,
+  Activity, ChevronRight,
   DollarSign, BarChart3, ArrowUpRight, Instagram, Facebook
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { mockAthletes } from '@/lib/mockData';
+import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
 
 const TiktokIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -23,67 +25,92 @@ const KPI_STATS = [
   { label: 'Avg Engagement',   value: '9.3%',     sub: 'industry avg 4.2%', icon: TrendingUp, accent: false },
 ];
 
+/** Pipeline stages — tonal neutrals + accent tint (aligned with sidebar palette) */
 const PIPELINE = [
-  { label: 'Outreach',    count: 3,  color: 'bg-gray-50'       },
-  { label: 'In Review',   count: 2,  color: 'bg-blue-50'       },
-  { label: 'Negotiating', count: 1,  color: 'bg-amber-50'     },
-  { label: 'Active',      count: 4,  color: 'bg-purple-50' },
-  { label: 'Completed',   count: 12, color: 'bg-emerald-50'     },
+  { label: 'Outreach',    count: 3,  color: 'bg-gray-100' },
+  { label: 'In Review',   count: 2,  color: 'bg-gray-200/80' },
+  { label: 'Negotiating', count: 1,  color: 'bg-nilink-accent/15' },
+  { label: 'Active',      count: 4,  color: 'bg-nilink-accent/25' },
+  { label: 'Completed',   count: 12, color: 'bg-nilink-sidebar-muted/20' },
+];
+
+const pipelineBarSegments = [
+  { count: 3,  className: 'bg-gray-300' },
+  { count: 2,  className: 'bg-gray-400/80' },
+  { count: 1,  className: 'bg-nilink-accent/50' },
+  { count: 4,  className: 'bg-nilink-accent' },
+  { count: 12, className: 'bg-nilink-sidebar-muted' },
 ];
 
 export function BusinessOverview() {
   const router = useRouter();
+  const totalDeals = pipelineBarSegments.reduce((s, x) => s + x.count, 0);
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-auto text-[#1C1C1E]">
+    <div className="h-full flex flex-col bg-nilink-surface overflow-auto text-nilink-ink">
       {/* ── Title Area ── */}
       <div className="px-6 py-6 shrink-0 border-b border-gray-100 mb-6">
-        <h1
-          className="text-4xl font-black tracking-wide uppercase"
+        <motion.h1
+          className="text-4xl font-black tracking-wide uppercase text-nilink-ink"
           style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
         >
           Dashboard
-        </h1>
+        </motion.h1>
+        <p className="text-sm text-gray-500 mt-1 font-medium">Overview of your NIL programs and partnerships</p>
       </div>
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
       <div className="flex-1 max-w-7xl mx-auto w-full px-6 pb-8 relative z-20 space-y-8">
 
         {/* ── KPI Strip ────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {KPI_STATS.map(({ label, value, sub, icon: Icon, accent }) => (
-            <div
+        <motion.div
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+        >
+          {KPI_STATS.map(({ label, value, sub, icon: Icon }) => (
+            <motion.div
               key={label}
-              className="bg-gray-50 rounded-xl p-5 border border-gray-100"
+              variants={staggerItem}
+              className="bg-gray-50 rounded-xl p-5 border border-gray-100 hover:border-gray-200 transition-colors"
+              whileHover={{ y: -2 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
             >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
                 <Icon className="w-4 h-4 text-gray-400" />
               </div>
               <p
-                className="text-4xl font-black leading-none text-[#1C1C1E] mb-2"
+                className="text-4xl font-black leading-none text-nilink-ink mb-2"
                 style={{ fontFamily: "'Bebas Neue', sans-serif" }}
               >
                 {value}
               </p>
               <p className="text-[11px] font-medium text-gray-500 flex items-center gap-1">
-                <ArrowUpRight className="w-3 h-3 text-emerald-500 shrink-0" />
+                <ArrowUpRight className="w-3 h-3 text-nilink-accent shrink-0" />
                 {sub}
               </p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         {/* ── Deal Pipeline ────────────────────────────────────── */}
         <div>
-          <div
+          <motion.div
+            layout
             className="w-full bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-gray-300 transition-all duration-200 group"
             onClick={() => router.push('/dashboard/deals')}
+            whileHover={{ scale: 1.002 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 35 }}
           >
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h3
-                  className="text-2xl font-black text-[#1C1C1E] leading-none mb-1"
+                  className="text-2xl font-black text-nilink-ink leading-none mb-1"
                   style={{ fontFamily: "'Bebas Neue', sans-serif" }}
                 >
                   Deal Pipeline
@@ -98,12 +125,12 @@ export function BusinessOverview() {
                 <div key={label} className="flex-1">
                   <div className={`w-full rounded-lg px-2 py-4 flex flex-col items-center gap-1 ${color}`}>
                     <span
-                      className="text-3xl font-black leading-none text-[#1C1C1E]"
+                      className="text-3xl font-black leading-none text-nilink-ink"
                       style={{ fontFamily: "'Bebas Neue', sans-serif" }}
                     >
                       {count}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-center leading-tight text-gray-500">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-center leading-tight text-gray-600">
                       {label}
                     </span>
                   </div>
@@ -113,34 +140,53 @@ export function BusinessOverview() {
 
             {/* Proportional bar */}
             <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden flex">
-              <div className="bg-gray-300" style={{ width: `${(3/22)*100}%` }} />
-              <div className="bg-blue-300"  style={{ width: `${(2/22)*100}%` }} />
-              <div className="bg-amber-300" style={{ width: `${(1/22)*100}%` }} />
-              <div className="bg-purple-300" style={{ width: `${(4/22)*100}%` }} />
-              <div className="bg-emerald-400" style={{ width: `${(12/22)*100}%` }} />
+              {pipelineBarSegments.map(({ count, className }, i) => (
+                <motion.div
+                  key={i}
+                  className={className}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(count / totalDeals) * 100}%` }}
+                  transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1], delay: i * 0.05 }}
+                />
+              ))}
             </div>
-            <p className="text-[10px] text-gray-500 font-medium mt-2">22 total deals tracked</p>
-          </div>
+            <p className="text-[10px] text-gray-500 font-medium mt-2">{totalDeals} total deals tracked</p>
+          </motion.div>
         </div>
 
         {/* ── Recommended Athletes ──────────────────────────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Recommended for Your Brand</h2>
-            <button 
+            <h2 className="text-xl font-bold text-nilink-ink">Recommended for Your Brand</h2>
+            <motion.button
+              type="button"
               onClick={() => router.push('/dashboard/search')}
-              className="px-4 py-1.5 bg-[#1C1C1E] text-white text-sm font-medium rounded-lg hover:bg-[#2D2D2F]"
+              className="px-4 py-1.5 bg-nilink-accent text-white text-sm font-semibold rounded-lg hover:bg-nilink-accent-hover transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
               See All
-            </button>
+            </motion.button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {mockAthletes.slice(0, 4).map((athlete) => (
-              <div
+            {mockAthletes.slice(0, 4).map((athlete, i) => (
+              <motion.div
                 key={athlete.id}
-                onClick={() => router.push('/dashboard/search')}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/dashboard/profile/view?id=${athlete.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    router.push(`/dashboard/profile/view?id=${athlete.id}`);
+                  }
+                }}
                 className="group cursor-pointer"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06, duration: 0.3 }}
+                whileHover={{ y: -3 }}
               >
                 <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
                   <ImageWithFallback
@@ -148,13 +194,13 @@ export function BusinessOverview() {
                     alt={athlete.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute top-3 right-3 bg-[#6CC3DA] px-2.5 py-1 rounded-full text-[10px] font-black text-[#0F172A] uppercase tracking-wider shadow-md flex items-center gap-1">
+                  <div className="absolute top-3 right-3 bg-nilink-accent-soft px-2.5 py-1 rounded-full text-[10px] font-black text-nilink-accent uppercase tracking-wider shadow-md border border-nilink-accent-border flex items-center gap-1">
                     <Target className="w-2.5 h-2.5" />
                     {98 - parseInt(athlete.id)}% Match
                   </div>
                 </div>
                 <div className="flex items-center gap-1 mb-1">
-                  <span className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{athlete.name}</span>
+                  <span className="font-bold text-gray-900 group-hover:text-nilink-accent transition-colors">{athlete.name}</span>
                   {athlete.verified && <VerifiedBadge />}
                 </div>
                 <p className="text-xs text-gray-500 mb-2 truncate">
@@ -165,7 +211,7 @@ export function BusinessOverview() {
                   <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {athlete.stats.tiktok}</span>
                   <span className="flex items-center gap-1"><Facebook className="w-3.5 h-3.5" /> {athlete.stats.facebook}</span>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

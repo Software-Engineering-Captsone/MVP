@@ -4,7 +4,7 @@ interface VerifiedBadgeProps {
   className?: string;
 }
 
-export function VerifiedBadge({ className = "w-4 h-4 text-blue-500 shrink-0" }: VerifiedBadgeProps) {
+export function VerifiedBadge({ className = "w-4 h-4 text-nilink-accent shrink-0" }: VerifiedBadgeProps) {
   return (
     <svg 
       className={className} 

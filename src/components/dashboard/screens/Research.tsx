@@ -114,12 +114,9 @@ export function Research() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-white p-8" style={{ borderBottom: '1px solid #B4E2ED' }}>
+      <div className="bg-white p-8 border-b border-nilink-accent-border">
         <div className="max-w-7xl mx-auto">
-          <h1
-            className="text-5xl mb-2 tracking-wide leading-snug"
-            style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}
-          >
+          <h1 className="text-5xl mb-2 tracking-wide leading-snug font-bebas text-nilink-ink">
             RESEARCH ATHLETES
           </h1>
           <p className="text-gray-600">Discover the perfect athlete partners for your brand</p>
@@ -133,7 +130,7 @@ export function Research() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, sport, school..."
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] transition-colors text-gray-900"
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent transition-colors text-gray-900"
               />
             </div>
             <button
@@ -154,7 +151,7 @@ export function Research() {
                   <select
                     value={filters.sport}
                     onChange={(e) => setFilters({ ...filters, sport: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900"
                   >
                     <option value="">All Sports</option>
                     <option value="Basketball">Basketball</option>
@@ -174,7 +171,7 @@ export function Research() {
                     value={filters.school}
                     onChange={(e) => setFilters({ ...filters, school: e.target.value })}
                     placeholder="Enter school"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900"
                   />
                 </div>
                 <div>
@@ -184,7 +181,7 @@ export function Research() {
                     value={filters.location}
                     onChange={(e) => setFilters({ ...filters, location: e.target.value })}
                     placeholder="State/City"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900"
                   />
                 </div>
                 <div>
@@ -192,7 +189,7 @@ export function Research() {
                   <select
                     value={filters.gender}
                     onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900"
                   >
                     <option value="">All</option>
                     <option value="Male">Male</option>
@@ -205,7 +202,7 @@ export function Research() {
 
           {/* Compare Bar */}
           {compareList.length > 0 && (
-            <div className="mt-4 p-4 bg-[#6CC3DA] rounded-lg flex items-center justify-between">
+            <div className="mt-4 p-4 bg-nilink-accent rounded-lg flex items-center justify-between shadow-sm">
               <div className="flex items-center gap-3 text-white">
                 <Users className="w-5 h-5" />
                 <span className="font-bold">{compareList.length} athletes selected for comparison</span>
@@ -213,11 +210,11 @@ export function Research() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setCompareList([])}
-                  className="px-4 py-2 bg-white text-[#6CC3DA] rounded-lg font-bold hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2 bg-white text-nilink-accent rounded-lg font-bold hover:bg-gray-100 transition-colors"
                 >
                   Clear
                 </button>
-                <button className="px-4 py-2 bg-white text-[#6CC3DA] rounded-lg font-bold hover:bg-gray-100 transition-colors">
+                <button type="button" className="px-4 py-2 bg-white text-nilink-accent rounded-lg font-bold hover:bg-gray-100 transition-colors">
                   Compare Now
                 </button>
               </div>
@@ -255,7 +252,7 @@ export function Research() {
                     >
                       {athlete.name}
                     </h3>
-                    {athlete.verified && <VerifiedBadge className="w-5 h-5 text-[#6CC3DA] shrink-0" />}
+                    {athlete.verified && <VerifiedBadge className="w-5 h-5 shrink-0" />}
                   </div>
                   <p className="text-gray-600">{athlete.school}</p>
                 </div>
@@ -299,10 +296,7 @@ export function Research() {
           >
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-              <h2
-                className="text-3xl"
-                style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}
-              >
+              <h2 className="text-3xl font-bebas text-nilink-ink">
                 ATHLETE PREVIEW
               </h2>
               <button
@@ -332,7 +326,7 @@ export function Research() {
                       >
                         {selectedAthlete.name.toUpperCase()}
                       </h3>
-                      {selectedAthlete.verified && <VerifiedBadge className="w-6 h-6 text-[#6CC3DA] shrink-0" />}
+                      {selectedAthlete.verified && <VerifiedBadge className="w-6 h-6 shrink-0" />}
                     </div>
                     <button
                       onClick={(e) => {
@@ -341,7 +335,7 @@ export function Research() {
                       }}
                       className={`p-3 rounded-lg transition-colors ${
                         savedAthletes.includes(selectedAthlete.id)
-                          ? 'bg-[#6CC3DA] text-white'
+                          ? 'bg-nilink-accent text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                       title={savedAthletes.includes(selectedAthlete.id) ? 'Remove from saved' : 'Save athlete'}
@@ -396,13 +390,14 @@ export function Research() {
 
               <div className="flex gap-3">
                 <button
-                  className="flex-1 px-6 py-3 rounded-lg font-bold text-white hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: '#6CC3DA' }}
+                  type="button"
+                  className="flex-1 px-6 py-3 rounded-lg font-bold text-white bg-nilink-accent hover:bg-nilink-accent-hover transition-colors"
                 >
                   VIEW FULL PROFILE
                 </button>
-                <button className="flex-1 px-6 py-3 rounded-lg font-bold border-2 hover:bg-gray-50 transition-colors text-gray-700"
-                  style={{ borderColor: '#6CC3DA' }}
+                <button
+                  type="button"
+                  className="flex-1 px-6 py-3 rounded-lg font-bold border-2 border-nilink-accent text-nilink-accent hover:bg-nilink-accent-soft transition-colors"
                 >
                   SEND OPPORTUNITY
                 </button>

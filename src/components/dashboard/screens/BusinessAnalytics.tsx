@@ -53,18 +53,18 @@ export function BusinessAnalytics() {
     ],
   };
 
-  const COLORS = ['#6CC3DA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#EC4899'];
+  const COLORS = ['#2A90B0', '#6CC3DA', '#94A3B8', '#64748B', '#1C1C1E', '#267594'];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-nilink-page">
       <div className="bg-white border-b border-gray-200 p-8">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>OVERALL ANALYTICS</h1>
+          <h1 className="text-5xl mb-2 tracking-wide leading-snug font-bebas text-nilink-ink">OVERALL ANALYTICS</h1>
           <p className="text-gray-600 mb-6">Comprehensive insights across all campaigns and partnerships</p>
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-2 font-bold">Date Range</label>
-              <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900">
+              <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900">
                 <option value="last7">Last 7 Days</option><option value="last30">Last 30 Days</option><option value="last90">Last 90 Days</option><option value="last6months">Last 6 Months</option>
               </select>
             </div>
@@ -105,7 +105,7 @@ export function BusinessAnalytics() {
                   <YAxis stroke="#6B7280" />
                   <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '8px' }} />
                   <Legend />
-                  <Line type="monotone" dataKey="engagement" stroke="#6CC3DA" strokeWidth={3} name="Engagement Rate %" />
+                  <Line type="monotone" dataKey="engagement" stroke="#2A90B0" strokeWidth={3} name="Engagement Rate %" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -135,7 +135,7 @@ export function BusinessAnalytics() {
                 <YAxis yAxisId="right" orientation="right" stroke="#6B7280" />
                 <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '8px' }} />
                 <Legend />
-                <Bar yAxisId="left" dataKey="reach" fill="#6CC3DA" name="Reach" />
+                <Bar yAxisId="left" dataKey="reach" fill="#2A90B0" name="Reach" />
                 <Bar yAxisId="left" dataKey="engagement" fill="#34D399" name="Engagement %" />
                 <Bar yAxisId="right" dataKey="roi" fill="#FBBF24" name="ROI" />
               </BarChart>
@@ -176,7 +176,7 @@ export function BusinessAnalytics() {
                   <XAxis type="number" stroke="#6B7280" />
                   <YAxis dataKey="category" type="category" stroke="#6B7280" width={120} />
                   <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '8px' }} formatter={(value) => `$${Number(value).toLocaleString()}`} />
-                  <Bar dataKey="amount" fill="#6CC3DA" />
+                  <Bar dataKey="amount" fill="#2A90B0" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -196,7 +196,7 @@ export function BusinessAnalytics() {
                         <span className="text-sm font-bold text-black">{group.percentage}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="h-2 rounded-full" style={{ width: `${group.percentage}%`, backgroundColor: '#6CC3DA' }}></div>
+                        <div className="h-2 rounded-full bg-nilink-accent" style={{ width: `${group.percentage}%` }}></div>
                       </div>
                     </div>
                   ))}

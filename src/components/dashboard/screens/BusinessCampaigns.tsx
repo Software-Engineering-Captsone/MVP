@@ -8,6 +8,7 @@ import {
 import { AnimatePresence } from 'framer-motion';
 import { CreateCampaignOverlay } from './CreateCampaignOverlay';
 import { CampaignDetail } from './CampaignDetail';
+import { u } from '@/lib/mockData';
 
 /* ── Types ──────────────────────────────────────────────────── */
 export type CampaignStatus =
@@ -106,7 +107,7 @@ const mockCampaigns: Campaign[] = [
     brief: 'Maximize reach through coordinated social media content across Instagram and TikTok, featuring product integrations with our new summer energy drink lineup.',
     athleteCount: 12,
     candidateCount: 24,
-    image: '/athletes_images/Athlete1.jpg',
+    image: u('photo-1571019613454-1cb2f99b2d8b', '800'),
     startDate: 'Apr 15, 2026',
     endDate: 'May 30, 2026',
     visibility: 'Public',
@@ -115,23 +116,23 @@ const mockCampaigns: Campaign[] = [
     packageDetails: ['2 Reels (Collaborator)', '4 Stories (48h apart)'],
     platforms: ['Instagram', 'Facebook'],
     deliverables: [
-      { id: 'd1', type: 'Instagram Reel', description: 'Product showcase reel with brand mention', assignedAthlete: 'Emalee Frost', assignedAthleteImage: '/athletes_images/Athlete5.jpeg', dueDate: 'May 1, 2026', status: 'In Progress' },
-      { id: 'd2', type: 'Story Set (x4)', description: '4 stories showing daily routine with product', assignedAthlete: 'Kyson Brown', assignedAthleteImage: '/athletes_images/Athlete6.jpg', dueDate: 'May 5, 2026', status: 'Pending' },
-      { id: 'd3', type: 'TikTok Video', description: 'Trend-aligned product unboxing', assignedAthlete: 'Emalee Frost', assignedAthleteImage: '/athletes_images/Athlete5.jpeg', dueDate: 'May 15, 2026', status: 'Pending' },
-      { id: 'd4', type: 'Instagram Reel', description: 'Behind-the-scenes training with product', assignedAthlete: 'Aaliyah Turner', assignedAthleteImage: '/athletes_images/Athlete11.jpg', dueDate: 'May 20, 2026', status: 'Submitted' },
+      { id: 'd1', type: 'Instagram Reel', description: 'Product showcase reel with brand mention', assignedAthlete: 'Emalee Frost', assignedAthleteImage: u('photo-1612872087720-bb876e2e67d1', '800'), dueDate: 'May 1, 2026', status: 'In Progress' },
+      { id: 'd2', type: 'Story Set (x4)', description: '4 stories showing daily routine with product', assignedAthlete: 'Kyson Brown', assignedAthleteImage: u('photo-1595435934249-5df7ed86e1c0', '800'), dueDate: 'May 5, 2026', status: 'Pending' },
+      { id: 'd3', type: 'TikTok Video', description: 'Trend-aligned product unboxing', assignedAthlete: 'Emalee Frost', assignedAthleteImage: u('photo-1612872087720-bb876e2e67d1', '800'), dueDate: 'May 15, 2026', status: 'Pending' },
+      { id: 'd4', type: 'Instagram Reel', description: 'Behind-the-scenes training with product', assignedAthlete: 'Aaliyah Turner', assignedAthleteImage: u('photo-1546519638-68e109498ffc', '800'), dueDate: 'May 20, 2026', status: 'Submitted' },
     ],
     candidates: [
-      { id: 'c1', name: 'Mia Galella', sport: 'Softball', school: 'Boston College', image: '/athletes_images/Athlete14.jpg', followers: '14.2K', engagement: '6.1%', status: 'Applied', appliedDate: 'Mar 18' },
-      { id: 'c2', name: 'Dante Holloway', sport: 'Track & Field', school: 'Oregon Ducks', image: '/athletes_images/Athlete12.jpg', followers: '18.9K', engagement: '7.3%', status: 'Shortlisted', appliedDate: 'Mar 15' },
-      { id: 'c3', name: 'Sienna Brooks', sport: 'Gymnastics', school: 'UCLA Bruins', image: '/athletes_images/Athlete8.jpg', followers: '88.2K', engagement: '11.2%', status: 'Recommended', appliedDate: 'Mar 20' },
-      { id: 'c4', name: 'Jordan Austin', sport: 'Baseball', school: 'Missouri Western', image: '/athletes_images/Athlete4.jpg', followers: '8.5K', engagement: '5.8%', status: 'Invited', appliedDate: 'Mar 12' },
-      { id: 'c5', name: 'Jaxon Steele', sport: 'Wrestling', school: 'Penn State', image: '/athletes_images/Athlete16.jpeg', followers: '12.4K', engagement: '4.9%', status: 'Selected', appliedDate: 'Mar 10' },
-      { id: 'c6', name: 'Malik Jefferson', sport: 'Football', school: 'Alabama', image: '/athletes_images/Athlete10.jpg', followers: '102K', engagement: '9.1%', status: 'Sent to Deals', appliedDate: 'Mar 8' },
+      { id: 'c1', name: 'Mia Galella', sport: 'Softball', school: 'Boston College', image: u('photo-1566577739112-5180d4bf9390', '800'), followers: '14.2K', engagement: '6.1%', status: 'Applied', appliedDate: 'Mar 18' },
+      { id: 'c2', name: 'Dante Holloway', sport: 'Track & Field', school: 'Oregon Ducks', image: u('photo-1552674605-db6ffd4facb5', '800'), followers: '18.9K', engagement: '7.3%', status: 'Shortlisted', appliedDate: 'Mar 15' },
+      { id: 'c3', name: 'Sienna Brooks', sport: 'Gymnastics', school: 'UCLA Bruins', image: u('photo-1518611012118-696072aa579a', '800'), followers: '88.2K', engagement: '11.2%', status: 'Recommended', appliedDate: 'Mar 20' },
+      { id: 'c4', name: 'Jordan Austin', sport: 'Baseball', school: 'Missouri Western', image: u('photo-1560272564-c83b66b1ad12', '800'), followers: '8.5K', engagement: '5.8%', status: 'Invited', appliedDate: 'Mar 12' },
+      { id: 'c5', name: 'Jaxon Steele', sport: 'Wrestling', school: 'Penn State', image: u('photo-1583454110551-21f2fa2afe61', '800'), followers: '12.4K', engagement: '4.9%', status: 'Selected', appliedDate: 'Mar 10' },
+      { id: 'c6', name: 'Malik Jefferson', sport: 'Football', school: 'Alabama', image: u('photo-1551698618-1dfe5d97d256', '800'), followers: '102K', engagement: '9.1%', status: 'Sent to Deals', appliedDate: 'Mar 8' },
     ],
     athletes: [
-      { id: 'a1', name: 'Emalee Frost', sport: "Women's Volleyball", school: 'Hofstra Pride', image: '/athletes_images/Athlete5.jpeg', contractValue: '$2,500', deliverablesCompleted: 1, deliverablesTotal: 3 },
-      { id: 'a2', name: 'Kyson Brown', sport: 'Football', school: 'Arizona State', image: '/athletes_images/Athlete6.jpg', contractValue: '$3,000', deliverablesCompleted: 0, deliverablesTotal: 2 },
-      { id: 'a3', name: 'Aaliyah Turner', sport: 'Basketball', school: 'Texas Athletics', image: '/athletes_images/Athlete11.jpg', contractValue: '$4,500', deliverablesCompleted: 1, deliverablesTotal: 2 },
+      { id: 'a1', name: 'Emalee Frost', sport: "Women's Volleyball", school: 'Hofstra Pride', image: u('photo-1612872087720-bb876e2e67d1', '800'), contractValue: '$2,500', deliverablesCompleted: 1, deliverablesTotal: 3 },
+      { id: 'a2', name: 'Kyson Brown', sport: 'Football', school: 'Arizona State', image: u('photo-1595435934249-5df7ed86e1c0', '800'), contractValue: '$3,000', deliverablesCompleted: 0, deliverablesTotal: 2 },
+      { id: 'a3', name: 'Aaliyah Turner', sport: 'Basketball', school: 'Texas Athletics', image: u('photo-1546519638-68e109498ffc', '800'), contractValue: '$4,500', deliverablesCompleted: 1, deliverablesTotal: 2 },
     ],
     activity: [
       { id: 'act1', type: 'deliverable', description: 'Emalee Frost submitted Instagram Reel for review', timestamp: '2 hours ago' },
@@ -156,7 +157,7 @@ const mockCampaigns: Campaign[] = [
     brief: 'Event-based activation seeking athletes for in-person appearances and social media coverage.',
     athleteCount: 1,
     candidateCount: 8,
-    image: '/athletes_images/Athlete6.jpg',
+    image: u('photo-1595435934249-5df7ed86e1c0', '800'),
     startDate: 'May 1, 2026',
     endDate: 'Jul 31, 2026',
     visibility: 'Private',
@@ -166,10 +167,10 @@ const mockCampaigns: Campaign[] = [
     platforms: ['Instagram'],
     deliverables: [],
     candidates: [
-      { id: 'c10', name: 'Kyson Brown', sport: 'Football', school: 'Arizona State', image: '/athletes_images/Athlete6.jpg', followers: '25.6K', engagement: '8.4%', status: 'Selected', appliedDate: 'Apr 1' },
+      { id: 'c10', name: 'Kyson Brown', sport: 'Football', school: 'Arizona State', image: u('photo-1595435934249-5df7ed86e1c0', '800'), followers: '25.6K', engagement: '8.4%', status: 'Selected', appliedDate: 'Apr 1' },
     ],
     athletes: [
-      { id: 'a10', name: 'Malik Jefferson', sport: 'Football', school: 'Alabama', image: '/athletes_images/Athlete10.jpg', contractValue: '$8,000', deliverablesCompleted: 0, deliverablesTotal: 4 },
+      { id: 'a10', name: 'Malik Jefferson', sport: 'Football', school: 'Alabama', image: u('photo-1551698618-1dfe5d97d256', '800'), contractValue: '$8,000', deliverablesCompleted: 0, deliverablesTotal: 4 },
     ],
     activity: [
       { id: 'act10', type: 'candidate_action', description: 'Kyson Brown selected for deals', timestamp: '1 day ago' },
@@ -189,7 +190,7 @@ const mockCampaigns: Campaign[] = [
     brief: 'UGC-focused campaign for winter apparel line launch, seeking photogenic athletes for product photography.',
     athleteCount: 0,
     candidateCount: 15,
-    image: '/athletes_images/Athlete8.jpg',
+    image: u('photo-1518611012118-696072aa579a', '800'),
     startDate: 'Jun 1, 2026',
     endDate: 'Jun 30, 2026',
     visibility: 'Public',
@@ -199,8 +200,8 @@ const mockCampaigns: Campaign[] = [
     platforms: ['Instagram'],
     deliverables: [],
     candidates: [
-      { id: 'c20', name: 'Sienna Brooks', sport: 'Gymnastics', school: 'UCLA', image: '/athletes_images/Athlete8.jpg', followers: '88.2K', engagement: '11.2%', status: 'Shortlisted', appliedDate: 'May 5' },
-      { id: 'c21', name: 'Mia Galella', sport: 'Softball', school: 'Boston College', image: '/athletes_images/Athlete14.jpg', followers: '14.2K', engagement: '6.1%', status: 'Applied', appliedDate: 'May 8' },
+      { id: 'c20', name: 'Sienna Brooks', sport: 'Gymnastics', school: 'UCLA', image: u('photo-1518611012118-696072aa579a', '800'), followers: '88.2K', engagement: '11.2%', status: 'Shortlisted', appliedDate: 'May 5' },
+      { id: 'c21', name: 'Mia Galella', sport: 'Softball', school: 'Boston College', image: u('photo-1566577739112-5180d4bf9390', '800'), followers: '14.2K', engagement: '6.1%', status: 'Applied', appliedDate: 'May 8' },
     ],
     athletes: [],
     activity: [
@@ -221,7 +222,7 @@ const mockCampaigns: Campaign[] = [
     brief: 'On-campus activation at select universities — seeking athletes to represent the brand at student events.',
     athleteCount: 0,
     candidateCount: 3,
-    image: '/athletes_images/Athlete12.jpg',
+    image: u('photo-1552674605-db6ffd4facb5', '800'),
     startDate: 'Jul 1, 2026',
     endDate: 'Jul 14, 2026',
     visibility: 'Public',
@@ -231,7 +232,7 @@ const mockCampaigns: Campaign[] = [
     platforms: ['Instagram', 'TikTok'],
     deliverables: [],
     candidates: [
-      { id: 'c30', name: 'Dante Holloway', sport: 'Track & Field', school: 'Oregon', image: '/athletes_images/Athlete12.jpg', followers: '18.9K', engagement: '7.3%', status: 'Applied', appliedDate: 'Jun 20' },
+      { id: 'c30', name: 'Dante Holloway', sport: 'Track & Field', school: 'Oregon', image: u('photo-1552674605-db6ffd4facb5', '800'), followers: '18.9K', engagement: '7.3%', status: 'Applied', appliedDate: 'Jun 20' },
     ],
     athletes: [],
     activity: [
@@ -251,7 +252,7 @@ const mockCampaigns: Campaign[] = [
     brief: 'Pre-season training content campaign featuring workout routines and nutrition partnerships.',
     athleteCount: 0,
     candidateCount: 0,
-    image: '/athletes_images/Athlete4.jpg',
+    image: u('photo-1560272564-c83b66b1ad12', '800'),
     startDate: 'TBD',
     endDate: 'TBD',
     visibility: 'Private',
@@ -279,7 +280,7 @@ const mockCampaigns: Campaign[] = [
     brief: 'Holiday gift guide activation with top athletes — unboxing, reviews, and curated product lists.',
     athleteCount: 8,
     candidateCount: 32,
-    image: '/athletes_images/Athlete11.jpg',
+    image: u('photo-1546519638-68e109498ffc', '800'),
     startDate: 'Nov 15, 2025',
     endDate: 'Dec 31, 2025',
     visibility: 'Public',
@@ -288,12 +289,12 @@ const mockCampaigns: Campaign[] = [
     packageDetails: ['1 Reel (Main Feed)', '2 Stories w/ Link'],
     platforms: ['Instagram', 'TikTok'],
     deliverables: [
-      { id: 'd60', type: 'Holiday Reel', description: 'Gift guide reel', assignedAthlete: 'Aaliyah Turner', assignedAthleteImage: '/athletes_images/Athlete11.jpg', dueDate: 'Dec 1, 2025', status: 'Approved' },
-      { id: 'd61', type: 'Unboxing TikTok', description: 'Product unboxing', assignedAthlete: 'Sienna Brooks', assignedAthleteImage: '/athletes_images/Athlete8.jpg', dueDate: 'Dec 10, 2025', status: 'Approved' },
+      { id: 'd60', type: 'Holiday Reel', description: 'Gift guide reel', assignedAthlete: 'Aaliyah Turner', assignedAthleteImage: u('photo-1546519638-68e109498ffc', '800'), dueDate: 'Dec 1, 2025', status: 'Approved' },
+      { id: 'd61', type: 'Unboxing TikTok', description: 'Product unboxing', assignedAthlete: 'Sienna Brooks', assignedAthleteImage: u('photo-1518611012118-696072aa579a', '800'), dueDate: 'Dec 10, 2025', status: 'Approved' },
     ],
     candidates: [],
     athletes: [
-      { id: 'a60', name: 'Aaliyah Turner', sport: 'Basketball', school: 'Texas Athletics', image: '/athletes_images/Athlete11.jpg', contractValue: '$4,500', deliverablesCompleted: 3, deliverablesTotal: 3 },
+      { id: 'a60', name: 'Aaliyah Turner', sport: 'Basketball', school: 'Texas Athletics', image: u('photo-1546519638-68e109498ffc', '800'), contractValue: '$4,500', deliverablesCompleted: 3, deliverablesTotal: 3 },
     ],
     activity: [
       { id: 'act60', type: 'status_change', description: 'Campaign marked as Completed', timestamp: 'Jan 5, 2026' },
@@ -312,7 +313,7 @@ const mockCampaigns: Campaign[] = [
     brief: 'Drive in-store foot traffic at university bookstores through athlete endorsements and geo-targeted content.',
     athleteCount: 5,
     candidateCount: 12,
-    image: '/athletes_images/Athlete16.jpeg',
+    image: u('photo-1583454110551-21f2fa2afe61', '800'),
     startDate: 'Aug 15, 2026',
     endDate: 'Sep 15, 2026',
     visibility: 'Public',
@@ -321,13 +322,13 @@ const mockCampaigns: Campaign[] = [
     packageDetails: ['1 Static Post', '1 Story Mention'],
     platforms: ['Instagram'],
     deliverables: [
-      { id: 'd70', type: 'Store Visit Story', description: 'In-store product showcase story', assignedAthlete: 'Jaxon Steele', assignedAthleteImage: '/athletes_images/Athlete16.jpeg', dueDate: 'Sep 1, 2026', status: 'In Progress' },
+      { id: 'd70', type: 'Store Visit Story', description: 'In-store product showcase story', assignedAthlete: 'Jaxon Steele', assignedAthleteImage: u('photo-1583454110551-21f2fa2afe61', '800'), dueDate: 'Sep 1, 2026', status: 'In Progress' },
     ],
     candidates: [
-      { id: 'c70', name: 'Jordan Austin', sport: 'Baseball', school: 'Missouri Western', image: '/athletes_images/Athlete4.jpg', followers: '8.5K', engagement: '5.8%', status: 'Applied', appliedDate: 'Aug 10' },
+      { id: 'c70', name: 'Jordan Austin', sport: 'Baseball', school: 'Missouri Western', image: u('photo-1560272564-c83b66b1ad12', '800'), followers: '8.5K', engagement: '5.8%', status: 'Applied', appliedDate: 'Aug 10' },
     ],
     athletes: [
-      { id: 'a70', name: 'Jaxon Steele', sport: 'Wrestling', school: 'Penn State', image: '/athletes_images/Athlete16.jpeg', contractValue: '$1,500', deliverablesCompleted: 0, deliverablesTotal: 2 },
+      { id: 'a70', name: 'Jaxon Steele', sport: 'Wrestling', school: 'Penn State', image: u('photo-1583454110551-21f2fa2afe61', '800'), contractValue: '$1,500', deliverablesCompleted: 0, deliverablesTotal: 2 },
     ],
     activity: [
       { id: 'act70', type: 'deliverable', description: 'Jaxon Steele started working on Store Visit Story', timestamp: '6 hours ago' },
@@ -338,11 +339,11 @@ const mockCampaigns: Campaign[] = [
 /* ── Status Badge ───────────────────────────────────────────── */
 const statusStyles: Record<CampaignStatus, string> = {
   'Draft': 'bg-gray-100 text-gray-500 border-gray-200',
-  'Ready to Launch': 'bg-blue-50 text-blue-600 border-blue-200',
-  'Open for Applications': 'bg-[#EFFAFC] text-[#2A90B0] border-[#B4E2ED]',
-  'Reviewing Candidates': 'bg-amber-50 text-amber-600 border-amber-200',
-  'Deal Creation in Progress': 'bg-purple-50 text-purple-600 border-purple-200',
-  'Active': 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  'Ready to Launch': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Open for Applications': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Reviewing Candidates': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Deal Creation in Progress': 'bg-gray-100 text-nilink-ink border-gray-300',
+  'Active': 'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Completed': 'bg-gray-100 text-gray-600 border-gray-300',
 };
 
@@ -448,7 +449,7 @@ export function BusinessCampaigns() {
           <div className="grid grid-cols-4 gap-4 mb-6">
             {[
               { label: 'Active', value: activeCampaigns.length, color: 'text-emerald-600' },
-              { label: 'Open for Apps', value: openCampaigns.length, color: 'text-[#2A90B0]' },
+              { label: 'Open for Apps', value: openCampaigns.length, color: 'text-nilink-accent' },
               { label: 'Reviewing', value: reviewingCampaigns.length, color: 'text-amber-600' },
               { label: 'Completed', value: completedCampaigns.length, color: 'text-gray-500' },
             ].map(stat => (

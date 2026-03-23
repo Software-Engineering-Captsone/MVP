@@ -14,30 +14,30 @@ import type { Campaign, CampaignStatus, CandidateStatus, Candidate, ContractedAt
 /* ── Status Badge (shared) ──────────────────────────────────── */
 const campaignStatusStyles: Record<CampaignStatus, string> = {
   'Draft': 'bg-gray-100 text-gray-500 border-gray-200',
-  'Ready to Launch': 'bg-blue-50 text-blue-600 border-blue-200',
-  'Open for Applications': 'bg-[#EFFAFC] text-[#2A90B0] border-[#B4E2ED]',
-  'Reviewing Candidates': 'bg-amber-50 text-amber-600 border-amber-200',
-  'Deal Creation in Progress': 'bg-purple-50 text-purple-600 border-purple-200',
-  'Active': 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  'Ready to Launch': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Open for Applications': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Reviewing Candidates': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Deal Creation in Progress': 'bg-gray-100 text-nilink-ink border-gray-300',
+  'Active': 'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Completed': 'bg-gray-100 text-gray-600 border-gray-300',
 };
 
 const candidateStatusStyles: Record<CandidateStatus, string> = {
-  'Recommended': 'bg-blue-50 text-blue-600 border-blue-200',
-  'Invited': 'bg-purple-50 text-purple-600 border-purple-200',
-  'Applied': 'bg-[#EFFAFC] text-[#2A90B0] border-[#B4E2ED]',
-  'Shortlisted': 'bg-amber-50 text-amber-600 border-amber-200',
-  'Selected': 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  'Sent to Deals': 'bg-purple-50 text-purple-700 border-purple-300',
-  'Contracted': 'bg-emerald-100 text-emerald-700 border-emerald-300',
-  'Declined': 'bg-red-50 text-red-500 border-red-200',
+  'Recommended': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Invited': 'bg-gray-50 text-nilink-ink border-gray-200',
+  'Applied': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Shortlisted': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Selected': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Sent to Deals': 'bg-nilink-sidebar-muted/15 text-nilink-ink border-nilink-sidebar-muted/30',
+  'Contracted': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  'Declined': 'bg-red-50 text-red-600 border-red-200',
 };
 
 const deliverableStatusStyles: Record<string, string> = {
   'Pending': 'bg-gray-100 text-gray-500 border-gray-200',
-  'In Progress': 'bg-blue-50 text-blue-600 border-blue-200',
-  'Submitted': 'bg-amber-50 text-amber-600 border-amber-200',
-  'Approved': 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  'In Progress': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Submitted': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Approved': 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 /* ── Tab Definitions ────────────────────────────────────────── */
@@ -168,8 +168,8 @@ export function CampaignDetail({ campaign, onBack }: Props) {
               {[
                 { icon: Users, label: 'Candidates', value: campaign.candidateCount, color: 'text-[#2A90B0]' },
                 { icon: Target, label: 'Athletes', value: campaign.athleteCount, color: 'text-emerald-600' },
-                { icon: Eye, label: 'Applications', value: campaign.candidates.filter(c => c.status === 'Applied').length, color: 'text-amber-600' },
-                { icon: TrendingUp, label: 'Deliverables', value: campaign.deliverables.length, color: 'text-purple-600' },
+                { icon: Eye, label: 'Applications', value: campaign.candidates.filter(c => c.status === 'Applied').length, color: 'text-nilink-accent' },
+                { icon: TrendingUp, label: 'Deliverables', value: campaign.deliverables.length, color: 'text-nilink-ink' },
               ].map(stat => (
                 <div key={stat.label} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <div className="flex items-center gap-2 mb-2">
@@ -205,7 +205,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
                     <DollarSign className="w-4 h-4 text-gray-300" />
                     <div>
                       <p className="text-[10px] text-gray-400 uppercase">Budget</p>
-                      <p className="text-sm font-bold text-[#6CC3DA]">{campaign.budget}</p>
+                      <p className="text-sm font-bold text-nilink-accent">{campaign.budget}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -226,7 +226,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
                   <div className="space-y-1.5">
                     {campaign.packageDetails.map((d, i) => (
                       <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                        <Check className="w-3.5 h-3.5 text-[#6CC3DA] shrink-0" />
+                        <Check className="w-3.5 h-3.5 text-nilink-accent shrink-0" />
                         {d}
                       </div>
                     ))}
@@ -413,7 +413,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-1.5">
                         <div
-                          className="h-1.5 rounded-full bg-[#6CC3DA] transition-all"
+                          className="h-1.5 rounded-full bg-nilink-accent-bright transition-all"
                           style={{
                             width: `${athlete.deliverablesTotal > 0 ? (athlete.deliverablesCompleted / athlete.deliverablesTotal) * 100 : 0}%`
                           }}
@@ -535,9 +535,9 @@ export function CampaignDetail({ campaign, onBack }: Props) {
 
                     const getIconColor = () => {
                       switch (item.type) {
-                        case 'status_change': return 'bg-emerald-100 text-emerald-600';
-                        case 'candidate_action': return 'bg-blue-50 text-blue-600';
-                        case 'deliverable': return 'bg-purple-50 text-purple-600';
+                        case 'status_change': return 'bg-emerald-100 text-emerald-700';
+                        case 'candidate_action': return 'bg-nilink-accent-soft text-nilink-accent';
+                        case 'deliverable': return 'bg-gray-100 text-nilink-ink';
                         case 'system': return 'bg-gray-100 text-gray-500';
                       }
                     };

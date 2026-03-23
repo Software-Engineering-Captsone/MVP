@@ -128,14 +128,14 @@ export function BusinessMessages() {
                   <div className="flex-1 min-w-0 pr-4">
                     <div className="flex items-center gap-1">
                       <h3 className="font-bold text-sm truncate">{conv.athleteName}</h3>
-                      {conv.verified && <VerifiedBadge className="w-4 h-4 text-blue-500 shrink-0" />}
+                      {conv.verified && <VerifiedBadge className="w-4 h-4 shrink-0" />}
                     </div>
                     <p className={`text-[13px] truncate ${conv.unread ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
                       {conv.lastMessage}
                     </p>
                   </div>
                   {conv.unread && (
-                    <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                    <div className="w-2 h-2 rounded-full bg-nilink-accent shrink-0" />
                   )}
                 </div>
               ))}

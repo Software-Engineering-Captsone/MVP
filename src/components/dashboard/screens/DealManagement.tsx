@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { DollarSign, Calendar, CheckCircle2, Clock, ChevronDown, FileText } from 'lucide-react';
+import { getBrandImageByName } from '@/lib/mockData';
 
 interface Deal {
   id: number;
@@ -73,9 +75,9 @@ export function DealManagement() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-white p-8" style={{ borderBottom: '1px solid #B4E2ED' }}>
+      <div className="bg-white p-8 border-b border-nilink-accent-border">
         <div className="max-w-5xl mx-auto">
-          <h1 className="text-5xl mb-2 tracking-wide leading-snug" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+          <h1 className="text-5xl mb-2 tracking-wide leading-snug text-nilink-ink font-bebas">
             DEAL MANAGEMENT
           </h1>
           <p className="text-gray-600 mb-6">Track your sponsorship deals, deliverables, and payments</p>
@@ -104,7 +106,7 @@ export function DealManagement() {
                 onClick={() => setActiveTab(tab)}
                 className={`px-6 py-3 rounded-lg font-bold transition-all ${
                   activeTab === tab
-                    ? 'bg-[#6CC3DA] text-white'
+                    ? 'bg-nilink-accent text-white shadow-sm'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -119,20 +121,28 @@ export function DealManagement() {
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-5xl mx-auto space-y-4">
           {filteredDeals.map((deal) => (
-            <div
+            <motion.div
               key={deal.id}
+              layout
               className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer"
               onClick={() => setSelectedDeal(deal)}
+              whileHover={{ y: -2 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
             >
               <div className="flex items-start justify-between mb-4">
-                <div>
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-white border border-gray-100 shrink-0 flex items-center justify-center overflow-hidden">
+                    <img src={getBrandImageByName(deal.brand)} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
                   <h3 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                     {deal.brand.toUpperCase()}
                   </h3>
                   <p className="text-gray-600">{deal.type}</p>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold" style={{ color: '#6CC3DA' }}>
+                  <p className="text-2xl font-bold text-nilink-accent">
                     ${deal.amount.toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-500">{deal.paymentSchedule}</p>
@@ -151,15 +161,14 @@ export function DealManagement() {
                 </div>
                 <div className="w-32 bg-gray-200 rounded-full h-2">
                   <div
-                    className="h-2 rounded-full"
+                    className="h-2 rounded-full bg-nilink-accent-bright"
                     style={{
                       width: `${(deal.deliverables.filter(d => d.completed).length / deal.deliverables.length) * 100}%`,
-                      backgroundColor: '#6CC3DA',
                     }}
                   />
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -174,11 +183,16 @@ export function DealManagement() {
             className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-gray-200 p-6">
-              <h2 className="text-3xl" style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#6CC3DA' }}>
+            <div className="border-b border-gray-200 p-6 flex items-start gap-4">
+              <div className="w-16 h-16 rounded-xl bg-gray-50 border border-gray-100 shrink-0 flex items-center justify-center overflow-hidden">
+                <img src={getBrandImageByName(selectedDeal.brand)} alt="" className="w-full h-full object-cover" />
+              </div>
+              <div>
+              <h2 className="text-3xl font-bebas text-nilink-ink">
                 {selectedDeal.brand.toUpperCase()}
               </h2>
               <p className="text-gray-600">{selectedDeal.type}</p>
+              </div>
             </div>
 
             <div className="p-6">
@@ -192,7 +206,7 @@ export function DealManagement() {
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-5 h-5" style={{ color: '#6CC3DA' }} />
+                    <Calendar className="w-5 h-5 text-nilink-accent" />
                     <h3 className="text-sm font-bold text-gray-500 uppercase">Duration</h3>
                   </div>
                   <p className="text-sm text-gray-700">{selectedDeal.startDate}<br />to {selectedDeal.endDate}</p>
@@ -207,14 +221,14 @@ export function DealManagement() {
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold text-gray-500 uppercase">Deliverables</h3>
-                  <span className="text-sm font-bold" style={{ color: '#6CC3DA' }}>
+                  <span className="text-sm font-bold text-nilink-accent">
                     {selectedDeal.deliverables.filter(d => d.completed).length}/{selectedDeal.deliverables.length} Completed
                   </span>
                 </div>
                 <div className="space-y-2">
                   {selectedDeal.deliverables.map((deliverable, index) => (
                     <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div className={`w-5 h-5 rounded flex items-center justify-center ${deliverable.completed ? 'bg-[#6CC3DA]' : 'bg-gray-300'}`}>
+                      <div className={`w-5 h-5 rounded flex items-center justify-center ${deliverable.completed ? 'bg-nilink-accent' : 'bg-gray-300'}`}>
                         {deliverable.completed && <CheckCircle2 className="w-4 h-4 text-white" />}
                       </div>
                       <span className={deliverable.completed ? 'text-gray-900' : 'text-gray-500'}>{deliverable.name}</span>
@@ -224,10 +238,10 @@ export function DealManagement() {
               </div>
 
               <div className="flex gap-3">
-                <button className="flex-1 px-6 py-3 rounded-lg font-bold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: '#6CC3DA' }}>
+                <button type="button" className="flex-1 px-6 py-3 rounded-lg font-bold text-white bg-nilink-accent hover:bg-nilink-accent-hover transition-colors">
                   VIEW CONTRACT
                 </button>
-                <button className="flex-1 px-6 py-3 rounded-lg font-bold border-2 hover:bg-gray-50 transition-colors text-gray-700" style={{ borderColor: '#6CC3DA' }}>
+                <button type="button" className="flex-1 px-6 py-3 rounded-lg font-bold border-2 border-nilink-accent text-nilink-accent hover:bg-nilink-accent-soft transition-colors">
                   MESSAGE BRAND
                 </button>
               </div>

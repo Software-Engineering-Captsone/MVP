@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Brand mark">
+  <defs><linearGradient id="g01" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#FF6B35"/><stop offset="100%" stop-color="#F7931E"/>
+  </linearGradient></defs>
+  <rect width="120" height="120" rx="28" fill="url(#g01)"/>
+  <rect x="24" y="38" width="72" height="48" rx="8" fill="white" opacity="0.92"/>
+  <circle cx="42" cy="62" r="8" fill="#FF6B35" opacity="0.85"/>
+  <rect x="56" y="54" width="32" height="16" rx="4" fill="#F7931E" opacity="0.9"/>
+</svg>

@@ -119,7 +119,6 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
 
   // Form state
   const [campaignName, setCampaignName] = useState('');
-  const [location, setLocation] = useState('');
   const [goal, setGoal] = useState('');
   const [budgetMin, setBudgetMin] = useState('');
   const [budgetMax, setBudgetMax] = useState('');
@@ -237,38 +236,21 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         />
                       </div>
 
-                      {/* Location + Goal */}
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5 block">
-                            Business Location
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={location}
-                              onChange={(e) => setLocation(e.target.value)}
-                              placeholder="San Francisco HQ"
-                              className="w-full px-4 py-3 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 placeholder:text-gray-300"
-                            />
-                            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5 block">
-                            Campaign Goal
-                          </label>
-                          <select
-                            value={goal}
-                            onChange={(e) => setGoal(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 text-gray-700 appearance-none bg-white"
-                          >
-                            <option value="">Select a goal</option>
-                            {goals.map(g => (
-                              <option key={g} value={g}>{g}</option>
-                            ))}
-                          </select>
-                        </div>
+                      {/* Goal */}
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5 block">
+                          Campaign Goal
+                        </label>
+                        <select
+                          value={goal}
+                          onChange={(e) => setGoal(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 text-gray-700 appearance-none bg-white font-medium"
+                        >
+                          <option value="">Select a goal</option>
+                          {goals.map(g => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* Budget Range — own row */}
@@ -353,7 +335,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                 <div className="w-72 shrink-0 pl-6 border-l border-gray-100">
                   <div className="bg-[#1C1C1E] rounded-2xl p-6 text-white sticky top-0">
                     <div className="flex items-center gap-2 mb-4">
-                      <Lightbulb className="w-5 h-5 text-[#6CC3DA]" />
+                      <Lightbulb className="w-5 h-5 text-nilink-accent-bright" />
                       <h3 className="font-bold text-sm">Goal Guidance</h3>
                     </div>
                     <p className="text-xs text-gray-400 leading-relaxed mb-5">
@@ -398,7 +380,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               {pkg.tag && (
-                                <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#EFFAFC] text-[#2A90B0] border border-[#B4E2ED] mb-2">
+                                <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#EFFAFC] text-nilink-accent border border-[#B4E2ED] mb-2">
                                   {pkg.tag}
                                 </span>
                               )}
@@ -415,7 +397,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                           <div className="space-y-2 mb-4">
                             {pkg.deliverables.map((d, i) => (
                               <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                                <Check className="w-3.5 h-3.5 text-[#6CC3DA] shrink-0" />
+                                <Check className="w-3.5 h-3.5 text-nilink-accent-bright shrink-0" />
                                 {d}
                               </div>
                             ))}
@@ -441,7 +423,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         { icon: Zap, label: 'NIL Compliant', desc: 'Automated filing with portals.' },
                       ].map((item, i) => (
                         <div key={i} className="flex items-start gap-3">
-                          <item.icon className="w-4 h-4 text-[#6CC3DA] mt-0.5 shrink-0" />
+                          <item.icon className="w-4 h-4 text-nilink-accent-bright mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs font-bold text-white">{item.label}</p>
                             <p className="text-[11px] text-gray-500 leading-snug">{item.desc}</p>
@@ -473,11 +455,11 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                   {/* Accept Applications */}
                   <div className="bg-white border border-gray-100 rounded-2xl p-6">
                     <div className="flex items-start justify-between mb-3">
-                      <Zap className="w-6 h-6 text-[#6CC3DA]" />
+                      <Zap className="w-6 h-6 text-nilink-accent-bright" />
                       <button
                         onClick={() => setAcceptApplications(!acceptApplications)}
                         className={`relative w-11 h-6 rounded-full transition-colors ${
-                          acceptApplications ? 'bg-[#2A90B0]' : 'bg-gray-200'
+                          acceptApplications ? 'bg-nilink-accent' : 'bg-gray-200'
                         }`}
                       >
                         <div
@@ -497,7 +479,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                   <div className="bg-white border border-gray-100 rounded-2xl p-6">
                     <div className="flex items-start gap-2 mb-3">
                       {visibility === 'Public' ? (
-                        <Globe className="w-6 h-6 text-[#6CC3DA]" />
+                        <Globe className="w-6 h-6 text-nilink-accent-bright" />
                       ) : (
                         <Lock className="w-6 h-6 text-gray-400" />
                       )}
@@ -585,7 +567,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         />
                         <div className="flex justify-between text-[11px] text-gray-400 mt-1">
                           <span>1K</span>
-                          <span className="font-bold text-[#2A90B0]">
+                          <span className="font-bold text-nilink-accent">
                             {followerMin >= 100 ? '1M+' : followerMin >= 50 ? `${followerMin}K+` : `${followerMin}K+`}
                           </span>
                           <span>1M</span>
@@ -646,7 +628,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         </div>
                         <div>
                           <p className="text-[10px] text-gray-400 uppercase tracking-wider">Budget</p>
-                          <p className="text-sm font-bold text-[#6CC3DA]">
+                          <p className="text-sm font-bold text-nilink-accent-bright">
                             {budgetMin && budgetMax ? `${budgetMin} – ${budgetMax}` : '$5,000 – $10,000'}
                           </p>
                         </div>

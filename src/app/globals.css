@@ -23,6 +23,18 @@
   --nilink-primary-hover: #46ADCA;
   --nilink-bg: #EFFAFC;
   --nilink-border: #B4E2ED;
+
+  /* Dashboard — sidebar neutrals + teal accent (CTA / focus) */
+  --nilink-sidebar: #1c1c1e;
+  --nilink-sidebar-muted: #2d2d2f;
+  --nilink-page: #f9fafb;
+  --nilink-ink: #1c1c1e;
+  --nilink-accent: #2a90b0;
+  --nilink-accent-hover: #267594;
+  --nilink-accent-bright: #6cc3da;
+  --nilink-accent-soft: #effafc;
+  --nilink-accent-border: #b4e2ed;
+  --nilink-surface: #ffffff;
 }
 
 @theme inline {
@@ -30,6 +42,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-nilink-sidebar: var(--nilink-sidebar);
+  --color-nilink-sidebar-muted: var(--nilink-sidebar-muted);
+  --color-nilink-page: var(--nilink-page);
+  --color-nilink-ink: var(--nilink-ink);
+  --color-nilink-accent: var(--nilink-accent);
+  --color-nilink-accent-hover: var(--nilink-accent-hover);
+  --color-nilink-accent-bright: var(--nilink-accent-bright);
+  --color-nilink-accent-soft: var(--nilink-accent-soft);
+  --color-nilink-accent-border: var(--nilink-accent-border);
+  --color-nilink-surface: var(--nilink-surface);
 }
 
 /* box-sizing only — Tailwind v4 preflight handles the rest */
@@ -66,4 +89,13 @@ button {
 
 .font-barlow {
   font-family: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Dashboard: consistent focus rings */
+.focus-nilink {
+  outline: none;
+}
+.focus-nilink:focus-visible {
+  outline: 2px solid var(--nilink-accent);
+  outline-offset: 2px;
 }

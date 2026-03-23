@@ -81,7 +81,7 @@ export function BusinessDeals() {
   });
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden text-[#1C1C1E]">
+    <div className="h-full flex flex-col bg-nilink-surface overflow-hidden text-nilink-ink">
       {/* Top Filter Bar */}
       <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
         <div className="relative w-64">
@@ -95,7 +95,7 @@ export function BusinessDeals() {
           />
         </div>
         
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#1C1C1E] text-white rounded-full text-sm font-medium hover:bg-[#2D2D2F] transition-colors shrink-0">
+        <button type="button" className="flex items-center gap-2 px-4 py-2 bg-nilink-sidebar text-white rounded-full text-sm font-medium hover:bg-nilink-sidebar-muted transition-colors shrink-0">
           All Filters
         </button>
 
@@ -108,7 +108,7 @@ export function BusinessDeals() {
                 onClick={() => setActiveSport(isActive ? null : sport)}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
                   isActive 
-                    ? 'border-[#1C1C1E] bg-[#1C1C1E] text-white' 
+                    ? 'border-nilink-sidebar bg-nilink-sidebar text-white' 
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -172,7 +172,7 @@ export function BusinessDeals() {
             </div>
           </div>
           
-          <button className="px-4 py-2 bg-[#1C1C1E] text-white rounded-lg text-sm font-medium hover:bg-[#2D2D2F] transition-colors">
+          <button type="button" className="px-4 py-2 bg-nilink-accent text-white rounded-lg text-sm font-semibold hover:bg-nilink-accent-hover transition-colors">
             Add Invoice
           </button>
         </div>
@@ -214,7 +214,7 @@ export function BusinessDeals() {
           </table>
           
           <div className="mt-8 text-center pb-8">
-            <button className="text-sm font-bold text-blue-500 hover:text-blue-600 transition-colors">
+            <button type="button" className="text-sm font-bold text-nilink-accent hover:text-nilink-accent-hover transition-colors">
               Load More
             </button>
           </div>
