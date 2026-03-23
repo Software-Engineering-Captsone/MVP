@@ -143,9 +143,9 @@ export function SavedAthletes() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-w-0 flex-1 overflow-hidden">
         {/* Main Grid Area */}
-        <div className={`flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x ${hasSelection ? 'max-w-[50%]' : ''}`}>
+        <div className={`min-w-0 flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x ${hasSelection ? 'max-w-[50%]' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">{isAthleteView ? 'Saved Brands' : 'Saved Athletes'}</h2>
             {loading && <span className="text-xs text-gray-400">Loading…</span>}
@@ -223,10 +223,10 @@ export function SavedAthletes() {
 
         {/* Quick View Sidebar (Right) */}
         {hasSelection && (
-          <div className="flex-1 border-l border-gray-100 flex flex-col bg-gray-50/30 overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-l border-gray-100 bg-gray-50/30">
             {isAthleteView && selectedBrand ? (
               // BRAND SIDEBAR
-              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x">
+              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-detail-pane-x">
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
                   <button 
                     onClick={() => setSelectedBrand(null)}
@@ -274,7 +274,7 @@ export function SavedAthletes() {
               </div>
             ) : selectedAthlete ? (
               // ATHLETE SIDEBAR
-              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x">
+              <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-detail-pane-x">
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
                   <button 
                     onClick={() => setSelectedAthlete(null)}

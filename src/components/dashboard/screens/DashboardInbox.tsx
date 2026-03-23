@@ -171,10 +171,10 @@ export function DashboardInbox({ variant }: { variant: InboxVariant }) {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-6 overflow-hidden py-4 dash-main-gutter-x lg:flex-row lg:py-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-hidden py-4 dash-main-gutter-x lg:flex-row lg:py-6">
         {/* Thread list */}
         <div
-          className={`flex h-full w-full shrink-0 flex-col lg:w-[320px] ${selectedId ? 'hidden lg:flex' : 'flex'}`}
+          className={`flex h-full w-full shrink-0 flex-col lg:w-[320px] lg:min-w-[320px] ${selectedId ? 'hidden lg:flex' : 'flex'}`}
         >
           <div className="mb-3 flex shrink-0 items-center justify-between px-1">
             <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900">
@@ -243,7 +243,7 @@ export function DashboardInbox({ variant }: { variant: InboxVariant }) {
         </div>
 
         {/* Chat panel */}
-        <div className={`flex h-full flex-1 flex-col ${selectedId ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex h-full min-w-0 flex-1 flex-col ${selectedId ? 'flex' : 'hidden lg:flex'}`}>
           <div className="mb-3 flex shrink-0 items-center gap-3 px-1">
             {selectedId && (
               <button

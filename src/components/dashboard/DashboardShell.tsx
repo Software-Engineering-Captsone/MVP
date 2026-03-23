@@ -117,8 +117,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   return (
     <DashboardContext.Provider value={{ accountType, user: sessionUser }}>
       <div className="flex h-screen bg-nilink-page text-nilink-ink">
-        <aside className="group relative z-50 w-20 overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]">
-          <div className="flex h-[72px] items-center justify-center px-2 pb-4 pt-6 group-hover:justify-start group-hover:px-5">
+        <aside className="group relative z-50 flex h-screen w-20 shrink-0 flex-col overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]">
+          <div className="flex h-[72px] shrink-0 items-center justify-center px-2 pb-4 pt-6 group-hover:justify-start group-hover:px-5">
             <Link
               href="/dashboard"
               className="flex w-full items-center justify-center gap-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar group-hover:justify-start group-hover:gap-3"
@@ -134,7 +134,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </Link>
           </div>
 
-          <nav className="mt-6 flex-1 overflow-x-hidden overflow-y-auto border-t border-nilink-sidebar-muted px-2 py-4 scrollbar-hide group-hover:px-3">
+          <nav className="mt-6 min-h-0 flex-1 overflow-x-hidden overflow-y-auto border-t border-nilink-sidebar-muted px-2 py-4 scrollbar-hide group-hover:px-3">
             <ul className="mt-4 space-y-1.5">
               {navigation.map((item) => {
                 const isActive =
@@ -188,7 +188,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </ul>
           </nav>
 
-          <div className="mt-auto bg-nilink-sidebar p-3 group-hover:p-4">
+          <div className="mt-auto shrink-0 bg-nilink-sidebar p-3 group-hover:p-4">
             <div className="border-t border-nilink-sidebar-muted pt-4">
               <div className="relative">
                 <motion.button
@@ -261,10 +261,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
         </aside>
 
-        <main className="flex flex-1 flex-col items-stretch overflow-auto bg-nilink-surface">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-nilink-surface">
           <motion.div
             key={pathname}
-            className="flex min-h-full w-full flex-1"
+            className="flex min-h-full min-w-0 w-full flex-1 flex-col"
             initial={pageTransition.initial}
             animate={pageTransition.animate}
             transition={pageTransition.transition}

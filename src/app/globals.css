@@ -199,3 +199,15 @@ button:disabled,
     padding-right: 2.5rem;
   }
 }
+
+/* Split views (Explore / Saved): lighter inset from the divider; keep right edge aligned with .dash-main-gutter-x */
+.dash-detail-pane-x {
+  padding-left: 1rem;
+  padding-right: 2rem;
+}
+@media (min-width: 768px) {
+  .dash-detail-pane-x {
+    padding-left: 1.25rem;
+    padding-right: 2.5rem;
+  }
+}
