@@ -344,12 +344,15 @@
 }
 
 .hero-content .hero-lede {
-  font-size: 17px;
+  white-space: nowrap;
+  font-size: clamp(12px, min(3.15vw, 2.9vmin), 17px);
   color: var(--text-secondary);
-  line-height: 1.55;
-  max-width: 28rem;
+  line-height: 1.45;
+  max-width: 100%;
   margin: 0 auto 28px;
   font-weight: 400;
+  padding: 0 0.25rem;
+  box-sizing: border-box;
 }
 
 .hero-ctas {

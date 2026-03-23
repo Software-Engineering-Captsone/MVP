@@ -19,7 +19,7 @@ export default function Hero() {
           </h1>
 
           <p className="hero-lede">
-            Discover the right partners and manage NIL deals in one place.
+            Discover partners and manage NIL deals in one place.
           </p>
 
           <div className="hero-ctas">
