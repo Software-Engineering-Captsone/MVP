@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
+import {
+  createLocalUser,
+  findUserByEmail,
+  findUserByGoogleId,
+  updateLocalUser,
+} from '@/lib/auth/localUserRepository';
 
 export async function GET(request: NextRequest) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
@@ -9,7 +13,6 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const error = searchParams.get('error');
 
-  // Read role from state param (passed from /api/auth/google)
   const state = searchParams.get('state');
   const role = state === 'brand' ? 'brand' : 'athlete';
 
@@ -17,7 +20,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${base}/auth?error=google_denied`);
   }
 
-  // Exchange authorization code for tokens
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -37,7 +39,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${base}/auth?error=google_failed`);
   }
 
-  // Fetch Google profile
   const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
@@ -49,43 +50,44 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${base}/auth?error=google_failed`);
   }
 
-  try {
-    await dbConnect();
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.error('JWT_SECRET is not set');
+    return NextResponse.redirect(`${base}/auth?error=google_failed`);
+  }
 
-    // 1. Try to find by Google ID
-    let user = await User.findOne({ googleId: profile.id });
+  try {
+    let user = await findUserByGoogleId(profile.id);
 
     if (!user) {
-      // 2. Try to find by email and link the Google account
-      user = await User.findOne({ email: profile.email });
-
-      if (user) {
-        // Existing email/password user — link their Google account
-        user.googleId = profile.id;
-        if (!user.verified) user.verified = true;
-        await user.save();
-      } else {
-        // 3. Brand-new user — use the role they selected before clicking Google
-        user = await User.create({
+      const byEmail = await findUserByEmail(profile.email);
+      if (byEmail) {
+        await updateLocalUser(byEmail._id, {
           googleId: profile.id,
+          verified: true,
+        });
+        user = (await findUserByGoogleId(profile.id)) ?? (await findUserByEmail(profile.email))!;
+      } else {
+        user = await createLocalUser({
           email: profile.email,
+          passwordHash: null,
           name: profile.name || profile.email.split('@')[0],
           role,
+          googleId: profile.id,
           verified: true,
         });
       }
     }
 
-    // Issue JWT
     const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
+      secret,
       { expiresIn: '7d' }
     );
 
-    return NextResponse.redirect(`${base}/auth/google/success?token=${token}`);
+    return NextResponse.redirect(`${base}/auth/google/success?token=${encodeURIComponent(token)}`);
   } catch (err) {
-    console.error('Google OAuth DB error:', err);
+    console.error('Google OAuth local user error:', err);
     return NextResponse.redirect(`${base}/auth?error=google_failed`);
   }
 }

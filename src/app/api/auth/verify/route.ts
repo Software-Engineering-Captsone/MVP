@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
+import { findUserByVerificationToken, updateLocalUser } from '@/lib/auth/localUserRepository';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,21 +10,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid verification link' }, { status: 400 });
     }
 
-    await dbConnect();
-
-    const user = await User.findOne({
-      verificationToken: token,
-      verificationExpires: { $gt: new Date() },
-    });
+    const user = await findUserByVerificationToken(token);
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid or expired verification token' }, { status: 400 });
     }
 
-    user.verified = true;
-    user.verificationToken = undefined;
-    user.verificationExpires = undefined;
-    await user.save();
+    await updateLocalUser(user._id, {
+      verified: true,
+      verificationToken: null,
+    });
 
     return NextResponse.redirect(new URL('/auth?verified=true', request.url));
   } catch (error) {

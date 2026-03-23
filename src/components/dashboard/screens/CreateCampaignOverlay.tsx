@@ -106,10 +106,48 @@ const packages = [
 /* ── Goal Options ───────────────────────────────────────────── */
 const goals = ['Brand Awareness', 'Lead Gen', 'Sales', 'Engagement', 'Foot Traffic', 'UGC Focus'];
 
+/* ── Launch payload (→ POST /api/campaigns) ─────────────────── */
+export type CreateCampaignPayload = {
+  name: string;
+  subtitle: string;
+  goal: string;
+  budget: string;
+  duration: string;
+  startDate: string;
+  endDate: string;
+  brief: string;
+  packageId: string;
+  packageName: string;
+  packageDetails: string[];
+  platforms: string[];
+  acceptApplications: boolean;
+  visibility: 'Public' | 'Private';
+  sport: string;
+  genderFilter: string;
+  followerMin: number;
+  location: string;
+};
+
+function formatDisplayDate(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDurationDays(start: string, end: string): string {
+  if (!start || !end) return 'TBD';
+  const s = new Date(`${start}T12:00:00`);
+  const e = new Date(`${end}T12:00:00`);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 'TBD';
+  const days = Math.max(0, Math.round((e.getTime() - s.getTime()) / 86400000));
+  return days === 0 ? 'Same day' : `${days} days`;
+}
+
 /* ── Main Component ─────────────────────────────────────────── */
 interface Props {
   onClose: () => void;
-  onLaunch: () => void;
+  onLaunch: (payload: CreateCampaignPayload) => void | Promise<void>;
 }
 
 export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
@@ -152,8 +190,36 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
     if (step > 1) setStep(step - 1);
   };
 
+  const buildPayload = (): CreateCampaignPayload => {
+    const pkg = packages.find((p) => p.id === selectedPackage);
+    const budget =
+      budgetMin || budgetMax
+        ? `$${budgetMin || '0'} – $${budgetMax || '0'}`
+        : '';
+    return {
+      name: campaignName.trim(),
+      subtitle: pkg?.subtitle?.trim() ?? '',
+      goal: goal.trim(),
+      budget,
+      duration: formatDurationDays(startDate, endDate),
+      startDate: formatDisplayDate(startDate),
+      endDate: formatDisplayDate(endDate),
+      brief: brief.trim(),
+      packageId: selectedPackage ?? '',
+      packageName: pkg?.name ?? '',
+      packageDetails: pkg ? [...pkg.deliverables] : [],
+      platforms: pkg ? [...pkg.platforms] : [],
+      acceptApplications,
+      visibility,
+      sport,
+      genderFilter: gender,
+      followerMin,
+      location: locationRadius.trim() || 'Flexible',
+    };
+  };
+
   const handleLaunch = () => {
-    onLaunch();
+    void onLaunch(buildPayload());
   };
 
   const handleSaveDraft = () => {

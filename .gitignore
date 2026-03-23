@@ -42,3 +42,7 @@ yarn-error.log*
 next-env.d.ts
 
 /.agent
+
+# Local campaign + application store (Mongoose-validated JSON; no cloud DB)
+/data/local-campaign-store.json
+/data/local-users-store.json

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Joi from 'joi';
-import crypto from 'crypto';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
+import { findUserByEmail, newResetToken, updateLocalUser } from '@/lib/auth/localUserRepository';
 import { sendPasswordResetEmail } from '@/lib/email';
 
 const forgotSchema = Joi.object({
@@ -11,8 +9,6 @@ const forgotSchema = Joi.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect();
-
     const body = await request.json();
     const { error, value } = forgotSchema.validate(body);
 
@@ -22,29 +18,30 @@ export async function POST(request: NextRequest) {
 
     const { email } = value;
 
-    const user = await User.findOne({ email });
+    const user = await findUserByEmail(email);
     if (!user) {
-      // Don't reveal if email exists
-      return NextResponse.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+      return NextResponse.json({
+        message: 'If an account with that email exists, a password reset link has been sent.',
+      });
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const { token, expires } = newResetToken();
+    await updateLocalUser(user._id, {
+      resetPasswordToken: token,
+      resetPasswordExpires: expires.toISOString(),
+    });
 
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = resetExpires;
-    await user.save();
+    const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const resetUrl = `${base}/auth/reset-password?token=${token}`;
 
-    // Send reset email
     try {
-      await sendPasswordResetEmail(email, resetToken);
+      await sendPasswordResetEmail(email, token);
     } catch (emailError) {
       console.error('Email send error:', emailError);
-      return NextResponse.json({ error: 'Failed to send reset email' }, { status: 500 });
+      console.info('[local auth] Password reset link (email not configured):', resetUrl);
     }
 
-    return NextResponse.json({ message: 'Password reset link sent to your email.' });
+    return NextResponse.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
   } catch (error) {
     console.error('Forgot password error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

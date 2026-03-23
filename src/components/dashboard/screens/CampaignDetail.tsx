@@ -1,15 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ChevronLeft, Edit3, Calendar, DollarSign, MapPin,
+  Edit3, Calendar, DollarSign, MapPin,
   Users, Eye, Target, Package, Globe, Lock,
-  Check, Clock, AlertCircle, Send, MoreHorizontal,
+  Check, Clock, Send, MoreHorizontal,
   FileText, Video, Image, ArrowRight, TrendingUp,
-  CheckCircle, XCircle, UserPlus, Zap
+  XCircle, UserPlus, Zap, MessageSquare,
 } from 'lucide-react';
+import { authFetch } from '@/lib/authFetch';
 import { motion } from 'framer-motion';
-import type { Campaign, CampaignStatus, CandidateStatus, Candidate, ContractedAthlete, Deliverable, ActivityItem } from './BusinessCampaigns';
+import type {
+  Campaign,
+  CampaignStatus,
+  CandidateStatus,
+} from '@/components/dashboard/screens/campaignDashboardTypes';
 
 /* ── Status Badge (shared) ──────────────────────────────────── */
 const campaignStatusStyles: Record<CampaignStatus, string> = {
@@ -51,15 +56,43 @@ const tabs: { id: TabId; label: string }[] = [
   { id: 'activity', label: 'Activity' },
 ];
 
+type CandidateFilter = 'All' | 'Applied' | 'Shortlisted' | 'Selected';
+
 /* ── Main Component ─────────────────────────────────────────── */
 interface Props {
   campaign: Campaign;
   onBack: () => void;
+  /** When true, show application actions (brand dashboard). */
+  brandReviewMode?: boolean;
+  onPatchApplication?: (
+    applicationId: string,
+    status: 'shortlisted' | 'approved' | 'declined'
+  ) => Promise<void>;
+  onApplicationsUpdated?: () => void | Promise<void>;
 }
 
-export function CampaignDetail({ campaign, onBack }: Props) {
+export function CampaignDetail({
+  campaign,
+  onBack,
+  brandReviewMode = false,
+  onPatchApplication,
+  onApplicationsUpdated,
+}: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
+  const [candidateFilter, setCandidateFilter] = useState<CandidateFilter>('All');
+  const [openMenuForId, setOpenMenuForId] = useState<string | null>(null);
+  const [messageAppId, setMessageAppId] = useState<string | null>(null);
+  const [threadMessages, setThreadMessages] = useState<
+    { id: string; fromUserId: string; body: string; createdAt: string }[]
+  >([]);
+  const [messageDraft, setMessageDraft] = useState('');
+  const [threadLoading, setThreadLoading] = useState(false);
+
+  const filteredCandidates = useMemo(() => {
+    if (candidateFilter === 'All') return campaign.candidates;
+    return campaign.candidates.filter((c) => c.status === candidateFilter);
+  }, [campaign.candidates, candidateFilter]);
 
   const toggleCandidate = (id: string) => {
     setSelectedCandidates(prev => {
@@ -74,8 +107,48 @@ export function CampaignDetail({ campaign, onBack }: Props) {
     if (selectedCandidates.size === campaign.candidates.length) {
       setSelectedCandidates(new Set());
     } else {
-      setSelectedCandidates(new Set(campaign.candidates.map(c => c.id)));
+      setSelectedCandidates(new Set(campaign.candidates.map((c) => c.id)));
     }
+  };
+
+  useEffect(() => {
+    if (!messageAppId) {
+      setThreadMessages([]);
+      return;
+    }
+    let cancelled = false;
+    setThreadLoading(true);
+    void (async () => {
+      try {
+        const res = await authFetch(`/api/applications/${messageAppId}/messages`);
+        const data = (await res.json()) as {
+          messages?: { id: string; fromUserId: string; body: string; createdAt: string }[];
+        };
+        if (!cancelled && res.ok && data.messages) setThreadMessages(data.messages);
+      } finally {
+        if (!cancelled) setThreadLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [messageAppId]);
+
+  const sendThreadMessage = async () => {
+    if (!messageAppId || !messageDraft.trim()) return;
+    const res = await authFetch(`/api/applications/${messageAppId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: messageDraft.trim() }),
+    });
+    if (!res.ok) return;
+    setMessageDraft('');
+    const refresh = await authFetch(`/api/applications/${messageAppId}/messages`);
+    const data = (await refresh.json()) as {
+      messages?: { id: string; fromUserId: string; body: string; createdAt: string }[];
+    };
+    if (refresh.ok && data.messages) setThreadMessages(data.messages);
+    await onApplicationsUpdated?.();
   };
 
   return (
@@ -278,14 +351,23 @@ export function CampaignDetail({ campaign, onBack }: Props) {
                   Select All
                 </button>
                 <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-gray-50 p-0.5">
-                  {['All', 'Applied', 'Shortlisted', 'Selected'].map(f => (
-                    <button
-                      key={f}
-                      className="px-3 py-1 text-xs font-medium rounded-md transition-colors text-gray-500 hover:text-gray-700 hover:bg-white"
-                    >
-                      {f}
-                    </button>
-                  ))}
+                  {(['All', 'Applied', 'Shortlisted', 'Selected'] as const).map((f) => {
+                    const on = candidateFilter === f;
+                    return (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setCandidateFilter(f)}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                          on
+                            ? 'bg-white text-nilink-ink shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-white'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -303,6 +385,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
             {/* Candidates Table */}
             <div className="flex-1 overflow-auto pb-6 dash-main-gutter-x">
               {campaign.candidates.length > 0 ? (
+                filteredCandidates.length > 0 ? (
                 <table className="w-full text-sm text-left">
                   <thead className="text-[11px] font-bold text-gray-500 uppercase bg-gray-50 sticky top-0 z-10">
                     <tr>
@@ -317,7 +400,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {campaign.candidates.map((candidate) => (
+                    {filteredCandidates.map((candidate) => (
                       <tr
                         key={candidate.id}
                         className="group hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors"
@@ -352,15 +435,82 @@ export function CampaignDetail({ campaign, onBack }: Props) {
                           </span>
                         </td>
                         <td className="px-5 py-4 text-gray-400 text-xs">{candidate.appliedDate}</td>
-                        <td className="px-5 py-4">
-                          <button className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-400">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
+                        <td className="relative px-5 py-4 text-right">
+                          {brandReviewMode && onPatchApplication && (
+                            <>
+                              <button
+                                type="button"
+                                className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-400"
+                                aria-label="Application actions"
+                                onClick={() =>
+                                  setOpenMenuForId((v) => (v === candidate.id ? null : candidate.id))
+                                }
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+                              {openMenuForId === candidate.id && (
+                                <div className="absolute right-2 top-9 z-30 w-48 rounded-xl border border-gray-100 bg-white py-1 shadow-xl text-left">
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                    onClick={() => {
+                                      setMessageAppId(candidate.id);
+                                      setOpenMenuForId(null);
+                                    }}
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                    Message
+                                  </button>
+                                  {candidate.status !== 'Shortlisted' && (
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                      onClick={() => {
+                                        setOpenMenuForId(null);
+                                        void onPatchApplication(candidate.id, 'shortlisted');
+                                      }}
+                                    >
+                                      Shortlist
+                                    </button>
+                                  )}
+                                  {candidate.status !== 'Selected' && (
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
+                                      onClick={() => {
+                                        setOpenMenuForId(null);
+                                        void onPatchApplication(candidate.id, 'approved');
+                                      }}
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                  {candidate.status !== 'Declined' && (
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                      onClick={() => {
+                                        setOpenMenuForId(null);
+                                        void onPatchApplication(candidate.id, 'declined');
+                                      }}
+                                    >
+                                      Decline
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                ) : (
+                  <p className="py-16 text-center text-sm text-gray-400">
+                    No candidates match this filter.
+                  </p>
+                )
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
@@ -574,6 +724,68 @@ export function CampaignDetail({ campaign, onBack }: Props) {
           </div>
         )}
       </div>
+
+        {messageAppId && (
+          <>
+            <button
+              type="button"
+              className="absolute inset-0 z-[70] bg-black/25"
+              aria-label="Close messages"
+              onClick={() => setMessageAppId(null)}
+            />
+            <div className="absolute right-0 top-0 z-[80] flex h-full w-full max-w-[380px] flex-col border-l border-gray-100 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                <p className="text-sm font-bold text-nilink-ink">Application messages</p>
+                <button
+                  type="button"
+                  onClick={() => setMessageAppId(null)}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 space-y-3 overflow-auto p-4">
+                {threadLoading ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : threadMessages.length === 0 ? (
+                  <p className="text-sm text-gray-400">No messages yet. Say hello.</p>
+                ) : (
+                  threadMessages.map((m) => (
+                    <div
+                      key={m.id}
+                      className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2 text-sm"
+                    >
+                      <p className="text-xs text-gray-400">
+                        {new Date(m.createdAt).toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-gray-800">{m.body}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2 border-t border-gray-100 p-3">
+                <input
+                  type="text"
+                  value={messageDraft}
+                  onChange={(e) => setMessageDraft(e.target.value)}
+                  placeholder="Write a message…"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void sendThreadMessage();
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => void sendThreadMessage()}
+                  className="shrink-0 rounded-lg bg-nilink-accent px-4 py-2 text-sm font-semibold text-white hover:bg-nilink-accent-hover"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </motion.div>
     </div>
   );

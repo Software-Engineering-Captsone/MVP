@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
-import crypto from 'crypto';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
-import { sendVerificationEmail } from '@/lib/email';
+import { createLocalUser } from '@/lib/auth/localUserRepository';
 
 const signupSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -15,8 +12,6 @@ const signupSchema = Joi.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect();
-
     const body = await request.json();
     const { error, value } = signupSchema.validate(body);
 
@@ -26,37 +21,30 @@ export async function POST(request: NextRequest) {
 
     const { email, password, role, name } = value;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return NextResponse.json({ error: 'User already exists' }, { status: 400 });
-    }
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    const user = await User.create({
-      email,
-      password: hashedPassword,
-      role,
-      name,
-      verificationToken,
-      verificationExpires,
-    });
-
-    // Send verification email
     try {
-      await sendVerificationEmail(email, verificationToken);
-    } catch (emailError) {
-      console.error('Email send error:', emailError);
-      // Don't fail signup if email fails
-    }
+      const user = await createLocalUser({
+        email,
+        passwordHash: hashedPassword,
+        role,
+        name,
+        verified: true,
+      });
 
-    return NextResponse.json({ message: 'User created successfully. Pending for Approval.', userId: user._id }, { status: 201 });
+      return NextResponse.json(
+        {
+          message: 'Account created. You can sign in now.',
+          userId: user._id,
+        },
+        { status: 201 }
+      );
+    } catch (e) {
+      if (e instanceof Error && e.message === 'User already exists') {
+        return NextResponse.json({ error: 'User already exists' }, { status: 400 });
+      }
+      throw e;
+    }
   } catch (error) {
     console.error('Signup error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

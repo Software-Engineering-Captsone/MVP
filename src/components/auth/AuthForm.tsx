@@ -83,10 +83,9 @@ export default function AuthForm() {
                 // Store token
                 localStorage.setItem('token', data.token);
                 setSuccessMessage('Sign in successful! Redirecting...');
-                const destination = data.user.role === 'athlete' ? '/athlete' : '/business';
                 setTimeout(() => {
-                    router.push(destination);
-                }, 1000);
+                    router.push('/dashboard');
+                }, 600);
             } else {
                 setFormError(data.error || 'Sign in failed');
             }
@@ -119,7 +118,7 @@ export default function AuthForm() {
             const data = await response.json();
 
             if (response.ok) {
-                setSuccessMessage('Please wait for verification.');
+                setSuccessMessage('Account created. You can sign in now.');
                 setActiveTab('signin');
                 setSignupFirstName('');
                 setSignupLastName('');

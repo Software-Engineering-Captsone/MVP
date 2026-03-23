@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Joi from 'joi';
-import crypto from 'crypto';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
+import {
+  findUserByEmail,
+  newVerificationToken,
+  updateLocalUser,
+} from '@/lib/auth/localUserRepository';
 import { sendVerificationEmail } from '@/lib/email';
 
 const resendSchema = Joi.object({
@@ -11,8 +13,6 @@ const resendSchema = Joi.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect();
-
     const body = await request.json();
     const { error, value } = resendSchema.validate(body);
 
@@ -22,29 +22,30 @@ export async function POST(request: NextRequest) {
 
     const { email } = value;
 
-    const user = await User.findOne({ email });
+    const user = await findUserByEmail(email);
     if (!user) {
-      // Don't reveal if email exists
-      return NextResponse.json({ message: 'If an account with that email exists, a verification link has been sent.' });
+      return NextResponse.json({
+        message: 'If an account with that email exists, a verification link has been sent.',
+      });
     }
 
     if (user.verified) {
       return NextResponse.json({ error: 'Email is already verified' }, { status: 400 });
     }
 
-    // Generate new verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const { token, expires } = newVerificationToken();
 
-    user.verificationToken = verificationToken;
-    user.verificationExpires = verificationExpires;
-    await user.save();
+    await updateLocalUser(user._id, {
+      verificationToken: token,
+      verificationExpires: expires.toISOString(),
+    });
 
-    // Send verification email
     try {
-      await sendVerificationEmail(email, verificationToken);
+      await sendVerificationEmail(email, token);
     } catch (emailError) {
       console.error('Email send error:', emailError);
+      const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      console.info('[local auth] Verification link (email not configured):', `${base}/api/auth/verify?token=${token}`);
       return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });
     }
 

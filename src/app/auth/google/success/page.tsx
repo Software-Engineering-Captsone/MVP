@@ -13,8 +13,7 @@ function GoogleSuccessContent() {
       localStorage.setItem('token', token);
       try {
         const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        const destination = payload.role === 'athlete' ? '/athlete' : '/business';
-        router.replace(destination);
+        router.replace('/dashboard');
       } catch {
         router.replace('/auth?error=google_failed');
       }

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/middleware';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
+import { findUserById } from '@/lib/auth/localUserRepository';
 
-async function handler(request: NextRequest, user: any) {
-  await dbConnect();
-  const fullUser = await User.findById(user.userId).select('-password');
+async function handler(request: NextRequest, user: { userId: string }) {
+  const fullUser = await findUserById(user.userId);
 
   if (!fullUser) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });

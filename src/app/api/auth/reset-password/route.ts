@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import Joi from 'joi';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
+import { findUserByResetToken, updateLocalUser } from '@/lib/auth/localUserRepository';
 
 const resetSchema = Joi.object({
   token: Joi.string().required(),
@@ -11,8 +10,6 @@ const resetSchema = Joi.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect();
-
     const body = await request.json();
     const { error, value } = resetSchema.validate(body);
 
@@ -22,22 +19,19 @@ export async function POST(request: NextRequest) {
 
     const { token, password } = value;
 
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: new Date() },
-    });
+    const user = await findUserByResetToken(token);
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid or expired reset token' }, { status: 400 });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    user.password = hashedPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
+    await updateLocalUser(user._id, {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+    });
 
     return NextResponse.json({ message: 'Password reset successfully' });
   } catch (error) {
