@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Filter, Instagram, Facebook } from 'lucide-react'; // Keep Instagram and Facebook as they are used
+import { Search, Filter, Instagram, Facebook, X } from 'lucide-react'; // Keep Instagram and Facebook as they are used
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge'; // Add VerifiedBadge import
 
 // Custom icons for sports and tiktok
@@ -223,7 +223,13 @@ export function AthleteDiscovery() {
         {selectedAthlete && (
           <div className="flex-1 border-l border-gray-100 flex flex-col bg-gray-50/30 overflow-hidden">
             <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
+                <button 
+                  onClick={() => setSelectedAthlete(null)}
+                  className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center bg-black/20 hover:bg-black/40 rounded-full transition-colors z-10"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
                 {/* Banner */}
                 <div className="h-32 bg-[#FFCD00] relative">
                   {selectedAthlete.teamLogo && (
