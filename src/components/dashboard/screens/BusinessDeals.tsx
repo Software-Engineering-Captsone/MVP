@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, MoreHorizontal, FileText } from 'lucide-react';
-import { mockAthletes } from '@/lib/mockData';
+import { Search, MoreHorizontal } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 
 // Reusing same icons from Discovery

@@ -14,9 +14,9 @@ export function NilinkLogoMark({
     'border border-white/15 text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)] [box-shadow:inset_0_1px_0_rgba(255,255,255,0.15)]';
   const light =
     'border border-transparent text-white [background:linear-gradient(135deg,#6cc3da,#2a90b0)] [box-shadow:inset_0_1px_0_rgba(255,255,255,0.15)]';
-  /* Softer than solid white so it doesn’t read like the sidebar’s stone-100 active pill */
+  /* Light frosted tile on dark sidebar — brighter than /55 so it doesn’t read muddy */
   const inverse =
-    'border border-white/35 bg-white/55 text-nilink-ink shadow-none backdrop-blur-[1px]';
+    'border border-white/50 bg-white/85 text-nilink-ink shadow-none backdrop-blur-sm';
   const variant = surface === 'light' ? light : surface === 'inverse' ? inverse : dark;
   return (
     <span className={`${base} ${variant} ${className}`} aria-hidden>
@@ -38,7 +38,7 @@ export function NilinkLogoText({
   const color =
     surface === 'light' ? 'text-[color:var(--text)]' : 'text-white';
   const collapse = collapsible
-    ? 'max-w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[200px] group-hover:opacity-100 whitespace-nowrap'
+    ? 'min-w-0 max-w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:opacity-100 whitespace-nowrap'
     : '';
   return (
     <span

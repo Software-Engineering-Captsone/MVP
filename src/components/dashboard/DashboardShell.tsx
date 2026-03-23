@@ -152,19 +152,21 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           className="group relative z-50 flex h-screen w-20 shrink-0 flex-col overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]"
           onMouseLeave={() => setIsProfileMenuOpen(false)}
         >
-          <div className="flex h-[72px] shrink-0 items-center px-3 pb-4 pt-6">
+          <div className="shrink-0 px-3 pb-4 pt-6">
             <Link
               href="/dashboard"
-              className="flex w-full items-center justify-start gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
+              className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
             >
-              <motion.div
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.98 }}
-                className="shrink-0"
-              >
-                <NilinkLogoMark surface="inverse" />
-              </motion.div>
-              <NilinkLogoText surface="dark" collapsible />
+              <div className="flex min-h-[44px] w-full items-center justify-center gap-0 rounded-xl px-2 py-2 group-hover:justify-start group-hover:gap-2">
+                <motion.span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <NilinkLogoMark surface="inverse" />
+                </motion.span>
+                <NilinkLogoText surface="dark" collapsible />
+              </div>
             </Link>
           </div>
 
