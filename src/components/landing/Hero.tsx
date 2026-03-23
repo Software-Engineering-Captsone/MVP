@@ -5,7 +5,7 @@ import { heroLandingCollageUrls } from "@/lib/mockData";
 const REEL_LEFT = heroLandingCollageUrls.slice(0, 3);
 const REEL_RIGHT = heroLandingCollageUrls.slice(3, 6);
 
-function ReelCard({
+function CollageCard({
   src,
   priority,
   variant,
@@ -15,22 +15,15 @@ function ReelCard({
   variant: "left-a" | "left-b" | "left-c" | "right-a" | "right-b" | "right-c";
 }) {
   return (
-    <div className={`hero-reel hero-reel--${variant}`}>
-      <div className="hero-reel__chrome">
-        <span className="hero-reel__dot" />
-        <span className="hero-reel__dot" />
-        <span className="hero-reel__dot" />
-      </div>
-      <div className="hero-reel__body">
-        <Image
-          src={src}
-          alt=""
-          fill
-          sizes="150px"
-          className="hero-reel__img"
-          priority={priority}
-        />
-      </div>
+    <div className={`hero-collage-card hero-collage-card--${variant}`}>
+      <Image
+        src={src}
+        alt=""
+        fill
+        sizes="(max-width: 900px) 0px, 200px"
+        className="hero-collage-card__img"
+        priority={priority}
+      />
     </div>
   );
 }
@@ -42,9 +35,9 @@ export default function Hero() {
   return (
     <section className="hero">
       <div className="hero-collage" aria-hidden>
-        <div className="hero-reel-stack hero-reel-stack--left">
+        <div className="hero-collage-stack hero-collage-stack--left">
           {REEL_LEFT.map((src, i) => (
-            <ReelCard
+            <CollageCard
               key={src}
               src={src}
               priority={i < 2}
@@ -52,9 +45,9 @@ export default function Hero() {
             />
           ))}
         </div>
-        <div className="hero-reel-stack hero-reel-stack--right">
+        <div className="hero-collage-stack hero-collage-stack--right">
           {REEL_RIGHT.map((src, i) => (
-            <ReelCard
+            <CollageCard
               key={src}
               src={src}
               priority={i < 2}

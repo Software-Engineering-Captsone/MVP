@@ -287,103 +287,81 @@
   pointer-events: none;
 }
 
-.hero-reel-stack {
+/* Side bands: up to 40vw from each edge toward center; cards scattered inside */
+.hero-collage-stack {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: clamp(100px, 12vw, 168px);
+  top: 0;
+  bottom: 0;
+  width: 40vw;
+  max-width: 520px;
+  pointer-events: none;
 }
 
-.hero-reel-stack--left {
-  left: clamp(0.25rem, 3vw, 2.25rem);
+.hero-collage-stack--left {
+  left: 0;
 }
 
-.hero-reel-stack--right {
-  right: clamp(0.25rem, 3vw, 2.25rem);
+.hero-collage-stack--right {
+  right: 0;
 }
 
-.hero-reel {
-  position: relative;
-  width: 100%;
-  max-width: 168px;
+.hero-collage-card {
+  position: absolute;
+  width: clamp(100px, 11vw, 176px);
   aspect-ratio: 9 / 16;
-  flex-shrink: 0;
-  border-radius: 20px;
+  border-radius: 18px;
   overflow: hidden;
-  background: #ffffff;
+  background: #d4d4d8;
   box-shadow:
     0 4px 6px -1px rgba(28, 28, 30, 0.06),
-    0 22px 48px -12px rgba(28, 28, 30, 0.18),
-    0 0 0 1px rgba(28, 28, 30, 0.07);
-  display: flex;
-  flex-direction: column;
+    0 22px 48px -14px rgba(28, 28, 30, 0.16),
+    0 0 0 1px rgba(28, 28, 30, 0.06);
 }
 
-.hero-reel + .hero-reel {
-  margin-top: clamp(-3.25rem, -7vw, -2.25rem);
-}
-
-.hero-reel__chrome {
-  flex: 0 0 auto;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 12px;
-  background: linear-gradient(180deg, #fafafa 0%, #f4f4f5 100%);
-  border-bottom: 1px solid rgba(28, 28, 30, 0.06);
-}
-
-.hero-reel__dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #d4d4d8;
-}
-
-.hero-reel__body {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-  background: #18181b;
-}
-
-.hero-reel__img {
+.hero-collage-card__img {
   object-fit: cover;
 }
 
-.hero-reel-stack--left .hero-reel--left-a {
-  transform: rotate(-7deg);
-  z-index: 3;
-  margin-right: 0.5rem;
-}
-
-.hero-reel-stack--left .hero-reel--left-b {
-  transform: rotate(3deg) translateX(8px);
+/* Organic scatter; rotations ±3–5° */
+.hero-collage-stack--left .hero-collage-card--left-a {
+  top: 10%;
+  left: 2%;
+  transform: rotate(-4.8deg);
   z-index: 2;
 }
 
-.hero-reel-stack--left .hero-reel--left-c {
-  transform: rotate(-4deg) translateX(-4px);
+.hero-collage-stack--left .hero-collage-card--left-b {
+  top: 38%;
+  left: 42%;
+  transform: rotate(3.4deg);
+  z-index: 3;
+}
+
+.hero-collage-stack--left .hero-collage-card--left-c {
+  top: 64%;
+  left: 8%;
+  transform: rotate(-3.2deg);
   z-index: 1;
 }
 
-.hero-reel-stack--right .hero-reel--right-a {
-  transform: rotate(6deg);
-  z-index: 3;
-  margin-left: 0.5rem;
-}
-
-.hero-reel-stack--right .hero-reel--right-b {
-  transform: rotate(-3deg) translateX(-8px);
+.hero-collage-stack--right .hero-collage-card--right-a {
+  top: 12%;
+  right: 4%;
+  transform: rotate(4.5deg);
   z-index: 2;
 }
 
-.hero-reel-stack--right .hero-reel--right-c {
-  transform: rotate(5deg) translateX(6px);
+.hero-collage-stack--right .hero-collage-card--right-b {
+  top: 40%;
+  right: 40%;
+  transform: rotate(-3.7deg);
+  z-index: 3;
+}
+
+.hero-collage-stack--right .hero-collage-card--right-c {
+  top: 66%;
+  right: 6%;
+  transform: rotate(3.1deg);
   z-index: 1;
 }
 
@@ -410,7 +388,7 @@
 }
 
 @media (max-width: 900px) {
-  .hero-reel-stack {
+  .hero-collage-stack {
     display: none;
   }
 
