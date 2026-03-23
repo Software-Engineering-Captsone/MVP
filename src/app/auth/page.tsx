@@ -4,8 +4,8 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 export const metadata: Metadata = {
-  title: 'NILHub — Sign In',
-  description: 'Sign in or create an account on NILHub to start connecting with athletes and brands.',
+  title: 'NILINK — Sign In',
+  description: 'Sign in or create an account on NILINK to start connecting with athletes and brands.',
 };
 
 export default function AuthPage() {

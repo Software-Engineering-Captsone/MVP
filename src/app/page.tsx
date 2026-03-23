@@ -17,8 +17,10 @@ export default function Home() {
   return (
     <div className="landing-page">
       <Navbar />
-      <Hero />
-      <TrustBar />
+      <div className="landing-hero-cluster">
+        <Hero />
+        <TrustBar />
+      </div>
       <HowItWorks />
       <DualAudience />
       <Features />

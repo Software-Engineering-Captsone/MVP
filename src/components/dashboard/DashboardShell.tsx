@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Home, Search, FileText, MessageSquare, Zap, Heart,
+  Home, Search, FileText, MessageSquare, Heart,
   CreditCard, Megaphone, BarChart3, MoreVertical,
   type LucideIcon,
 } from 'lucide-react';
+import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
 import { pageTransition } from '@/components/dashboard/dashboardMotion';
 import { authFetch } from '@/lib/authFetch';
 import { userAvatarDataUrl } from '@/lib/userAvatar';
@@ -120,18 +121,16 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <div className="flex h-[72px] items-center justify-center px-2 pb-4 pt-6 group-hover:justify-start group-hover:px-5">
             <Link
               href="/dashboard"
-              className="flex w-full items-center justify-center gap-0 rounded-lg outline-none group-hover:justify-start group-hover:gap-3 focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
+              className="flex w-full items-center justify-center gap-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar group-hover:justify-start group-hover:gap-3"
             >
               <motion.div
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm"
+                className="shrink-0"
               >
-                <Zap className="h-5 w-5 text-nilink-sidebar" fill="currentColor" strokeWidth={1} />
+                <NilinkLogoMark surface="dark" />
               </motion.div>
-              <h1 className="max-w-0 overflow-hidden text-xl font-bold tracking-wide text-white opacity-0 transition-all duration-300 group-hover:max-w-[200px] group-hover:opacity-100 whitespace-nowrap">
-                NILINK
-              </h1>
+              <NilinkLogoText surface="dark" collapsible />
             </Link>
           </div>
 

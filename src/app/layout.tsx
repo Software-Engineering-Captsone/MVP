@@ -16,9 +16,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "NILHub — The NIL Marketplace for College Athletes",
+  title: "NILINK — The NIL Marketplace for College Athletes",
   description:
-    "NILHub is the marketplace that connects student athletes with the right brand partnerships. Real social data, simple deal management, and profiles that actually showcase who you are.",
+    "NILINK is the marketplace that connects student athletes with the right brand partnerships. Real social data, simple deal management, and profiles that actually showcase who you are.",
 };
 
 export default function RootLayout({

@@ -294,7 +294,7 @@ export default function AuthForm() {
                     <div className="form-view active">
                         <div className="auth-header">
                             <h2>Create your account</h2>
-                            <p>Get started with NILHub in seconds</p>
+                            <p>Get started with NILINK in seconds</p>
                         </div>
 
                         {/* Role Selection */}

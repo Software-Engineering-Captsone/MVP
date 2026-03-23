@@ -2,33 +2,33 @@ import Link from "next/link";
 
 export default function Navbar() {
   return (
-    <nav className="nav-dark">
-      <div className="nav-left">
-        <Link href="/" className="nav-logo">
-          <div className="nav-logo-mark">
-            <span>N</span>
+    <header className="landing-nav-shell">
+      <div className="landing-nav-dock">
+        <div className="landing-nav-inner">
+          <Link href="/" className="landing-nav-wordmark">
+            NILINK
+          </Link>
+
+          <nav className="landing-nav-center" aria-label="Primary">
+            <ul className="landing-nav-menu">
+              <li><a href="#how">How it works</a></li>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#athletes">For Athletes</a></li>
+              <li><a href="#brands">For Brands</a></li>
+              <li><a href="#pricing">Pricing</a></li>
+            </ul>
+          </nav>
+
+          <div className="landing-nav-right">
+            <Link href="/auth" className="landing-nav-ghost">
+              Log in
+            </Link>
+            <Link href="/auth" className="landing-nav-ghost">
+              Sign in
+            </Link>
           </div>
-          <span className="nav-logo-text">NILHub</span>
-        </Link>
-
-        <ul className="nav-menu">
-          <li><a href="#how">How it works</a></li>
-          <li><a href="#features">Features</a></li>
-          <li><a href="#athletes">For Athletes</a></li>
-          <li><a href="#brands">For Brands</a></li>
-          <li><a href="#pricing">Pricing</a></li>
-        </ul>
+        </div>
       </div>
-
-      <div className="nav-right">
-        <Link href="/auth" className="btn-ghost-dark">
-          Log in
-        </Link>
-
-        <Link href="/auth" className="btn-pill btn-white">
-          Get started free
-        </Link>
-      </div>
-    </nav>
+    </header>
   );
 }

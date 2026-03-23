@@ -1,12 +1,9 @@
-import Link from 'next/link';
+import { NilinkLogoLink } from '@/components/brand/NilinkLogo';
 
 export default function AuthLeftPanel() {
     return (
         <div className="auth-left">
-            <Link href="/" className="auth-left-logo">
-                <div className="auth-left-logo-mark"></div>
-                <span className="auth-left-logo-text">NILHub</span>
-            </Link>
+            <NilinkLogoLink href="/" className="auth-left-logo" surface="dark" />
 
             <div className="auth-left-content">
                 <h1>Build partnerships <em>that matter</em></h1>
@@ -14,7 +11,7 @@ export default function AuthLeftPanel() {
             </div>
 
             <div className="auth-left-testimonial">
-                <p className="testimonial-text">&quot;NILHub made it incredibly easy to find the right brands for my personal brand. I closed my first deal within a week.&quot;</p>
+                <p className="testimonial-text">&quot;NILINK made it incredibly easy to find the right brands for my personal brand. I closed my first deal within a week.&quot;</p>
                 <div className="testimonial-author">
                     <div className="testimonial-avatar"></div>
                     <div>

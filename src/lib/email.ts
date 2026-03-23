@@ -14,9 +14,9 @@ export const sendVerificationEmail = async (email: string, token: string) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
-    subject: 'Verify your NILHub account',
+    subject: 'Verify your NILINK account',
     html: `
-      <h1>Welcome to NILHub!</h1>
+      <h1>Welcome to NILINK!</h1>
       <p>Please click the link below to verify your email address:</p>
       <a href="${verificationUrl}">Verify Email</a>
       <p>This link will expire in 24 hours.</p>
@@ -32,7 +32,7 @@ export const sendPasswordResetEmail = async (email: string, token: string) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
-    subject: 'Reset your NILHub password',
+    subject: 'Reset your NILINK password',
     html: `
       <h1>Password Reset</h1>
       <p>You requested a password reset. Click the link below to reset your password:</p>
