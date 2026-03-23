@@ -57,7 +57,7 @@ export default function AuthForm() {
 
     const handleGoogleAuth = (e: React.FormEvent) => {
         e.preventDefault();
-        window.location.href = '/api/auth/google';
+        window.location.href = `/api/auth/google?role=${role}`;
     };
 
     const handleSignIn = async (e: React.FormEvent) => {

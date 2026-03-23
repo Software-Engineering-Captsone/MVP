@@ -9,6 +9,10 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const error = searchParams.get('error');
 
+  // Read role from state param (passed from /api/auth/google)
+  const state = searchParams.get('state');
+  const role = state === 'brand' ? 'brand' : 'athlete';
+
   if (error || !code) {
     return NextResponse.redirect(`${base}/auth?error=google_denied`);
   }
@@ -56,16 +60,17 @@ export async function GET(request: NextRequest) {
       user = await User.findOne({ email: profile.email });
 
       if (user) {
+        // Existing email/password user — link their Google account
         user.googleId = profile.id;
         if (!user.verified) user.verified = true;
         await user.save();
       } else {
-        // 3. Create a new user — default role is athlete, can be changed in settings
+        // 3. Brand-new user — use the role they selected before clicking Google
         user = await User.create({
           googleId: profile.id,
           email: profile.email,
           name: profile.name || profile.email.split('@')[0],
-          role: 'athlete',
+          role,
           verified: true,
         });
       }
@@ -78,7 +83,6 @@ export async function GET(request: NextRequest) {
       { expiresIn: '7d' }
     );
 
-    // Hand off token to the client via an intermediate page
     return NextResponse.redirect(`${base}/auth/google/success?token=${token}`);
   } catch (err) {
     console.error('Google OAuth DB error:', err);
