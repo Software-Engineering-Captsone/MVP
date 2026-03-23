@@ -1,8 +1,27 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
-import { Building2, MapPin, Globe, Users, Star, Edit3, Save, Megaphone, Award, MessageSquare } from 'lucide-react';
+import {
+  Building2,
+  MapPin,
+  Globe,
+  Users,
+  Star,
+  Edit3,
+  Save,
+  Megaphone,
+  MessageSquare,
+  Heart,
+  ChevronRight,
+} from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { mockAthletes } from '@/lib/mockData';
+
+/** Demo roster on the public-facing business profile (replace with API-backed saves later). */
+const DUMMY_SAVED_ATHLETES = mockAthletes.slice(0, 4);
 
 export function BusinessProfile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -45,7 +64,7 @@ export function BusinessProfile() {
             <button
               type="button"
               onClick={() => setIsEditing(!isEditing)}
-              className="flex shrink-0 items-center gap-2 rounded-lg bg-nilink-ink px-6 py-3 font-bold text-white transition-colors hover:bg-gray-800"
+              className="flex shrink-0 items-center gap-2 rounded-lg bg-nilink-accent px-6 py-3 font-bold text-white transition-colors hover:bg-nilink-accent-hover"
             >
               {isEditing ? (
                 <>
@@ -114,6 +133,53 @@ export function BusinessProfile() {
           ) : (
             <p className="text-gray-700 leading-relaxed">{profile.description}</p>
           )}
+        </div>
+
+        {/* Saved athletes (dummy preview for brand profile) */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Heart className="h-6 w-6 fill-[#6CC3DA]/20 text-[#6CC3DA]" />
+              <div>
+                <h3
+                  className="text-2xl tracking-wide text-gray-900"
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}
+                >
+                  SAVED ATHLETES
+                </h3>
+                <p className="text-sm text-gray-500">Athletes you are tracking for upcoming campaigns</p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/saved"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-[#6CC3DA] hover:underline"
+            >
+              View all saved
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {DUMMY_SAVED_ATHLETES.map((athlete) => (
+              <Link
+                key={athlete.id}
+                href={`/dashboard/profile/view?id=${athlete.id}`}
+                className="group flex gap-4 rounded-xl border border-gray-100 bg-gray-50/80 p-4 transition-colors hover:border-[#6CC3DA]/40 hover:bg-white"
+              >
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-white shadow-sm">
+                  <ImageWithFallback src={athlete.image} alt="" className="h-full w-full object-cover" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <p className="truncate font-bold text-gray-900 group-hover:text-[#6CC3DA]">{athlete.name}</p>
+                    {athlete.verified ? <VerifiedBadge className="h-4 w-4 shrink-0" /> : null}
+                  </div>
+                  <p className="truncate text-xs text-gray-500">{athlete.sport}</p>
+                  <p className="truncate text-xs text-gray-400">{athlete.school}</p>
+                  <p className="mt-1 text-xs font-semibold text-[#6CC3DA]">{athlete.compatibilityScore}% match</p>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* Active Campaigns */}

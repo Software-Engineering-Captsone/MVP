@@ -60,7 +60,7 @@ export function ExploreCollege() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search colleges, mascots, or locations..."
-                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] transition-colors text-gray-900"
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent transition-colors text-gray-900"
               />
             </div>
           </div>
@@ -69,7 +69,7 @@ export function ExploreCollege() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Division</label>
               <select value={selectedDivision} onChange={(e) => setSelectedDivision(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900"
               >
                 <option value="all">All Divisions</option>
                 <option value="Division I">Division I</option>
@@ -80,7 +80,7 @@ export function ExploreCollege() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
               <select value={selectedState} onChange={(e) => setSelectedState(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900"
               >
                 <option value="all">All States</option>
                 <option value="California">California</option>

@@ -96,7 +96,10 @@ export function BusinessDeals() {
           />
         </div>
         
-        <button type="button" className="flex items-center gap-2 px-4 py-2 bg-nilink-sidebar text-white rounded-full text-sm font-medium hover:bg-nilink-sidebar-muted transition-colors shrink-0">
+        <button
+          type="button"
+          className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        >
           All Filters
         </button>
 

@@ -1,15 +1,9 @@
 'use client';
 
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-import { Messaging } from '@/components/dashboard/screens/Messaging';
-import { BusinessMessages } from '@/components/dashboard/screens/BusinessMessages';
+import { DashboardInbox } from '@/components/dashboard/screens/DashboardInbox';
 
 export default function MessagesPage() {
   const { accountType } = useDashboard();
-
-  if (accountType === 'business') {
-    return <BusinessMessages />;
-  }
-
-  return <Messaging />;
+  return <DashboardInbox variant={accountType === 'business' ? 'business' : 'athlete'} />;
 }

@@ -134,7 +134,7 @@ export function AthleteDiscovery() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-white text-[#1C1C1E]">
+    <div className="flex h-full flex-col overflow-hidden bg-white text-nilink-ink">
       <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-3 pt-5">
         <DashboardPageHeader
           title="Explore"
@@ -158,7 +158,10 @@ export function AthleteDiscovery() {
           />
         </div>
         
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#1C1C1E] text-white rounded-full text-sm font-medium hover:bg-[#2D2D2F] transition-colors shrink-0">
+        <button
+          type="button"
+          className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        >
           All Filters
         </button>
 
@@ -169,9 +172,9 @@ export function AthleteDiscovery() {
               <button
                 key={option}
                 onClick={() => setActiveFilter(isActive ? null : option)}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
-                  isActive 
-                    ? 'border-[#1C1C1E] bg-[#1C1C1E] text-white' 
+                className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'border-gray-800 bg-gray-100 text-gray-900'
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -264,8 +267,11 @@ export function AthleteDiscovery() {
                   ))}
                 </div>
                 
-                <div className="mt-8 text-center pb-8">
-                  <button className="px-6 py-2 bg-[#1C1C1E] text-white text-sm font-medium rounded-lg hover:bg-[#2D2D2F]">
+                <div className="mt-8 pb-8 text-center">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-gray-200 bg-white px-6 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  >
                     Load More
                   </button>
                 </div>
@@ -278,9 +284,10 @@ export function AthleteDiscovery() {
                 <div key={cat.id}>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-bold">{cat.title}</h2>
-                    <button 
+                    <button
+                      type="button"
                       onClick={() => setExpandedCategory(cat.id)}
-                      className="px-4 py-1.5 bg-[#1C1C1E] text-white text-sm font-medium rounded-lg hover:bg-[#2D2D2F]"
+                      className="rounded-lg bg-nilink-accent px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-nilink-accent-hover"
                     >
                       See All
                     </button>
@@ -353,7 +360,7 @@ export function AthleteDiscovery() {
                     <X className="w-5 h-5 text-white" />
                   </button>
                   {/* Banner */}
-                  <div className="h-32 bg-[#1C1C1E] relative">
+                  <div className="relative h-32 bg-nilink-ink">
                   </div>
                   
                   {/* Profile Header */}
@@ -506,16 +513,22 @@ export function AthleteDiscovery() {
               {!isAthleteView && selectedAthlete ? (
                 <Link
                   href={`/dashboard/profile/view?id=${selectedAthlete.id}`}
-                  className="inline-flex items-center justify-center rounded-lg bg-[#1C1C1E] px-4 py-2 text-sm font-medium !text-white no-underline hover:bg-[#2D2D2F] hover:!text-white"
+                  className="inline-flex items-center justify-center rounded-lg bg-nilink-accent px-4 py-2 text-sm font-semibold !text-white no-underline transition-colors hover:bg-nilink-accent-hover hover:!text-white"
                 >
                   View Profile
                 </Link>
               ) : (
-                <button type="button" className="px-4 py-2 bg-[#1C1C1E] text-white rounded-lg text-sm font-medium hover:bg-[#2D2D2F]">
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                >
                   View Profile
                 </button>
               )}
-              <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              >
                 Next {isAthleteView ? 'Brand' : 'Athlete'}
               </button>
             </div>

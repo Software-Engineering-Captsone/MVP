@@ -64,13 +64,13 @@ export function CollegeDetail() {
           </div>
 
           <div className="flex gap-4 flex-wrap">
-            <select value={selectedSport} onChange={(e) => setSelectedSport(e.target.value)} className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900">
+            <select value={selectedSport} onChange={(e) => setSelectedSport(e.target.value)} className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900">
               <option value="all">All Sports</option>
               {[...new Set(mockAthletes.map((a) => a.sport))].sort().map((sport) => (
                 <option key={sport} value={sport}>{sport}</option>
               ))}
             </select>
-            <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] text-gray-900">
+            <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900">
               <option value="all">All Years</option>
               <option value="Freshman">Freshman</option>
               <option value="Redshirt Freshman">Redshirt Freshman</option>
@@ -109,7 +109,7 @@ export function CollegeDetail() {
                         toggleAthlete(athlete.id);
                       }}
                       title={isAthleteSaved(athlete.id) ? 'Remove from saved' : 'Save athlete'}
-                      className={`p-2 rounded-full backdrop-blur-sm transition-colors ${isAthleteSaved(athlete.id) ? 'bg-[#6CC3DA] text-white' : 'bg-white/90 text-gray-600 hover:bg-white'}`}
+                      className={`rounded-full p-2 backdrop-blur-sm transition-colors ${isAthleteSaved(athlete.id) ? 'bg-nilink-accent text-white' : 'bg-white/90 text-gray-600 hover:bg-white'}`}
                     >
                       <Heart className={`w-4 h-4 ${isAthleteSaved(athlete.id) ? 'fill-current' : ''}`} />
                     </button>

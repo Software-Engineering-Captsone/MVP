@@ -31,19 +31,19 @@ function Stepper({ currentStep }: { currentStep: number }) {
             {/* Step indicator */}
             <div className="flex items-center gap-2">
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all ${
                   isCompleted
-                    ? 'bg-[#1C1C1E] text-white'
+                    ? 'bg-nilink-accent text-white'
                     : isCurrent
-                    ? 'bg-[#1C1C1E] text-white ring-4 ring-gray-200'
-                    : 'bg-gray-100 text-gray-400 border border-gray-200'
+                      ? 'bg-nilink-accent text-white ring-4 ring-nilink-accent-soft'
+                      : 'border border-gray-200 bg-gray-100 text-gray-400'
                 }`}
               >
                 {isCompleted ? <Check className="w-3.5 h-3.5" /> : step.id}
               </div>
               <span
-                className={`text-xs font-bold uppercase tracking-wider whitespace-nowrap ${
-                  isCurrent ? 'text-[#1C1C1E]' : isCompleted ? 'text-gray-600' : 'text-gray-400'
+                className={`whitespace-nowrap text-xs font-bold uppercase tracking-wider ${
+                  isCurrent ? 'text-nilink-ink' : isCompleted ? 'text-gray-600' : 'text-gray-400'
                 }`}
               >
                 {step.label}
@@ -53,9 +53,7 @@ function Stepper({ currentStep }: { currentStep: number }) {
             {/* Connector line */}
             {idx < STEPS.length - 1 && (
               <div
-                className={`w-16 h-px mx-4 ${
-                  isCompleted ? 'bg-[#1C1C1E]' : 'bg-gray-200'
-                }`}
+                className={`mx-4 h-px w-16 ${isCompleted ? 'bg-nilink-accent' : 'bg-gray-200'}`}
               />
             )}
           </div>
@@ -333,7 +331,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
 
                 {/* Right Rail — Goal Guidance */}
                 <div className="w-72 shrink-0 pl-6 border-l border-gray-100">
-                  <div className="bg-[#1C1C1E] rounded-2xl p-6 text-white sticky top-0">
+                  <div className="sticky top-0 rounded-2xl bg-nilink-ink p-6 text-white">
                     <div className="flex items-center gap-2 mb-4">
                       <Lightbulb className="w-5 h-5 text-nilink-accent-bright" />
                       <h3 className="font-bold text-sm">Goal Guidance</h3>
@@ -371,28 +369,28 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         <button
                           key={pkg.id}
                           onClick={() => setSelectedPackage(pkg.id)}
-                          className={`text-left p-6 rounded-2xl border-2 transition-all ${
+                          className={`rounded-2xl border-2 p-6 text-left transition-all ${
                             isSelected
-                              ? 'border-[#1C1C1E] bg-white shadow-lg'
+                              ? 'border-nilink-accent bg-white shadow-lg'
                               : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
                           }`}
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               {pkg.tag && (
-                                <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#EFFAFC] text-nilink-accent border border-[#B4E2ED] mb-2">
+                                <span className="mb-2 inline-block rounded-full border border-nilink-accent-border bg-nilink-accent-soft px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-nilink-accent">
                                   {pkg.tag}
                                 </span>
                               )}
                               {isSelected && (
-                                <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#1C1C1E] text-white mb-2">
+                                <span className="mb-2 inline-block rounded-full bg-nilink-accent px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                                   Selected
                                 </span>
                               )}
                             </div>
                             <span className="text-sm font-bold text-gray-400">{pkg.priceLevel}</span>
                           </div>
-                          <h3 className="text-lg font-bold text-[#1C1C1E] mb-1">{pkg.name}</h3>
+                          <h3 className="mb-1 text-lg font-bold text-nilink-ink">{pkg.name}</h3>
                           <p className="text-xs text-gray-400 mb-4">{pkg.subtitle}</p>
                           <div className="space-y-2 mb-4">
                             {pkg.deliverables.map((d, i) => (
@@ -414,7 +412,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
 
                 {/* Right Rail — Compliance Summary */}
                 <div className="w-72 shrink-0 pl-6 border-l border-gray-100">
-                  <div className="bg-[#1C1C1E] rounded-2xl p-6 text-white sticky top-0">
+                  <div className="sticky top-0 rounded-2xl bg-nilink-ink p-6 text-white">
                     <h3 className="font-bold text-sm mb-5">Compliance Summary</h3>
                     <div className="space-y-4">
                       {[
@@ -469,7 +467,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         />
                       </button>
                     </div>
-                    <h3 className="text-base font-bold text-[#1C1C1E] mb-1">Accept Applications</h3>
+                    <h3 className="mb-1 text-base font-bold text-nilink-ink">Accept Applications</h3>
                     <p className="text-xs text-gray-400 leading-relaxed">
                       Allow athletes to discover and apply to your campaign directly via the marketplace.
                     </p>
@@ -484,16 +482,16 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         <Lock className="w-6 h-6 text-gray-400" />
                       )}
                     </div>
-                    <h3 className="text-base font-bold text-[#1C1C1E] mb-3">Visibility Settings</h3>
+                    <h3 className="mb-3 text-base font-bold text-nilink-ink">Visibility Settings</h3>
                     <div className="flex gap-2">
                       {(['Public', 'Private'] as const).map(v => (
                         <button
                           key={v}
                           onClick={() => setVisibility(v)}
-                          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                          className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors ${
                             visibility === v
-                              ? 'bg-[#1C1C1E] text-white'
-                              : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                              ? 'border border-nilink-accent bg-nilink-accent text-white'
+                              : 'border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
                           }`}
                         >
                           {v}
@@ -506,8 +504,8 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                 {/* Target Athlete Filters */}
                 <div className="bg-white border border-gray-100 rounded-2xl p-8">
                   <div className="flex items-center gap-2 mb-6">
-                    <SlidersHorizontal className="w-5 h-5 text-[#1C1C1E]" />
-                    <h3 className="text-base font-bold text-[#1C1C1E]">Target Athlete Filters</h3>
+                    <SlidersHorizontal className="h-5 w-5 text-nilink-ink" />
+                    <h3 className="text-base font-bold text-nilink-ink">Target Athlete Filters</h3>
                   </div>
 
                   <div className="grid grid-cols-2 gap-6">
@@ -540,10 +538,10 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                           <button
                             key={g}
                             onClick={() => setGender(g)}
-                            className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                            className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors ${
                               gender === g
-                                ? 'bg-[#1C1C1E] text-white'
-                                : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                                ? 'border border-nilink-accent bg-nilink-accent text-white'
+                                : 'border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
                             }`}
                           >
                             {g}
@@ -606,7 +604,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <button
                         onClick={() => setStep(1)}
-                        className="text-xs font-bold text-gray-400 hover:text-[#1C1C1E] transition-colors uppercase tracking-wider"
+                        className="text-xs font-bold text-gray-400 hover:text-nilink-ink transition-colors uppercase tracking-wider"
                       >
                         Edit
                       </button>
@@ -617,12 +615,12 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                     <div className="space-y-3 mt-3">
                       <div>
                         <p className="text-[10px] text-gray-400 uppercase tracking-wider">Goal</p>
-                        <p className="text-sm font-bold text-[#1C1C1E]">{goal || 'Brand Awareness'}</p>
+                        <p className="text-sm font-bold text-nilink-ink">{goal || 'Brand Awareness'}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-[10px] text-gray-400 uppercase tracking-wider">Duration</p>
-                          <p className="text-sm font-bold text-[#1C1C1E]">
+                          <p className="text-sm font-bold text-nilink-ink">
                             {startDate && endDate ? `${startDate} – ${endDate}` : 'Apr 15 – May 30'}
                           </p>
                         </div>
@@ -642,7 +640,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                       <FileText className="w-5 h-5 text-gray-400" />
                       <button
                         onClick={() => setStep(2)}
-                        className="text-xs font-bold text-gray-400 hover:text-[#1C1C1E] transition-colors uppercase tracking-wider"
+                        className="text-xs font-bold text-gray-400 hover:text-nilink-ink transition-colors uppercase tracking-wider"
                       >
                         Edit
                       </button>
@@ -677,7 +675,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-[#1C1C1E]">Mandatory Fields Complete</p>
+                        <p className="text-sm font-bold text-nilink-ink">Mandatory Fields Complete</p>
                         <p className="text-xs text-gray-400">All deliverables and terms are validated.</p>
                       </div>
                     </div>
@@ -686,7 +684,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-[#1C1C1E]">Disclosure Requirements Set</p>
+                        <p className="text-sm font-bold text-nilink-ink">Disclosure Requirements Set</p>
                         <p className="text-xs text-gray-400">FTC #Ad mandates are active.</p>
                       </div>
                     </div>
@@ -716,10 +714,10 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
               <button
                 onClick={handleNext}
                 disabled={!canProceed()}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-bold transition-colors ${
                   canProceed()
-                    ? 'bg-[#1C1C1E] text-white hover:bg-[#2D2D2F]'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'bg-nilink-accent text-white hover:bg-nilink-accent-hover'
+                    : 'cursor-not-allowed bg-gray-100 text-gray-400'
                 }`}
               >
                 Continue
@@ -730,7 +728,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
             /* Review step — special bottom bar */
             <div className="flex items-center justify-between max-w-5xl mx-auto">
               <div>
-                <p className="text-sm font-bold text-[#1C1C1E]">Final Step</p>
+                <p className="text-sm font-bold text-nilink-ink">Final Step</p>
                 <p className="text-xs text-gray-400">Launch to begin the athlete sourcing phase.</p>
               </div>
               <div className="flex items-center gap-3">
@@ -749,7 +747,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
                 </button>
                 <button
                   onClick={handleLaunch}
-                  className="px-6 py-2.5 rounded-lg text-sm font-bold bg-[#1C1C1E] text-white hover:bg-[#2D2D2F] transition-colors flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-lg bg-nilink-accent px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-nilink-accent-hover"
                 >
                   <Zap className="w-4 h-4" />
                   Launch & Open Sourcing

@@ -414,7 +414,7 @@ export function BusinessCampaigns() {
     <>
       {/* ── Campaigns Home (list view) ── */}
       {!selectedCampaign && (
-        <div className="h-full flex flex-col bg-white overflow-hidden text-[#1C1C1E]">
+        <div className="h-full flex flex-col bg-white overflow-hidden text-nilink-ink">
         {/* ── Title + Stats ── */}
         <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 py-6">
           <DashboardPageHeader
@@ -508,7 +508,7 @@ export function BusinessCampaigns() {
           <button
             type="button"
             onClick={() => setShowCreateOverlay(true)}
-            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1C1C1E] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2D2D2F] sm:ml-auto sm:w-auto"
+            className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-nilink-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-nilink-accent-hover sm:ml-auto sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Create Campaign

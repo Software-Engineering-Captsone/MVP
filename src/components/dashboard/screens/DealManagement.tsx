@@ -142,12 +142,12 @@ export function DealManagement() {
                     onClick={() => setActiveTab(tab)}
                     className={`rounded-full border px-3 py-1 text-xs font-semibold transition sm:text-[13px] ${
                       selected
-                        ? 'border-gray-900 bg-gray-900 text-white'
+                        ? 'border-gray-400 bg-gray-100 text-gray-900'
                         : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
                     {label}{' '}
-                    <span className={selected ? 'text-white/80' : 'text-gray-400'}>({tabCounts[tab]})</span>
+                    <span className={selected ? 'text-gray-500' : 'text-gray-400'}>({tabCounts[tab]})</span>
                   </button>
                 );
               })}
@@ -203,7 +203,7 @@ export function DealManagement() {
                 </div>
                 <div className="h-2 w-32 rounded-full bg-gray-100">
                   <div
-                    className="h-2 rounded-full bg-nilink-ink/80"
+                    className="h-2 rounded-full bg-nilink-accent"
                     style={{
                       width: `${(deal.deliverables.filter((d) => d.completed).length / deal.deliverables.length) * 100}%`,
                     }}

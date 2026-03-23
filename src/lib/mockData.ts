@@ -749,3 +749,113 @@ export const mockConversations: Conversation[] = mockAthletes.map((athlete, inde
     messages: messages
   };
 });
+
+/** Athlete inbox: conversations with brands (mirror of legacy Messaging mock). */
+export interface BrandInboxThread {
+  id: number;
+  brandId: string;
+  brandName: string;
+  industry: string;
+  image: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  online: boolean;
+  unread: boolean;
+  unreadCount: number;
+  verified: boolean;
+  messages: ChatMessage[];
+}
+
+export const mockAthleteBrandThreads: BrandInboxThread[] = [
+  {
+    id: 1,
+    brandId: 'b1',
+    brandName: 'PowerFuel Energy',
+    industry: 'Sports Nutrition',
+    image: mockBrands.find((b) => b.id === 'b1')!.image,
+    lastMessage: 'Looking forward to seeing the content!',
+    lastMessageTime: '2m ago',
+    online: true,
+    unread: true,
+    unreadCount: 2,
+    verified: true,
+    messages: [
+      { id: 'a1', sender: 'brand', type: 'text', content: "Hi! We'd love to discuss the campaign details.", timestamp: '10:30 AM' },
+      { id: 'a2', sender: 'athlete', type: 'text', content: "Hey! I'm excited to work with you guys. What do you have in mind?", timestamp: '10:35 AM' },
+      {
+        id: 'a3',
+        sender: 'brand',
+        type: 'text',
+        content: "We'd like 3 Instagram posts featuring our new energy drink. Can you share your content calendar?",
+        timestamp: '10:40 AM',
+      },
+      {
+        id: 'a4',
+        sender: 'athlete',
+        type: 'text',
+        content: "Sure! I'll send it over by end of day. I have some great ideas for the basketball court shots.",
+        timestamp: '10:42 AM',
+      },
+      { id: 'a5', sender: 'brand', type: 'text', content: 'Looking forward to seeing the content!', timestamp: '10:45 AM' },
+    ],
+  },
+  {
+    id: 2,
+    brandId: 'b2',
+    brandName: 'Velocity Athletics',
+    industry: 'Apparel',
+    image: mockBrands.find((b) => b.id === 'b2')!.image,
+    lastMessage: 'The photoshoot is scheduled for next week',
+    lastMessageTime: '1h ago',
+    online: false,
+    unread: false,
+    unreadCount: 0,
+    verified: true,
+    messages: [
+      { id: 'b1', sender: 'brand', type: 'text', content: 'Hi, thanks for accepting our partnership!', timestamp: 'Yesterday' },
+      { id: 'b2', sender: 'athlete', type: 'text', content: 'Happy to be on board! When do we start?', timestamp: 'Yesterday' },
+      { id: 'b3', sender: 'brand', type: 'text', content: 'The photoshoot is scheduled for next week', timestamp: '9:00 AM' },
+    ],
+  },
+  {
+    id: 3,
+    brandId: 'b3',
+    brandName: 'Peak Recovery',
+    industry: 'Fitness Tech',
+    image: mockBrands.find((b) => b.id === 'b3')!.image,
+    lastMessage: 'Can you make it to the event on Saturday?',
+    lastMessageTime: '3h ago',
+    online: true,
+    unread: true,
+    unreadCount: 1,
+    verified: true,
+    messages: [
+      {
+        id: 'c1',
+        sender: 'brand',
+        type: 'text',
+        content: "We're launching a new product line and would love you to be involved.",
+        timestamp: '11:00 AM',
+      },
+      { id: 'c2', sender: 'athlete', type: 'text', content: "That sounds great! What's the timeline?", timestamp: '11:15 AM' },
+      { id: 'c3', sender: 'brand', type: 'text', content: 'Can you make it to the event on Saturday?', timestamp: '11:30 AM' },
+    ],
+  },
+  {
+    id: 4,
+    brandId: 'b7',
+    brandName: 'Titan Supplements',
+    industry: 'Sports Nutrition',
+    image: mockBrands.find((b) => b.id === 'b7')!.image,
+    lastMessage: 'Great working with you!',
+    lastMessageTime: 'Yesterday',
+    online: false,
+    unread: false,
+    unreadCount: 0,
+    verified: true,
+    messages: [
+      { id: 'd1', sender: 'brand', type: 'text', content: 'The campaign was a hit! Here are the final numbers.', timestamp: 'Yesterday' },
+      { id: 'd2', sender: 'athlete', type: 'text', content: 'Great working with you!', timestamp: 'Yesterday' },
+    ],
+  },
+];
