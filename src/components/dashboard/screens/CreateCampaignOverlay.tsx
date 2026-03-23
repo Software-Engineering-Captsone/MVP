@@ -7,6 +7,7 @@ import {
   Video, Image, FileText, MapPin,
   Globe, Lock, Users, SlidersHorizontal
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 /* ── Steps ──────────────────────────────────────────────────── */
 const STEPS = [
@@ -173,10 +174,21 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 md:p-12">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+      />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-6xl max-h-full flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.96, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 10 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="relative w-[1100px] max-w-[95vw] h-[800px] max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+      >
         {/* ── Top Bar ── */}
         <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 shrink-0">
           <div>
@@ -764,7 +776,7 @@ export function CreateCampaignOverlay({ onClose, onLaunch }: Props) {
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   FileText, Video, Image, ArrowRight, TrendingUp,
   CheckCircle, XCircle, UserPlus, Zap
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import type { Campaign, CampaignStatus, CandidateStatus, Candidate, ContractedAthlete, Deliverable, ActivityItem } from './BusinessCampaigns';
 
 /* ── Status Badge (shared) ──────────────────────────────────── */
@@ -80,10 +81,21 @@ export function CampaignDetail({ campaign, onBack }: Props) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 md:p-12">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+      />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-6xl max-h-full flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-[#1C1C1E]">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.96, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 10 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="relative w-[1100px] max-w-[95vw] h-[800px] max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden text-[#1C1C1E]"
+      >
         {/* ── Header ── */}
         <div className="px-6 py-5 border-b border-gray-100 shrink-0">
           <div className="flex items-center justify-between">
@@ -559,7 +571,7 @@ export function CampaignDetail({ campaign, onBack }: Props) {
           </div>
         )}
       </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

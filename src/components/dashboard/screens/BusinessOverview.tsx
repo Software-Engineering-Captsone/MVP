@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import {
   TrendingUp, Target, Users, ArrowRight,
   Activity, Bookmark, ChevronRight,
-  DollarSign, BarChart3, ArrowUpRight, CalendarDays,
+  DollarSign, BarChart3, ArrowUpRight,
 } from 'lucide-react';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
@@ -69,56 +69,8 @@ export function BusinessOverview() {
   return (
     <div className="h-full flex flex-col bg-[#F4F6F9] overflow-auto font-sans">
 
-      {/* ── Hero — compact, executive ─────────────────────────────────── */}
-      <div className="relative bg-[#0F172A] text-white pt-12 pb-24 px-10 overflow-hidden shrink-0">
-        {/* Ambient glows */}
-        <div className="absolute top-0 right-0 -translate-y-12 translate-x-1/4 pointer-events-none">
-          <div className="w-[600px] h-[600px] bg-[#6CC3DA] rounded-full mix-blend-screen filter blur-[150px] opacity-[0.12]" />
-        </div>
-        <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/4 pointer-events-none">
-          <div className="w-[300px] h-[300px] bg-[#6CC3DA] rounded-full mix-blend-screen filter blur-[100px] opacity-[0.07]" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto flex items-center justify-between gap-8">
-          {/* Left — greeting */}
-          <div>
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1 mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#6CC3DA] animate-pulse" />
-              <span className="text-[11px] font-bold text-gray-400 tracking-widest uppercase">Brand Dashboard</span>
-            </div>
-            <h1
-              className="text-5xl md:text-6xl font-black tracking-normal uppercase leading-none mb-3"
-              style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-            >
-              Welcome back,{' '}
-              <span className="text-[#6CC3DA] relative">
-                PowerFuel Energy
-                <span className="absolute -bottom-1 left-0 right-0 h-[3px] bg-gradient-to-r from-[#6CC3DA] to-transparent rounded-full opacity-40" />
-              </span>
-            </h1>
-            <p className="text-gray-500 text-sm font-medium tracking-wide">
-              Here's your brand performance overview — March 2026
-            </p>
-          </div>
-
-          {/* Right — date + quick action */}
-          <div className="shrink-0 flex flex-col items-end gap-3">
-            <div className="flex items-center gap-2 text-gray-500 text-xs font-medium">
-              <CalendarDays className="w-3.5 h-3.5" />
-              March 23, 2026
-            </div>
-            <button
-              onClick={() => router.push('/dashboard/search')}
-              className="bg-[#6CC3DA] hover:bg-white text-[#0F172A] font-black tracking-widest uppercase py-3 px-7 rounded-xl transition-all text-xs shadow-[0_0_20px_rgba(108,195,218,0.3)] flex items-center gap-2"
-            >
-              Find Athletes <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* ── Main Content ─────────────────────────────────────────────────── */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-8 py-10 -mt-14 relative z-20 space-y-6">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-8 py-10 relative z-20 space-y-6">
 
         {/* ── KPI Strip ────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
