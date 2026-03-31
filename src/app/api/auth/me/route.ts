@@ -1,34 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/middleware';
-import { mergeAthleteProfile, sanitizeAthleteProfilePatch } from '@/lib/auth/athleteProfile';
-import { findUserById, updateLocalUser, type UserPatch } from '@/lib/auth/localUserRepository';
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 
-function userJson(fullUser: NonNullable<Awaited<ReturnType<typeof findUserById>>>) {
-  return {
-    id: fullUser._id,
-    email: fullUser.email,
-    name: fullUser.name,
-    role: fullUser.role,
-    verified: fullUser.verified,
-    athleteProfile:
-      fullUser.role === 'athlete' ? mergeAthleteProfile(fullUser.athleteProfile) : undefined,
-  };
-}
+/**
+ * GET /api/auth/me — return the current authenticated user.
+ * Uses Supabase server-side session (cookie-based, no more Bearer token).
+ */
+export async function GET() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-async function getHandler(_request: NextRequest, user: { userId: string }) {
-  const fullUser = await findUserById(user.userId);
-
-  if (!fullUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  if (error || !user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  return NextResponse.json({ user: userJson(fullUser) });
+  const meta = user.user_metadata ?? {};
+
+  return NextResponse.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      name: (meta.full_name as string) || (meta.name as string) || user.email?.split('@')[0] || 'User',
+      role: meta.role === 'brand' ? 'brand' : 'athlete',
+      verified: !!user.email_confirmed_at,
+    },
+  });
 }
 
-async function patchHandler(request: NextRequest, user: { userId: string }) {
-  const fullUser = await findUserById(user.userId);
-  if (!fullUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+/**
+ * PATCH /api/auth/me — update user metadata (name, role, athlete profile).
+ */
+export async function PATCH(request: Request) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   let body: Record<string, unknown>;
@@ -38,22 +44,34 @@ async function patchHandler(request: NextRequest, user: { userId: string }) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const patch: UserPatch = {};
+  // Build the metadata update
+  const metaUpdate: Record<string, unknown> = {};
   if (typeof body.name === 'string') {
     const n = body.name.trim();
-    if (n.length > 0) patch.name = n.slice(0, 120);
+    if (n.length > 0) metaUpdate.full_name = n.slice(0, 120);
   }
-  if (fullUser.role === 'athlete' && body.athleteProfile != null) {
-    patch.athleteProfile = sanitizeAthleteProfilePatch(body.athleteProfile);
-  }
-
-  const updated = await updateLocalUser(user.userId, patch);
-  if (!updated) {
-    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+  if (body.athleteProfile != null) {
+    metaUpdate.athlete_profile = body.athleteProfile;
   }
 
-  return NextResponse.json({ user: userJson(updated) });
+  const { data, error: updateError } = await supabase.auth.updateUser({
+    data: metaUpdate,
+  });
+
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  const meta = data.user.user_metadata ?? {};
+
+  return NextResponse.json({
+    user: {
+      id: data.user.id,
+      email: data.user.email,
+      name: (meta.full_name as string) || (meta.name as string) || data.user.email?.split('@')[0] || 'User',
+      role: meta.role === 'brand' ? 'brand' : 'athlete',
+      verified: !!data.user.email_confirmed_at,
+      athleteProfile: meta.athlete_profile ?? undefined,
+    },
+  });
 }
-
-export const GET = withAuth(getHandler);
-export const PATCH = withAuth(patchHandler);

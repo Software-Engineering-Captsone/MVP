@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 
 function ResetPasswordContent() {
   const [password, setPassword] = useState('');
@@ -10,21 +11,21 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [ready, setReady] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const supabase = createClient();
 
-  if (!token) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
-        <div className="max-w-md w-full bg-white shadow rounded-lg p-8 text-center">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Invalid Link</h2>
-          <p className="text-gray-600 mb-6">This password reset link is missing a token. Please request a new one.</p>
-          <Link href="/auth" className="text-blue-600 hover:underline">Back to Sign In</Link>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    // Supabase redirects here with a session already established
+    // via the recovery link. We just need to check the session exists.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setReady(true);
+      } else {
+        setError('Invalid or expired reset link. Please request a new one.');
+      }
+    });
+  }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,19 +44,15 @@ function ResetPasswordContent() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess(true);
-        setTimeout(() => router.push('/auth'), 3000);
+      if (updateError) {
+        setError(updateError.message);
       } else {
-        setError(data.error || 'Failed to reset password.');
+        setSuccess(true);
+        setTimeout(() => router.push('/dashboard'), 3000);
       }
     } catch {
       setError('Network error. Please try again.');
@@ -63,6 +60,26 @@ function ResetPasswordContent() {
       setLoading(false);
     }
   };
+
+  if (!ready && !error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+      </div>
+    );
+  }
+
+  if (error && !ready) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+        <div className="max-w-md w-full bg-white shadow rounded-lg p-8 text-center">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Invalid Link</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <Link href="/auth" className="text-blue-600 hover:underline">Back to Sign In</Link>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
@@ -75,8 +92,8 @@ function ResetPasswordContent() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Password Reset!</h2>
           <p className="text-gray-600 mb-2">Your password has been updated successfully.</p>
-          <p className="text-sm text-gray-500">Redirecting to sign in...</p>
-          <Link href="/auth" className="mt-4 inline-block text-blue-600 hover:underline">Sign In now</Link>
+          <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
+          <Link href="/dashboard" className="mt-4 inline-block text-blue-600 hover:underline">Go to Dashboard</Link>
         </div>
       </div>
     );

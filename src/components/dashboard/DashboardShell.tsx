@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
 import { pageTransition } from '@/components/dashboard/dashboardMotion';
-import { authFetch } from '@/lib/authFetch';
+import { createClient } from '@/lib/supabase/client';
 import { userAvatarDataUrl } from '@/lib/userAvatar';
 
 export type AccountType = 'athlete' | 'business';
@@ -26,7 +26,7 @@ export type DashboardUser = {
 interface DashboardContextValue {
   accountType: AccountType;
   user: DashboardUser | null;
-  /** Re-fetch `/api/auth/me` (e.g. after profile save). */
+  /** Re-fetch user data (e.g. after profile save). */
   refreshUser: () => Promise<void>;
 }
 
@@ -73,53 +73,59 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
   const [booting, setBooting] = useState(true);
 
-  const mapMeUser = useCallback((raw: {
+  const supabase = createClient();
+
+  const mapSupabaseUser = useCallback((supaUser: {
     id: string;
-    email: string;
-    name: string;
-    role: string;
-  }): DashboardUser => ({
-    id: raw.id,
-    email: raw.email,
-    name: raw.name,
-    role: raw.role === 'brand' ? 'brand' : 'athlete',
-  }), []);
+    email?: string;
+    user_metadata?: Record<string, unknown>;
+  }): DashboardUser => {
+    const meta = supaUser.user_metadata ?? {};
+    const role = meta.role === 'brand' ? 'brand' : 'athlete';
+    const name = (meta.full_name as string)
+      || (meta.name as string)
+      || supaUser.email?.split('@')[0]
+      || 'User';
+    return {
+      id: supaUser.id,
+      email: supaUser.email ?? '',
+      name,
+      role,
+    };
+  }, []);
 
   const refreshUser = useCallback(async () => {
-    const res = await authFetch('/api/auth/me');
-    if (!res.ok) return;
-    const data = (await res.json()) as { user: DashboardUser };
-    if (data.user) setSessionUser(mapMeUser(data.user));
-  }, [mapMeUser]);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setSessionUser(mapSupabaseUser(user));
+  }, [supabase, mapSupabaseUser]);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.replace('/auth');
+    // Get initial session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setSessionUser(mapSupabaseUser(user));
+      } else {
+        router.replace('/auth');
+      }
       setBooting(false);
-      return;
-    }
+    });
 
-    let cancelled = false;
-    void authFetch('/api/auth/me')
-      .then(async (res) => {
-        if (cancelled) return;
-        if (!res.ok) {
-          localStorage.removeItem('token');
+    // Listen for auth state changes (sign out, token refresh, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          setSessionUser(mapSupabaseUser(session.user));
+        } else {
+          setSessionUser(null);
           router.replace('/auth');
-          return;
         }
-        const data = (await res.json()) as { user: DashboardUser };
-        if (!cancelled) setSessionUser(mapMeUser(data.user));
-      })
-      .finally(() => {
-        if (!cancelled) setBooting(false);
-      });
+      }
+    );
 
     return () => {
-      cancelled = true;
+      subscription.unsubscribe();
     };
-  }, [router, mapMeUser]);
+  }, [supabase, router, mapSupabaseUser]);
 
   if (booting) {
     return (
@@ -144,6 +150,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const InboxIcon = inboxNavItem.icon;
   const inboxActive = pathname.startsWith(inboxNavItem.href);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setIsProfileMenuOpen(false);
+    router.push('/auth');
+    router.refresh();
+  };
 
   return (
     <DashboardContext.Provider value={{ accountType, user: sessionUser, refreshUser }}>
@@ -319,11 +332,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                         type="button"
                         role="menuitem"
                         className="block w-full border-t border-gray-100 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                        onClick={() => {
-                          localStorage.removeItem('token');
-                          setIsProfileMenuOpen(false);
-                          router.push('/auth');
-                        }}
+                        onClick={handleSignOut}
                       >
                         Sign out
                       </button>

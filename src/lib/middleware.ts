@@ -1,23 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
-export function withAuth(handler: (request: NextRequest, user: any) => Promise<NextResponse>) {
+/**
+ * Server-side auth wrapper for API route handlers.
+ * Replaces the old JWT-based withAuth() — now uses Supabase session cookies.
+ */
+export function withAuth(
+  handler: (request: NextRequest, user: { userId: string; email: string; role: string }) => Promise<NextResponse>
+) {
   return async (request: NextRequest) => {
     try {
-      const authHeader = request.headers.get('authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return NextResponse.json({ error: 'No token provided' }, { status: 401 });
+      const supabase = await createClient();
+      const { data: { user }, error } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
       }
 
-      const token = authHeader.substring(7);
-      const user = await verifyToken(token);
+      const meta = user.user_metadata ?? {};
 
-      if (!user) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-      }
-
-      return handler(request, user);
-    } catch (error) {
+      return handler(request, {
+        userId: user.id,
+        email: user.email ?? '',
+        role: (meta.role as string) ?? 'athlete',
+      });
+    } catch {
       return NextResponse.json({ error: 'Authentication error' }, { status: 500 });
     }
   };

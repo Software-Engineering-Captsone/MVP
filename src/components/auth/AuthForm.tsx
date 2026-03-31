@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 function GoogleIcon() {
     return (
@@ -36,12 +37,14 @@ export default function AuthForm() {
 
     const router = useRouter();
     const searchParams = useSearchParams();
+    const supabase = createClient();
 
     useEffect(() => {
         const error = searchParams.get('error');
         const verified = searchParams.get('verified');
         if (error === 'google_denied') setFormError('Google sign-in was cancelled.');
         else if (error === 'google_failed') setFormError('Google sign-in failed. Please try again.');
+        else if (error === 'auth_callback_failed') setFormError('Authentication failed. Please try again.');
         if (verified === 'true') setSuccessMessage('Email verified! You can now sign in.');
     }, [searchParams]);
 
@@ -55,145 +58,157 @@ export default function AuthForm() {
         clearMessages();
     };
 
-    const handleGoogleAuth = (e: React.FormEvent) => {
+    /* ────────────── Google OAuth via Supabase ────────────── */
+    const handleGoogleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
-        window.location.href = `/api/auth/google?role=${role}`;
+        clearMessages();
+
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent',
+                },
+                // We pass the selected role as metadata so the DB trigger
+                // can pick it up when creating the profile row.
+                // NOTE: For OAuth, the role is stored after redirect via
+                // the profile upsert in the callback or via a separate call.
+            },
+        });
+
+        if (error) {
+            setFormError(error.message);
+        }
     };
 
+    /* ────────────── Email/Password Sign In ────────────── */
     const handleSignIn = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         clearMessages();
 
         try {
-            const response = await fetch('/api/auth/signin', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: signinEmail,
-                    password: signinPassword,
-                }),
+            const { error } = await supabase.auth.signInWithPassword({
+                email: signinEmail,
+                password: signinPassword,
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                // Store token
-                localStorage.setItem('token', data.token);
+            if (error) {
+                if (error.message.includes('Email not confirmed')) {
+                    setFormError('Your email is not verified yet. Check your inbox or resend the verification email below.');
+                } else if (error.message.includes('Invalid login credentials')) {
+                    setFormError('Invalid email or password.');
+                } else {
+                    setFormError(error.message);
+                }
+            } else {
                 setSuccessMessage('Sign in successful! Redirecting...');
                 setTimeout(() => {
                     router.push('/dashboard');
+                    router.refresh();
                 }, 600);
-            } else {
-                setFormError(data.error || 'Sign in failed');
             }
-        } catch (err) {
+        } catch {
             setFormError('Network error');
         } finally {
             setLoading(false);
         }
     };
 
+    /* ────────────── Email/Password Sign Up ────────────── */
     const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         clearMessages();
 
+        const fullName = `${signupFirstName.trim()} ${signupLastName.trim()}`;
+
         try {
-            const response = await fetch('/api/auth/signup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+            const { error } = await supabase.auth.signUp({
+                email: signupEmail,
+                password: signupPassword,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+                    data: {
+                        full_name: fullName,
+                        role: role,
+                    },
                 },
-                body: JSON.stringify({
-                    email: signupEmail,
-                    password: signupPassword,
-                    role,
-                    name: `${signupFirstName} ${signupLastName}`,
-                }),
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                setSuccessMessage('Account created. You can sign in now.');
+            if (error) {
+                if (error.message.includes('already registered')) {
+                    setFormError('An account with this email already exists.');
+                } else {
+                    setFormError(error.message);
+                }
+            } else {
+                setSuccessMessage(
+                    'Account created! Check your email for a verification link to activate your account.'
+                );
                 setActiveTab('signin');
                 setSignupFirstName('');
                 setSignupLastName('');
                 setSignupEmail('');
                 setSignupPassword('');
-            } else {
-                setFormError(data.error || 'Sign up failed');
             }
-        } catch (err) {
+        } catch {
             setFormError('Network error');
         } finally {
             setLoading(false);
         }
     };
 
+    /* ────────────── Forgot Password ────────────── */
     const handleForgotPassword = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         clearMessages();
 
         try {
-            const response = await fetch('/api/auth/forgot-password', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: forgotEmail,
-                }),
+            const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                redirectTo: `${window.location.origin}/auth/reset-password`,
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
+            if (error) {
+                setFormError(error.message);
+            } else {
                 setSuccessMessage('Password reset link sent to your email.');
                 setShowForgotPassword(false);
                 setForgotEmail('');
-            } else {
-                setFormError(data.error || 'Failed to send reset email');
             }
-        } catch (err) {
+        } catch {
             setFormError('Network error');
         } finally {
             setLoading(false);
         }
     };
 
+    /* ────────────── Resend Verification ────────────── */
     const handleResendVerification = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         clearMessages();
 
         try {
-            // For resend, we need to find the user and send a new verification email
-            // This would require a separate API endpoint for resending
-            const response = await fetch('/api/auth/resend-verification', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: resendEmail,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
                 },
-                body: JSON.stringify({
-                    email: resendEmail,
-                }),
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
+            if (error) {
+                setFormError(error.message);
+            } else {
                 setSuccessMessage('Verification email sent! Please check your inbox.');
                 setShowResendVerification(false);
                 setResendEmail('');
-            } else {
-                setFormError(data.error || 'Failed to resend verification email');
             }
-        } catch (err) {
+        } catch {
             setFormError('Network error');
         } finally {
             setLoading(false);
@@ -244,25 +259,25 @@ export default function AuthForm() {
                         <form onSubmit={handleSignIn}>
                             <div className="form-group">
                                 <label htmlFor="signin-email">Email</label>
-                                <input 
-                                    type="email" 
-                                    id="signin-email" 
-                                    placeholder="you@example.com" 
+                                <input
+                                    type="email"
+                                    id="signin-email"
+                                    placeholder="you@example.com"
                                     value={signinEmail}
                                     onChange={(e) => setSigninEmail(e.target.value)}
-                                    required 
+                                    required
                                 />
                             </div>
                             <div className="form-group">
                                 <label htmlFor="signin-password">Password</label>
                                 <div className="password-wrapper">
-                                    <input 
-                                        type="password" 
-                                        id="signin-password" 
-                                        placeholder="Enter your password" 
+                                    <input
+                                        type="password"
+                                        id="signin-password"
+                                        placeholder="Enter your password"
                                         value={signinPassword}
                                         onChange={(e) => setSigninPassword(e.target.value)}
-                                        required 
+                                        required
                                     />
                                 </div>
                             </div>
@@ -328,36 +343,36 @@ export default function AuthForm() {
                             <div className="form-row">
                                 <div className="form-group">
                                     <label htmlFor="signup-first">First Name</label>
-                                    <input 
-                                        type="text" 
-                                        id="signup-first" 
-                                        placeholder="John" 
+                                    <input
+                                        type="text"
+                                        id="signup-first"
+                                        placeholder="John"
                                         value={signupFirstName}
                                         onChange={(e) => setSignupFirstName(e.target.value)}
-                                        required 
+                                        required
                                     />
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="signup-last">Last Name</label>
-                                    <input 
-                                        type="text" 
-                                        id="signup-last" 
-                                        placeholder="Doe" 
+                                    <input
+                                        type="text"
+                                        id="signup-last"
+                                        placeholder="Doe"
                                         value={signupLastName}
                                         onChange={(e) => setSignupLastName(e.target.value)}
-                                        required 
+                                        required
                                     />
                                 </div>
                             </div>
                             <div className="form-group">
                                 <label htmlFor="signup-email">Email</label>
-                                <input 
-                                    type="email" 
-                                    id="signup-email" 
-                                    placeholder="you@example.com" 
+                                <input
+                                    type="email"
+                                    id="signup-email"
+                                    placeholder="you@example.com"
                                     value={signupEmail}
                                     onChange={(e) => setSignupEmail(e.target.value)}
-                                    required 
+                                    required
                                 />
                             </div>
                             <div className="form-group">
@@ -403,18 +418,18 @@ export default function AuthForm() {
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
                             <h2 className="text-xl font-bold mb-4">Reset Password</h2>
-                            <p className="text-gray-600 mb-4">Enter your email address and we'll send you a link to reset your password.</p>
-                            
+                            <p className="text-gray-600 mb-4">Enter your email address and we&apos;ll send you a link to reset your password.</p>
+
                             <form onSubmit={handleForgotPassword}>
                                 <div className="form-group">
                                     <label htmlFor="forgot-email">Email</label>
-                                    <input 
-                                        type="email" 
-                                        id="forgot-email" 
-                                        placeholder="you@example.com" 
+                                    <input
+                                        type="email"
+                                        id="forgot-email"
+                                        placeholder="you@example.com"
                                         value={forgotEmail}
                                         onChange={(e) => setForgotEmail(e.target.value)}
-                                        required 
+                                        required
                                     />
                                 </div>
                                 {formError && <p className="error-message">{formError}</p>}
@@ -422,8 +437,8 @@ export default function AuthForm() {
                                     <button type="submit" className="btn-submit flex-1" disabled={loading}>
                                         {loading ? 'Sending...' : 'Send Reset Link'}
                                     </button>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={() => { setShowForgotPassword(false); setFormError(''); setForgotEmail(''); }}
                                         className="btn-secondary flex-1"
                                     >
