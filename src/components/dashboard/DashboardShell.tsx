@@ -131,8 +131,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   useEffect(() => {
     if (booting || !sessionUser) return;
     if (sessionUser.role !== 'athlete') return;
-    // Don't redirect if already on onboarding
-    if (pathname.startsWith('/dashboard/onboarding')) return;
 
     try {
       const raw = localStorage.getItem('athlete_onboarding_draft');
@@ -140,11 +138,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         const draft = JSON.parse(raw) as { completedAt?: string };
         if (draft.completedAt) return; // already onboarded
       }
-      // No draft or no completedAt → redirect to onboarding
-      router.replace('/dashboard/onboarding');
+      // No draft or no completedAt → redirect to dedicated onboarding
+      router.replace('/onboarding');
     } catch {
       // Malformed JSON — treat as not onboarded
-      router.replace('/dashboard/onboarding');
+      router.replace('/onboarding');
     }
   }, [booting, sessionUser, pathname, router]);
 

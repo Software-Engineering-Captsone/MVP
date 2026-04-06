@@ -36,7 +36,7 @@ interface Step4Props {
 }
 
 export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props) {
-  const filled = data.bio.trim().length > 0 && data.availabilityStatus !== '';
+  const filled = true; // Temporary: Dev mode allows skipping this section
 
   const updateSocial = (key: keyof OnboardingProfile['socials'], value: string) => {
     onChange({ socials: { ...data.socials, [key]: value } });
@@ -50,21 +50,10 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
       transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
       className="space-y-6"
     >
-      {/* Header */}
-      <div className="mb-2">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
-          <Sparkles className="h-6 w-6" strokeWidth={2} />
-        </div>
-        <h2
-          className="text-2xl tracking-wide text-nilink-ink"
-          style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-        >
-          MAKE IT SHINE
-        </h2>
-        <p className="mt-1 text-sm font-medium text-gray-500">
-          Polish your public profile. This is what brands see when they find you.
-        </p>
-      </div>
+      {/* Helper text */}
+      <p className="text-sm leading-relaxed text-gray-500">
+        Polish your public profile. This is what brands see when they find you.
+      </p>
 
       {/* Profile Picture + Banner */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -75,7 +64,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
           </div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Profile Picture</p>
           <label className={`${labelClass} mt-3`} htmlFor="ob-pic-url">
-            Image URL
+            Image URL <span className="text-gray-300 normal-case">(optional)</span>
           </label>
           <input
             id="ob-pic-url"
@@ -94,7 +83,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
           </div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Profile Banner</p>
           <label className={`${labelClass} mt-3`} htmlFor="ob-banner-url">
-            Image URL
+            Image URL <span className="text-gray-300 normal-case">(optional)</span>
           </label>
           <input
             id="ob-banner-url"
@@ -110,7 +99,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
       {/* Bio */}
       <div>
         <label className={labelClass} htmlFor="ob-bio">
-          Bio
+          Bio <span className="text-gray-300 normal-case">(optional)</span>
         </label>
         <textarea
           id="ob-bio"
@@ -226,7 +215,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
+          className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-6 py-3.5 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -235,7 +224,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
           type="button"
           disabled={!filled}
           onClick={onComplete}
-          className="inline-flex items-center gap-2 rounded-xl bg-nilink-accent px-8 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-2xl bg-nilink-accent px-8 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           whileHover={filled ? { scale: 1.02 } : {}}
           whileTap={filled ? { scale: 0.98 } : {}}
         >
