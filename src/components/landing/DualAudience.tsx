@@ -2,13 +2,13 @@ import Link from 'next/link';
 
 export default function DualAudience() {
     return (
-        <section className="dual-section" id="athletes">
+        <section className="dual-section">
             <div className="dual-header fade-up">
                 <div className="section-eyebrow">Built for both sides</div>
                 <h2 className="section-heading">One platform, two powerful experiences</h2>
             </div>
             <div className="dual-grid">
-                <div className="dual-card dual-card-light fade-up">
+                <div className="dual-card dual-card-light fade-up" id="athletes">
                     <h3>For Athletes</h3>
                     <p>Turn your personal brand into income. Showcase your stats, let brands come to you, and manage every deal in one place.</p>
                     <ul className="dual-list">

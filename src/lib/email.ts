@@ -44,3 +44,50 @@ export const sendPasswordResetEmail = async (email: string, token: string) => {
 
   await transporter.sendMail(mailOptions);
 };
+
+export type ContactSalesPayload = {
+  name: string;
+  email: string;
+  company?: string;
+  message?: string;
+};
+
+/** Sends a sales inquiry to CONTACT_SALES_TO (or EMAIL_USER). Returns whether an email was sent. */
+export async function sendContactSalesInquiry(
+  payload: ContactSalesPayload
+): Promise<boolean> {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("[contact-sales] EMAIL_USER / EMAIL_PASS not set; inquiry not emailed.");
+    return false;
+  }
+
+  const to = process.env.CONTACT_SALES_TO || process.env.EMAIL_USER;
+  const company = payload.company?.trim() || "—";
+  const message = payload.message?.trim() || "—";
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to,
+    replyTo: payload.email,
+    subject: `NILINK sales inquiry from ${payload.name}`,
+    html: `
+      <h1>New sales inquiry</h1>
+      <p><strong>Name:</strong> ${escapeHtml(payload.name)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
+      <p><strong>Company:</strong> ${escapeHtml(company)}</p>
+      <p><strong>Message:</strong></p>
+      <p>${escapeHtml(message).replace(/\n/g, "<br/>")}</p>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+  return true;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}

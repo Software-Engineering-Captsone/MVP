@@ -7,7 +7,7 @@ export default function CTA() {
             <p className="fade-up">Join thousands of athletes and brands already on NILINK.</p>
             <div className="cta-buttons fade-up">
                 <Link href="/auth" className="btn-pill btn-nilink-primary">Start free trial</Link>
-                <button type="button" className="btn-pill btn-outline-light">Talk to sales</button>
+                <Link href="/talk-to-sales" className="btn-pill btn-outline-light">Talk to sales</Link>
             </div>
         </section>
     );

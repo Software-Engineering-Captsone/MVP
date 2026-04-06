@@ -81,9 +81,9 @@ export default function Hero() {
               Get started free
             </Link>
 
-            <button type="button" className="btn-pill btn-outline">
+            <Link href="/watch-demo" className="btn-pill btn-outline">
               Watch demo
-            </button>
+            </Link>
           </div>
 
           <p className="hero-note">
