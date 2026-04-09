@@ -13,7 +13,7 @@ const TIERS = [
       "Email support",
     ],
     cta: "Sign up free",
-    href: "/auth",
+    href: "/auth?mode=signup",
     variant: "default" as const,
   },
   {
@@ -29,7 +29,7 @@ const TIERS = [
       "Priority chat support",
     ],
     cta: "Start free trial",
-    href: "/auth",
+    href: "/auth?mode=signup",
     variant: "featured" as const,
   },
   {

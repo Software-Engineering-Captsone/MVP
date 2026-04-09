@@ -77,7 +77,7 @@ export default function Hero() {
           </p>
 
           <div className="hero-ctas">
-            <Link href="/auth" className="btn-pill btn-nilink-primary">
+            <Link href="/auth?mode=signup" className="btn-pill btn-nilink-primary">
               Get started free
             </Link>
 

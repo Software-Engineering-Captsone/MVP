@@ -42,6 +42,11 @@ export default function AuthForm() {
     useEffect(() => {
         const error = searchParams.get('error');
         const verified = searchParams.get('verified');
+        const mode = searchParams.get('mode');
+
+        if (mode === 'signup') setActiveTab('signup');
+        if (mode === 'signin') setActiveTab('signin');
+
         if (error === 'google_denied') setFormError('Google sign-in was cancelled.');
         else if (error === 'google_failed') setFormError('Google sign-in failed. Please try again.');
         else if (error === 'auth_callback_failed') setFormError('Authentication failed. Please try again.');

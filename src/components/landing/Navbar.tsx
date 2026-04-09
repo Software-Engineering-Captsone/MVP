@@ -84,11 +84,11 @@ export default function Navbar() {
           </nav>
 
           <div className="landing-nav-right">
-            <Link href="/auth" className="landing-nav-ghost">
+            <Link href="/auth?mode=signin" className="landing-nav-ghost">
               Log in
             </Link>
-            <Link href="/auth" className="landing-nav-ghost">
-              Sign in
+            <Link href="/auth?mode=signup" className="landing-nav-ghost">
+              Sign up
             </Link>
           </div>
         </div>

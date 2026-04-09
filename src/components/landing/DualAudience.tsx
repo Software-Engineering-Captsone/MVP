@@ -17,7 +17,7 @@ export default function DualAudience() {
                         <li><span className="dual-check">✓</span> Manage offers and track your earnings</li>
                         <li><span className="dual-check">✓</span> Show off past brand work and content</li>
                     </ul>
-                    <Link href="/auth" className="btn-pill btn-dark">Sign up as an athlete <span className="btn-dual-arrow">→</span></Link>
+                    <Link href="/auth?mode=signup" className="btn-pill btn-dark">Sign up as an athlete <span className="btn-dual-arrow">→</span></Link>
                 </div>
                 <div className="dual-card dual-card-dark fade-up" id="brands">
                     <h3>For Brands</h3>
@@ -28,7 +28,7 @@ export default function DualAudience() {
                         <li><span className="dual-check">✓</span> Send deal proposals and manage campaigns</li>
                         <li><span className="dual-check">✓</span> Set your brand tone for better athlete fit</li>
                     </ul>
-                    <Link href="/auth" className="btn-pill btn-nilink-primary">Sign up as a brand <span className="btn-dual-arrow">→</span></Link>
+                    <Link href="/auth?mode=signup" className="btn-pill btn-nilink-primary">Sign up as a brand <span className="btn-dual-arrow">→</span></Link>
                 </div>
             </div>
         </section>

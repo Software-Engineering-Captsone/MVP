@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, createContext, useContext, useEffect, useCallback } from 'react';
+import { useState, createContext, useContext, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -72,6 +72,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
   const [booting, setBooting] = useState(true);
+  const signOutRequestedRef = useRef(false);
 
   const supabase = createClient();
 
@@ -117,7 +118,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           setSessionUser(mapSupabaseUser(session.user));
         } else {
           setSessionUser(null);
-          router.replace('/auth');
+          router.replace(signOutRequestedRef.current ? '/' : '/auth');
         }
       }
     );
@@ -173,9 +174,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const inboxActive = pathname.startsWith(inboxNavItem.href);
 
   const handleSignOut = async () => {
+    signOutRequestedRef.current = true;
     await supabase.auth.signOut();
     setIsProfileMenuOpen(false);
-    router.push('/auth');
+    router.push('/');
     router.refresh();
   };
 
