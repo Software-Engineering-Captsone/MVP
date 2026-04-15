@@ -1,0 +1,116 @@
+{
+  "aliases": {
+    "brandDemoUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11"
+  },
+  "threads": [
+    {
+      "id": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "applicationId": null,
+      "threadKind": "brand_outreach",
+      "brandUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "athleteUserId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
+      "createdAt": "2026-04-15T02:42:29.485Z",
+      "updatedAt": "2026-04-15T02:42:44.027Z"
+    },
+    {
+      "id": "28281ffd-1f53-47b2-800b-047dd2b75404",
+      "applicationId": "demo-approved-application-1",
+      "threadKind": "application_approved",
+      "brandUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "athleteUserId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
+      "createdAt": "2026-04-15T02:42:29.485Z",
+      "updatedAt": "2026-04-15T02:43:29.485Z"
+    }
+  ],
+  "participants": [
+    {
+      "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "userId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "displayName": "NILINK Demo Brand"
+    },
+    {
+      "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "userId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
+      "displayName": "Demo Athlete"
+    },
+    {
+      "threadId": "28281ffd-1f53-47b2-800b-047dd2b75404",
+      "userId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "displayName": "NILINK Demo Brand"
+    },
+    {
+      "threadId": "28281ffd-1f53-47b2-800b-047dd2b75404",
+      "userId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
+      "displayName": "Demo Athlete"
+    }
+  ],
+  "messages": [
+    {
+      "id": "586950a4-f3dd-4de3-bce7-1e8133583b1c",
+      "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "fromUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "body": "Hi! We loved your content style and want to discuss a potential NIL partnership.",
+      "createdAt": "2026-04-15T02:42:29.485Z",
+      "messageKind": "user",
+      "offerId": null
+    },
+    {
+      "id": "a267e6f4-0558-4a76-b809-4f7f5b22bb42",
+      "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "fromUserId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
+      "body": "Thanks! Happy to chat. What deliverables are you looking for?",
+      "createdAt": "2026-04-15T02:42:59.485Z",
+      "messageKind": "user",
+      "offerId": null
+    },
+    {
+      "id": "8144a440-c96a-4970-8330-83e173ad7b01",
+      "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "fromUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "body": "Great — two IG story frames and one reel. I can send a draft offer now.",
+      "createdAt": "2026-04-15T02:43:29.485Z",
+      "messageKind": "user",
+      "offerId": null
+    },
+    {
+      "id": "58ba5b1b-da4e-4141-9edf-112f48eac558",
+      "threadId": "28281ffd-1f53-47b2-800b-047dd2b75404",
+      "fromUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "body": "[nilink-notice:application_approved] Application approved — you can coordinate here.",
+      "createdAt": "2026-04-15T02:42:29.485Z",
+      "messageKind": "system",
+      "offerId": null
+    },
+    {
+      "id": "a2852f2a-68f0-410f-ae45-e3142ed1f1fd",
+      "threadId": "28281ffd-1f53-47b2-800b-047dd2b75404",
+      "fromUserId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
+      "body": "Awesome, thank you! I am available this week to kick this off.",
+      "createdAt": "2026-04-15T02:42:59.485Z",
+      "messageKind": "user",
+      "offerId": null
+    },
+    {
+      "id": "ce1b5834-80ea-4c59-a127-b7d16560db1e",
+      "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "fromUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "body": "Hi how are you?",
+      "createdAt": "2026-04-15T02:42:44.027Z",
+      "messageKind": "user",
+      "offerId": null
+    }
+  ],
+  "reads": [
+    {
+      "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
+      "userId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "lastReadAt": "2026-04-15T02:45:07.889Z"
+    },
+    {
+      "threadId": "28281ffd-1f53-47b2-800b-047dd2b75404",
+      "userId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "lastReadAt": "2026-04-15T03:11:31.260Z"
+    }
+  ],
+  "seededAt": "2026-04-15T02:42:29.485Z"
+}

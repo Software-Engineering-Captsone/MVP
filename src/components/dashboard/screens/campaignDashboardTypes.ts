@@ -11,8 +11,12 @@ export type CandidateStatus =
   | 'Recommended'
   | 'Invited'
   | 'Applied'
+  | 'Under Review'
   | 'Shortlisted'
-  | 'Selected'
+  | 'Offer Sent'
+  | 'Offer Declined'
+  | 'Withdrawn'
+  | 'Rejected'
   | 'Sent to Deals'
   | 'Contracted'
   | 'Declined';
@@ -27,6 +31,8 @@ export interface Deliverable {
   status: 'Pending' | 'In Progress' | 'Submitted' | 'Approved';
 }
 
+export type ApplicationQueueSource = 'referral' | 'regular';
+
 export interface Candidate {
   id: string;
   name: string;
@@ -37,6 +43,8 @@ export interface Candidate {
   engagement: string;
   status: CandidateStatus;
   appliedDate: string;
+  /** How this row entered the campaign application queue (API `application.source`). */
+  applicationSource: ApplicationQueueSource;
 }
 
 export interface ContractedAthlete {

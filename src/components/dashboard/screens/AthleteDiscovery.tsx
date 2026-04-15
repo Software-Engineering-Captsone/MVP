@@ -9,6 +9,8 @@ import { Athlete, Brand } from '@/lib/mockData';
 import { useMarketplaceCatalog } from '@/hooks/useMarketplaceCatalog';
 import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { AthleteExploreMarketplace } from '@/components/dashboard/screens/AthleteExploreMarketplace';
+import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 
 // Custom icons for sports and tiktok
 const TiktokIcon = ({ className }: { className?: string }) => (
@@ -40,6 +42,13 @@ const BaseballIcon = ({ className }: { className?: string }) => (
 const sports = ['Football', 'Baseball', 'Softball', 'Cheerleading', 'Dance', 'Basketball', 'Beach Volleyball'];
 const industries = ['Sports Nutrition', 'Apparel', 'Fitness Tech', 'Beverages', 'Footwear', 'Fitness Equipment'];
 
+type MarketplaceItem = Athlete | Brand;
+type MarketplaceCategory = { id: string; title: string; items: MarketplaceItem[] };
+
+function isBrandItem(item: MarketplaceItem): item is Brand {
+  return 'industry' in item;
+}
+
 export function AthleteDiscovery() {
   const { accountType } = useDashboard();
   const isAthleteView = accountType === 'athlete';
@@ -54,7 +63,7 @@ export function AthleteDiscovery() {
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
-  const athleteCategories = useMemo(
+  const athleteCategories = useMemo<MarketplaceCategory[]>(
     () => [
       { id: 'popular', title: 'Popular Athletes', items: athletes },
       { id: 'aligned', title: 'Aligned Athletes', items: [...athletes].reverse() },
@@ -67,7 +76,7 @@ export function AthleteDiscovery() {
     [athletes]
   );
 
-  const brandCategories = useMemo(
+  const brandCategories = useMemo<MarketplaceCategory[]>(
     () => [
       { id: 'popular', title: 'Popular Brands', items: brands },
       { id: 'aligned', title: 'Aligned Brands', items: [...brands].reverse() },
@@ -80,12 +89,17 @@ export function AthleteDiscovery() {
     [brands]
   );
 
-  const categories = isAthleteView ? brandCategories : athleteCategories;
+  const categories: MarketplaceCategory[] = isAthleteView ? brandCategories : athleteCategories;
 
-  const handleItemClick = (item: any, categoryId: string) => {
+  const handleItemClick = (item: MarketplaceItem, categoryId: string) => {
     setExpandedCategory(categoryId);
-    if (isAthleteView) setSelectedBrand(item);
-    else setSelectedAthlete(item);
+    if (isAthleteView && isBrandItem(item)) {
+      setSelectedBrand(item);
+      return;
+    }
+    if (!isAthleteView && !isBrandItem(item)) {
+      setSelectedAthlete(item);
+    }
   };
 
   const handleBackToExplore = () => {
@@ -131,6 +145,10 @@ export function AthleteDiscovery() {
         {error}
       </div>
     );
+  }
+
+  if (isAthleteView) {
+    return <AthleteExploreMarketplace />;
   }
 
   return (
@@ -198,9 +216,9 @@ export function AthleteDiscovery() {
           )}
           
           {displayCategory ? (() => {
-            const activeCat = isFiltering 
+            const activeCat: MarketplaceCategory | undefined = isFiltering
               ? { id: 'search', title: 'Results', items: filteredItems }
-              : categories.find((c: any) => c.id === displayCategory);
+              : categories.find((c) => c.id === displayCategory);
             if (!activeCat) return null;
             
             return (
@@ -220,14 +238,14 @@ export function AthleteDiscovery() {
                 </div>
 
                 <div className={`grid gap-4 ${hasSelection ? 'grid-cols-2' : 'grid-cols-4'}`}>
-                  {activeCat.items.map((item: any, i: number) => (
+                  {activeCat.items.map((item, i: number) => (
                     <div 
                       key={`${item.id}_expanded_${i}`} 
                       onClick={() => handleItemClick(item, activeCat.id)}
                       className="group cursor-pointer"
                     >
                       <div className={`relative ${hasSelection ? 'aspect-[4/3]' : 'aspect-square md:aspect-[4/3]'} rounded-xl overflow-hidden mb-3 ${isAthleteView ? 'bg-gray-100 border border-gray-100' : ''}`}>
-                        <img
+                        <ImageWithFallback
                           src={item.image}
                           alt={item.name}
                           className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
@@ -294,14 +312,14 @@ export function AthleteDiscovery() {
                   </div>
                   
                   <div className="grid grid-cols-4 gap-4">
-                    {cat.items.slice(0, 4).map((item: any, i: number) => (
+                    {cat.items.slice(0, 4).map((item, i: number) => (
                       <div 
                         key={`${item.id}_${cat.id}_${i}`} 
                         onClick={() => handleItemClick(item, cat.id)}
                         className="group cursor-pointer"
                       >
                         <div className={`relative aspect-[4/3] rounded-xl overflow-hidden mb-3 ${isAthleteView ? 'bg-gray-100 border border-gray-100' : ''}`}>
-                          <img
+                          <ImageWithFallback
                             src={item.image}
                             alt={item.name}
                             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
@@ -366,7 +384,7 @@ export function AthleteDiscovery() {
                   {/* Profile Header */}
                   <div className="px-6 relative pb-6 border-b border-gray-100">
                     <div className="absolute -top-12 left-6">
-                      <img 
+                      <ImageWithFallback
                         src={selectedBrand.image} 
                         alt={selectedBrand.name} 
                         className="w-24 h-24 rounded-2xl border-4 border-white object-cover shadow-sm bg-white" 
@@ -410,14 +428,18 @@ export function AthleteDiscovery() {
                   {/* Banner */}
                   <div className="h-32 bg-[#FFCD00] relative">
                     {selectedAthlete.teamLogo && (
-                      <img src={selectedAthlete.teamLogo} alt="Team Logo" className="absolute right-4 top-4 h-16 opacity-80" />
+                      <ImageWithFallback
+                        src={selectedAthlete.teamLogo}
+                        alt="Team Logo"
+                        className="absolute right-4 top-4 h-16 opacity-80"
+                      />
                     )}
                   </div>
                   
                   {/* Profile Header */}
                   <div className="px-6 relative pb-6 border-b border-gray-100">
                     <div className="absolute -top-12 left-6">
-                      <img 
+                      <ImageWithFallback
                         src={selectedAthlete.image} 
                         alt={selectedAthlete.name} 
                         className="w-24 h-24 rounded-full border-4 border-white object-cover shadow-sm bg-white" 
@@ -461,7 +483,7 @@ export function AthleteDiscovery() {
                     <div className="grid grid-cols-3 gap-2">
                       {selectedAthlete.contentImages?.map((img, i) => (
                         <div key={i} className="aspect-[3/4] rounded-lg overflow-hidden relative">
-                          <img src={img} className="w-full h-full object-cover" alt="Content" />
+                          <ImageWithFallback src={img} className="w-full h-full object-cover" alt="Content" />
                           <div className="absolute bottom-2 left-2 flex items-center gap-1 text-[10px] text-white font-medium bg-black/40 px-1.5 py-0.5 rounded">
                             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                             33K

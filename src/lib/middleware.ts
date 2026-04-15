@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { resolveSupabaseRole } from '@/lib/auth/supabaseRole';
 
 /**
  * Server-side auth wrapper for API route handlers.
@@ -17,12 +18,15 @@ export function withAuth(
         return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
       }
 
-      const meta = user.user_metadata ?? {};
+      const role = resolveSupabaseRole({
+        userMetadata: user.user_metadata as Record<string, unknown> | undefined,
+        appMetadata: user.app_metadata as Record<string, unknown> | undefined,
+      });
 
       return handler(request, {
         userId: user.id,
         email: user.email ?? '',
-        role: (meta.role as string) ?? 'athlete',
+        role,
       });
     } catch {
       return NextResponse.json({ error: 'Authentication error' }, { status: 500 });

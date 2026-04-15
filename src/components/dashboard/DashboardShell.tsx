@@ -6,13 +6,15 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Search, FileText, MessageSquare, Heart,
-  CreditCard, Megaphone, BarChart3, MoreVertical,
+  CreditCard, Megaphone, BarChart3, MoreVertical, Handshake,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react';
 import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
 import { pageTransition } from '@/components/dashboard/dashboardMotion';
 import { createClient } from '@/lib/supabase/client';
 import { userAvatarDataUrl } from '@/lib/userAvatar';
+import { resolveSupabaseRole } from '@/lib/auth/supabaseRole';
 
 export type AccountType = 'athlete' | 'business';
 
@@ -45,7 +47,8 @@ type NavItem = { href: string; icon: LucideIcon; label: string; badge?: string }
 const athleteNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/dashboard/search', icon: Search, label: 'Explore' },
-  { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
+  { href: '/dashboard/applications', icon: ClipboardList, label: 'Applications' },
+  { href: '/dashboard/offers', icon: Handshake, label: 'Offers' },
   { href: '/dashboard/deals', icon: FileText, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
 ];
@@ -72,6 +75,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
   const [booting, setBooting] = useState(true);
+  const [pendingOfferCount, setPendingOfferCount] = useState(0);
 
   const supabase = createClient();
 
@@ -79,9 +83,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     id: string;
     email?: string;
     user_metadata?: Record<string, unknown>;
+    app_metadata?: Record<string, unknown>;
   }): DashboardUser => {
     const meta = supaUser.user_metadata ?? {};
-    const role = meta.role === 'brand' ? 'brand' : 'athlete';
+    const role = resolveSupabaseRole({
+      userMetadata: supaUser.user_metadata,
+      appMetadata: supaUser.app_metadata,
+    });
     const name = (meta.full_name as string)
       || (meta.name as string)
       || supaUser.email?.split('@')[0]
@@ -146,6 +154,40 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [booting, sessionUser, pathname, router]);
 
+  const refreshPendingOfferCount = useCallback(async () => {
+    if (!sessionUser || sessionUser.role !== 'athlete') {
+      setPendingOfferCount(0);
+      return;
+    }
+    try {
+      const res = await fetch('/api/offers', { credentials: 'include' });
+      if (!res.ok) {
+        setPendingOfferCount(0);
+        return;
+      }
+      const data = (await res.json()) as {
+        offers?: { athleteOfferStatus?: string }[];
+      };
+      const offers = Array.isArray(data.offers) ? data.offers : [];
+      const count = offers.filter((o) => o.athleteOfferStatus === 'pending').length;
+      setPendingOfferCount(count);
+    } catch {
+      setPendingOfferCount(0);
+    }
+  }, [sessionUser]);
+
+  useEffect(() => {
+    if (!sessionUser || sessionUser.role !== 'athlete') {
+      setPendingOfferCount(0);
+      return;
+    }
+    void refreshPendingOfferCount();
+    const t = window.setInterval(() => {
+      void refreshPendingOfferCount();
+    }, 45000);
+    return () => window.clearInterval(t);
+  }, [sessionUser, refreshPendingOfferCount, pathname]);
+
   if (booting) {
     return (
       <div className="flex h-screen items-center justify-center bg-nilink-page text-nilink-ink">
@@ -209,6 +251,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   item.href === '/dashboard'
                     ? pathname === '/dashboard'
                     : pathname.startsWith(item.href);
+                const badge =
+                  accountType === 'athlete' && item.href === '/dashboard/offers'
+                    ? pendingOfferCount > 0
+                      ? pendingOfferCount > 99
+                        ? '99+'
+                        : String(pendingOfferCount)
+                      : undefined
+                    : item.badge;
 
                 return (
                   <li key={item.href + item.label}>
@@ -241,9 +291,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                           >
                             {item.label}
                           </span>
-                          {item.badge && (
+                          {badge && (
                             <span className="shrink-0 rounded-full bg-nilink-accent px-2 py-0.5 text-[10px] font-bold text-white">
-                              {item.badge}
+                              {badge}
                             </span>
                           )}
                         </div>

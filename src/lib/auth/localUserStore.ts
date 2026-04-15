@@ -3,8 +3,8 @@ import path from 'path';
 import type { AthleteProfile } from './athleteProfile';
 
 /**
- * Server-only JSON persistence for users (no MongoDB).
- * Aligns with fields in `src/models/User.ts` for a future DB swap.
+ * Server-only JSON persistence for users (Supabase auth is separate).
+ * Aligns with Supabase `auth.users` + app profile tables for a future swap.
  */
 export const LOCAL_USERS_STORE_PATH = path.join(process.cwd(), 'data', 'local-users-store.json');
 

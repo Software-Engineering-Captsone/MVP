@@ -1,27 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/campaigns/getAuthUser';
+import { getChatSessionUser } from '@/lib/chat/session';
 import {
   createApplication,
   getCampaignById,
   listApplicationsForCampaign,
 } from '@/lib/campaigns/repository';
 import { applicationToJSON } from '@/lib/campaigns/serialization';
+import { jsonError } from '@/lib/api/jsonError';
+import { createClient } from '@/lib/supabase/server';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(request: NextRequest, context: RouteContext) {
-  const user = getAuthUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(_request: NextRequest, context: RouteContext) {
+  const supabase = await createClient();
+  const session = await getChatSessionUser(supabase);
+  if (!session) {
+    return jsonError(401, 'Unauthorized');
   }
+  const user = { userId: session.id, role: session.role };
   if (user.role !== 'brand') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return jsonError(403, 'Forbidden');
   }
 
   const { id } = await context.params;
   const campaign = await getCampaignById(id);
   if (!campaign || campaign.brandUserId !== user.userId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return jsonError(404, 'Not found');
   }
 
   const applications = await listApplicationsForCampaign(id);
@@ -29,12 +33,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
-  const user = getAuthUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const supabase = await createClient();
+  const session = await getChatSessionUser(supabase);
+  if (!session) {
+    return jsonError(401, 'Unauthorized');
   }
+  const user = { userId: session.id, role: session.role };
   if (user.role !== 'athlete') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return jsonError(403, 'Forbidden');
   }
 
   const { id } = await context.params;
@@ -52,6 +58,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const result = await createApplication({
       campaignId: id,
       athleteUserId: user.userId,
+      source: 'regular',
       pitch,
       athleteSnapshot: {
         name: athleteSnapshot.name ?? '',
@@ -64,10 +71,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
 
     if (result.error === 'duplicate') {
-      return NextResponse.json(
-        { error: 'Already applied', application: applicationToJSON(result.application) },
-        { status: 409 }
-      );
+      return jsonError(409, 'Already applied', {
+        application: applicationToJSON(result.application),
+      });
     }
 
     return NextResponse.json(
@@ -77,6 +83,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed to apply';
     const status = msg === 'Campaign not found' ? 404 : 400;
-    return NextResponse.json({ error: msg }, { status });
+    return jsonError(status, msg);
   }
 }

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import mongoose from 'mongoose';
+import { newObjectIdHex } from '@/lib/generateId';
 import { mergeAthleteProfile, type AthleteProfile } from './athleteProfile';
 import {
   mutateLocalUsersStore,
@@ -64,7 +64,7 @@ export interface CreateLocalUserInput {
 }
 
 export async function createLocalUser(input: CreateLocalUserInput): Promise<StoredUser> {
-  const _id = new mongoose.Types.ObjectId().toString();
+  const _id = newObjectIdHex();
   const verified = input.verified !== false;
   const row: StoredUser = {
     _id,

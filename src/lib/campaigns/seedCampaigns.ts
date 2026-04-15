@@ -19,8 +19,71 @@ function daysAgoIso(days: number): Date {
   return d;
 }
 
+function buildSeedBrief(input: {
+  name: string;
+  summary: string;
+  startDate: string;
+  endDate: string;
+  marketRegion: string;
+  sport: string;
+  followerMin: number;
+  engagementRateMinPct?: number;
+  platforms: string[];
+  deliverables: string[];
+  budgetCap: number;
+  visibility: 'public' | 'private';
+  acceptApplications: boolean;
+}): Record<string, unknown> {
+  return {
+    schemaVersion: 'campaign_brief_v2',
+    strategy: {
+      campaignName: input.name,
+      objectiveType: 'awareness',
+      primaryKpi: 'engagement_rate',
+      primaryKpiTarget: Math.max(1, input.engagementRateMinPct ?? 3),
+      flightStartDate: input.startDate,
+      flightEndDate: input.endDate,
+      marketRegion: input.marketRegion,
+      campaignSummary: input.summary,
+    },
+    audienceCreatorFit: {
+      audiencePersona: 'Student-athletes with strong authentic audience fit.',
+      sportCategory: input.sport || 'All Sports',
+      followerRangeMin: Math.max(0, input.followerMin),
+      engagementRateMinPct: Math.max(0, input.engagementRateMinPct ?? 0),
+      audienceGeoRequirement: 'preferred',
+      genderFilter: 'Any',
+    },
+    contentDeliverables: {
+      platforms: input.platforms.map((p) => p.toLowerCase()),
+      deliverableBundle: input.deliverables.map((d) => ({
+        platform: input.platforms[0]?.toLowerCase() || 'instagram',
+        format: 'custom',
+        quantity: 1,
+        notes: d,
+      })),
+      ctaType: 'learn_more',
+      messagePillars: ['Brand alignment'],
+      draftRequired: true,
+      revisionRounds: 1,
+    },
+    budgetRights: {
+      budgetCap: input.budgetCap,
+      paymentModel: 'flat',
+      usageRights: { mode: 'organic_only', durationDays: 90 },
+    },
+    sourcingVisibility: {
+      acceptApplications: input.acceptApplications,
+      visibility: input.visibility,
+      shortlistStrategy: 'manual',
+    },
+    reviewLaunch: { reviewConfirmed: true },
+    templateMeta: { source: 'blank' },
+  };
+}
+
 /**
- * Raw shapes validated with the Campaign mongoose schema before persisting.
+ * Raw shapes validated before persisting (see validateCampaignRecords).
  */
 export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
   return [
@@ -47,6 +110,21 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 0,
       packageDetails: ['2 Reels', '1 Story series', 'Usage rights 12 months'],
       platforms: ['Instagram', 'TikTok'],
+      campaignBriefV2: buildSeedBrief({
+        name: 'Spring Product Reviews',
+        summary:
+          'Share honest reviews of our new hydration line. We provide product, talking points, and a flexible posting window during the NCAA season.',
+        startDate: '2026-03-01',
+        endDate: '2026-04-15',
+        marketRegion: 'US',
+        sport: 'All Sports',
+        followerMin: 0,
+        platforms: ['instagram', 'tiktok'],
+        deliverables: ['2 Reels', '1 Story series', 'Usage rights 12 months'],
+        budgetCap: 1200,
+        visibility: 'public',
+        acceptApplications: true,
+      }),
       image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(2),
@@ -75,6 +153,21 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 5000,
       packageDetails: ['1 shoot day', '2 hero edits', 'B-roll for social'],
       platforms: ['Instagram', 'YouTube'],
+      campaignBriefV2: buildSeedBrief({
+        name: 'Regional Commercial Spots',
+        summary:
+          'Local-market TV and social spots featuring student athletes. One on-site shoot day plus deliverables for paid social.',
+        startDate: '2026-03-10',
+        endDate: '2026-05-01',
+        marketRegion: 'US-Midwest',
+        sport: 'All Sports',
+        followerMin: 5000,
+        platforms: ['instagram', 'youtube'],
+        deliverables: ['1 shoot day', '2 hero edits', 'B-roll for social'],
+        budgetCap: 3500,
+        visibility: 'public',
+        acceptApplications: true,
+      }),
       image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(5),
@@ -103,6 +196,21 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 2000,
       packageDetails: ['8 posts/mo', 'Campus tabling kit', 'Performance stipend'],
       platforms: ['Instagram', 'TikTok'],
+      campaignBriefV2: buildSeedBrief({
+        name: 'Campus Ambassador — Spring Term',
+        summary:
+          'Represent our study and focus app on campus. Host micro-events, post twice weekly, and join a monthly creator call.',
+        startDate: '2026-03-01',
+        endDate: '2026-06-30',
+        marketRegion: 'US',
+        sport: 'All Sports',
+        followerMin: 2000,
+        platforms: ['instagram', 'tiktok'],
+        deliverables: ['8 posts/mo', 'Campus tabling kit', 'Performance stipend'],
+        budgetCap: 1500,
+        visibility: 'public',
+        acceptApplications: true,
+      }),
       image: '',
       status: 'Reviewing Candidates',
       createdAt: daysAgoIso(7),
@@ -131,6 +239,21 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 3000,
       packageDetails: ['3 Carousels', '2 Reels', 'Affiliate code'],
       platforms: ['Instagram'],
+      campaignBriefV2: buildSeedBrief({
+        name: 'Game-Day Fit — Content Series',
+        summary:
+          'Showcase game-day outfits and recovery fits. We ship seasonal kits; you create carousel and short-form content.',
+        startDate: '2026-03-15',
+        endDate: '2026-04-20',
+        marketRegion: 'US',
+        sport: 'Football',
+        followerMin: 3000,
+        platforms: ['instagram'],
+        deliverables: ['3 Carousels', '2 Reels', 'Affiliate code'],
+        budgetCap: 2000,
+        visibility: 'public',
+        acceptApplications: true,
+      }),
       image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(3),
@@ -159,6 +282,21 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
       followerMin: 0,
       packageDetails: ['5 Stories', '1 Reel', 'Product shipment'],
       platforms: ['Instagram', 'TikTok'],
+      campaignBriefV2: buildSeedBrief({
+        name: 'Training Week Fuel-Ups',
+        summary:
+          'Document a week of training with our energy and recovery products. Authentic voice; no scripted medical claims.',
+        startDate: '2026-03-05',
+        endDate: '2026-03-28',
+        marketRegion: 'US',
+        sport: 'All Sports',
+        followerMin: 0,
+        platforms: ['instagram', 'tiktok'],
+        deliverables: ['5 Stories', '1 Reel', 'Product shipment'],
+        budgetCap: 1400,
+        visibility: 'public',
+        acceptApplications: true,
+      }),
       image: '',
       status: 'Open for Applications',
       createdAt: daysAgoIso(1),

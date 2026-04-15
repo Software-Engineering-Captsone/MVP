@@ -17,7 +17,7 @@ function resolveUserKey(): string {
  * GET  — load `{ athleteIds, brandIds }`
  * PUT  — replace full snapshot (same shape as body)
  *
- * Production: swap `memorySavedRepository` for a repository that reads/writes MongoDB.
+ * Production: swap `memorySavedRepository` for a repository backed by Supabase.
  */
 export async function GET() {
   const userKey = resolveUserKey();

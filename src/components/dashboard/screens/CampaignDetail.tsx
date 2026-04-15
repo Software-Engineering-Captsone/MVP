@@ -6,15 +6,23 @@ import {
   Users, Eye, Target, Package, Globe, Lock,
   Check, Clock, Send, MoreHorizontal,
   FileText, Video, Image, ArrowRight, TrendingUp,
-  XCircle, UserPlus, Zap, MessageSquare,
+  XCircle, UserPlus, Zap, MessageSquare, Loader2,
 } from 'lucide-react';
 import { authFetch } from '@/lib/authFetch';
 import { motion } from 'framer-motion';
+import { OfferWizard } from '@/components/offers/OfferWizard';
+import { COPY_INVITE_TO_CAMPAIGN, COPY_REFERRAL, COPY_SEND_OFFER } from '@/lib/productCopy';
 import type {
+  ApplicationQueueSource,
   Campaign,
   CampaignStatus,
   CandidateStatus,
 } from '@/components/dashboard/screens/campaignDashboardTypes';
+
+const applicationSourceStyles: Record<ApplicationQueueSource, string> = {
+  referral: 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  regular: 'bg-gray-50 text-gray-600 border-gray-200',
+};
 
 /* ── Status Badge (shared) ──────────────────────────────────── */
 const campaignStatusStyles: Record<CampaignStatus, string> = {
@@ -31,7 +39,12 @@ const candidateStatusStyles: Record<CandidateStatus, string> = {
   'Recommended': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
   'Invited': 'bg-gray-50 text-nilink-ink border-gray-200',
   'Applied': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Under Review': 'bg-blue-50 text-blue-700 border-blue-200',
   'Shortlisted': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Offer Sent': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Offer Declined': 'bg-orange-50 text-orange-700 border-orange-200',
+  'Withdrawn': 'bg-slate-100 text-slate-700 border-slate-300',
+  'Rejected': 'bg-red-50 text-red-600 border-red-200',
   'Selected': 'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Sent to Deals': 'bg-nilink-sidebar-muted/15 text-nilink-ink border-nilink-sidebar-muted/30',
   'Contracted': 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -56,7 +69,14 @@ const tabs: { id: TabId; label: string }[] = [
   { id: 'activity', label: 'Activity' },
 ];
 
-type CandidateFilter = 'All' | 'Applied' | 'Shortlisted' | 'Selected';
+type CandidateFilter = 'All' | 'Applied' | 'Under Review' | 'Shortlisted' | 'Offer Sent';
+
+/** Application queue slice (referral vs organic) for the candidates table. */
+type QueueSourceFilter = 'all' | 'referral' | 'regular';
+
+function isEligibleForOffer(candidateStatus: CandidateStatus): boolean {
+  return candidateStatus === 'Shortlisted';
+}
 
 /* ── Main Component ─────────────────────────────────────────── */
 interface Props {
@@ -66,8 +86,14 @@ interface Props {
   brandReviewMode?: boolean;
   onPatchApplication?: (
     applicationId: string,
-    status: 'shortlisted' | 'approved' | 'declined'
-  ) => Promise<void>;
+    status: 'under_review' | 'shortlisted' | 'rejected'
+  ) => Promise<{ warnings?: { code?: string; message: string }[] } | undefined>;
+  onPatchCampaignStatus?: (campaignId: string, status: CampaignStatus) => Promise<void>;
+  /**
+   * Handoff: create offer draft(s) from selected application ids, then caller may advance campaign.
+   * When set, “Send Shortlisted to Offers” uses this instead of only patching campaign status.
+   */
+  onSendSelectedToDeals?: (applicationIds: string[]) => Promise<void>;
   onApplicationsUpdated?: () => void | Promise<void>;
 }
 
@@ -76,23 +102,67 @@ export function CampaignDetail({
   onBack,
   brandReviewMode = false,
   onPatchApplication,
+  onPatchCampaignStatus,
+  onSendSelectedToDeals,
   onApplicationsUpdated,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
   const [candidateFilter, setCandidateFilter] = useState<CandidateFilter>('All');
+  const [queueSourceFilter, setQueueSourceFilter] = useState<QueueSourceFilter>('all');
   const [openMenuForId, setOpenMenuForId] = useState<string | null>(null);
   const [messageAppId, setMessageAppId] = useState<string | null>(null);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [threadMessages, setThreadMessages] = useState<
     { id: string; fromUserId: string; body: string; createdAt: string }[]
   >([]);
   const [messageDraft, setMessageDraft] = useState('');
+  const [messageThreadError, setMessageThreadError] = useState<string | null>(null);
+  const [applicationPatchNotice, setApplicationPatchNotice] = useState<string | null>(null);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [promotingToOffers, setPromotingToOffers] = useState(false);
+  const [offerIdByApplicationId, setOfferIdByApplicationId] = useState<Record<string, string>>({});
+  const [offersMapLoading, setOffersMapLoading] = useState(false);
+  const [offersMapError, setOffersMapError] = useState<string | null>(null);
+  const [wizardOfferId, setWizardOfferId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await authFetch('/api/auth/me');
+      if (!res.ok) return;
+      const data = (await res.json()) as { user?: { id?: string } };
+      if (data.user?.id) setCurrentUserId(data.user.id);
+    })();
+  }, []);
 
   const filteredCandidates = useMemo(() => {
-    if (candidateFilter === 'All') return campaign.candidates;
-    return campaign.candidates.filter((c) => c.status === candidateFilter);
-  }, [campaign.candidates, candidateFilter]);
+    let list =
+      candidateFilter === 'All'
+        ? campaign.candidates
+        : campaign.candidates.filter((c) => c.status === candidateFilter);
+    if (queueSourceFilter === 'referral') {
+      list = list.filter((c) => c.applicationSource === 'referral');
+    } else if (queueSourceFilter === 'regular') {
+      list = list.filter((c) => c.applicationSource !== 'referral');
+    }
+    return list;
+  }, [campaign.candidates, candidateFilter, queueSourceFilter]);
+
+  const referralApplicationCount = useMemo(
+    () => campaign.candidates.filter((c) => c.applicationSource === 'referral').length,
+    [campaign.candidates]
+  );
+
+  const selectableCandidateIds = useMemo(
+    () => filteredCandidates.filter((c) => isEligibleForOffer(c.status)).map((c) => c.id),
+    [filteredCandidates]
+  );
+
+  const selectedEligibleCandidateIds = useMemo(
+    () => Array.from(selectedCandidates).filter((id) => selectableCandidateIds.includes(id)),
+    [selectedCandidates, selectableCandidateIds]
+  );
 
   const toggleCandidate = (id: string) => {
     setSelectedCandidates(prev => {
@@ -104,27 +174,41 @@ export function CampaignDetail({
   };
 
   const selectAll = () => {
-    if (selectedCandidates.size === campaign.candidates.length) {
+    if (
+      selectableCandidateIds.length > 0 &&
+      selectedEligibleCandidateIds.length === selectableCandidateIds.length
+    ) {
       setSelectedCandidates(new Set());
     } else {
-      setSelectedCandidates(new Set(campaign.candidates.map((c) => c.id)));
+      setSelectedCandidates(new Set(selectableCandidateIds));
     }
   };
 
   useEffect(() => {
     if (!messageAppId) {
       setThreadMessages([]);
+      setActiveThreadId(null);
+      setMessageThreadError(null);
       return;
     }
     let cancelled = false;
     setThreadLoading(true);
+    setActiveThreadId(null);
+    setMessageThreadError(null);
     void (async () => {
       try {
         const res = await authFetch(`/api/applications/${messageAppId}/messages`);
         const data = (await res.json()) as {
+          threadId?: string;
           messages?: { id: string; fromUserId: string; body: string; createdAt: string }[];
+          error?: string;
         };
-        if (!cancelled && res.ok && data.messages) setThreadMessages(data.messages);
+        if (!cancelled && res.ok && data.messages) {
+          setThreadMessages(data.messages);
+          if (data.threadId) setActiveThreadId(data.threadId);
+        } else if (!cancelled && !res.ok) {
+          setMessageThreadError(data.error || 'Could not load messages');
+        }
       } finally {
         if (!cancelled) setThreadLoading(false);
       }
@@ -134,20 +218,77 @@ export function CampaignDetail({
     };
   }, [messageAppId]);
 
+  useEffect(() => {
+    if (!activeThreadId || threadLoading) return;
+    void authFetch(`/api/chat/threads/${activeThreadId}/read`, { method: 'POST' });
+  }, [activeThreadId, threadLoading]);
+
+  useEffect(() => {
+    if (!brandReviewMode) return;
+    let cancelled = false;
+    setOffersMapLoading(true);
+    setOffersMapError(null);
+    void (async () => {
+      try {
+        const res = await authFetch(`/api/campaigns/${campaign.id}/offers`);
+        const data = (await res.json()) as {
+          offers?: { id: string; applicationId: string | null }[];
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok || !data.offers) {
+          setOfferIdByApplicationId({});
+          setOffersMapError(data.error || 'Could not load offer links');
+          return;
+        }
+        const map: Record<string, string> = {};
+        for (const o of data.offers) {
+          if (o.applicationId) map[o.applicationId] = o.id;
+        }
+        setOfferIdByApplicationId(map);
+      } catch {
+        if (!cancelled) {
+          setOfferIdByApplicationId({});
+          setOffersMapError('Network error while loading offers');
+        }
+      } finally {
+        if (!cancelled) setOffersMapLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [brandReviewMode, campaign.id, campaign.status, campaign.candidates.length]);
+
   const sendThreadMessage = async () => {
-    if (!messageAppId || !messageDraft.trim()) return;
+    if (!messageAppId || !messageDraft.trim() || !currentUserId) return;
+    setMessageThreadError(null);
+    const text = messageDraft.trim();
+    const tempId = `tmp-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      fromUserId: currentUserId,
+      body: text,
+      createdAt: new Date().toISOString(),
+    };
+    setThreadMessages((prev) => [...prev, optimistic]);
+    setMessageDraft('');
     const res = await authFetch(`/api/applications/${messageAppId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body: messageDraft.trim() }),
+      body: JSON.stringify({ body: text }),
     });
-    if (!res.ok) return;
-    setMessageDraft('');
-    const refresh = await authFetch(`/api/applications/${messageAppId}/messages`);
-    const data = (await refresh.json()) as {
-      messages?: { id: string; fromUserId: string; body: string; createdAt: string }[];
+    if (!res.ok) {
+      setThreadMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMessageDraft(text);
+      const errJson = (await res.json().catch(() => ({}))) as { error?: string };
+      setMessageThreadError(errJson.error || 'Message could not be sent. Please try again.');
+      return;
+    }
+    const data = (await res.json()) as {
+      application?: { messages?: { id: string; fromUserId: string; body: string; createdAt: string }[] };
     };
-    if (refresh.ok && data.messages) setThreadMessages(data.messages);
+    if (data.application?.messages) setThreadMessages(data.application.messages);
     await onApplicationsUpdated?.();
   };
 
@@ -204,6 +345,21 @@ export function CampaignDetail({
           </div>
         </div>
 
+        {brandReviewMode && applicationPatchNotice ? (
+          <div className="dash-main-gutter-x shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <div className="flex items-start justify-between gap-3">
+              <p className="min-w-0 flex-1 leading-snug">{applicationPatchNotice}</p>
+              <button
+                type="button"
+                className="shrink-0 text-xs font-bold uppercase tracking-wide text-amber-900 underline"
+                onClick={() => setApplicationPatchNotice(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {/* ── Tab Bar ── */}
       <div className="dash-main-gutter-x flex shrink-0 items-center gap-6 border-b border-gray-100">
         {tabs.map(tab => (
@@ -241,7 +397,12 @@ export function CampaignDetail({
               {[
                 { icon: Users, label: 'Candidates', value: campaign.candidateCount, color: 'text-[#2A90B0]' },
                 { icon: Target, label: 'Athletes', value: campaign.athleteCount, color: 'text-emerald-600' },
-                { icon: Eye, label: 'Applications', value: campaign.candidates.filter(c => c.status === 'Applied').length, color: 'text-nilink-accent' },
+                {
+                  icon: Eye,
+                  label: 'Applications',
+                  value: campaign.candidates.filter((c) => c.status === 'Applied' || c.status === 'Under Review').length,
+                  color: 'text-nilink-accent'
+                },
                 { icon: TrendingUp, label: 'Deliverables', value: campaign.deliverables.length, color: 'text-nilink-ink' },
               ].map(stat => (
                 <div key={stat.label} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
@@ -336,54 +497,130 @@ export function CampaignDetail({
         {activeTab === 'candidates' && (
           <div className="flex flex-col h-full">
             {/* Candidates Actions */}
-            <div className="dash-main-gutter-x flex shrink-0 items-center justify-between py-4">
-              <div className="flex items-center gap-3">
+            <div className="dash-main-gutter-x flex shrink-0 flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
                 <button
+                  type="button"
                   onClick={selectAll}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex w-fit max-w-full items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-50"
                 >
                   <input
                     type="checkbox"
-                    checked={selectedCandidates.size === campaign.candidates.length && campaign.candidates.length > 0}
+                    checked={
+                      selectableCandidateIds.length > 0 &&
+                      selectedEligibleCandidateIds.length === selectableCandidateIds.length
+                    }
                     readOnly
                     className="rounded border-gray-300 accent-nilink-accent"
                   />
-                  Select All
+                  Select All Eligible
                 </button>
-                <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-gray-50 p-0.5">
-                  {(['All', 'Applied', 'Shortlisted', 'Selected'] as const).map((f) => {
-                    const on = candidateFilter === f;
-                    return (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setCandidateFilter(f)}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                          on
-                            ? 'bg-white text-nilink-ink shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700 hover:bg-white'
-                        }`}
-                      >
-                        {f}
-                      </button>
-                    );
-                  })}
+                <p className="max-w-md text-xs text-gray-400">
+                  Only <span className="font-semibold text-gray-600">Shortlisted</span> candidates can be sent
+                  to offers.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Status</span>
+                  <div className="flex flex-wrap items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+                    {(['All', 'Applied', 'Under Review', 'Shortlisted', 'Offer Sent'] as const).map((f) => {
+                      const on = candidateFilter === f;
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => {
+                            setCandidateFilter(f);
+                          }}
+                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3 ${
+                            on
+                              ? 'bg-white text-nilink-ink shadow-sm'
+                              : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                          }`}
+                        >
+                          {f}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Queue</span>
+                  <div className="flex flex-wrap items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+                    {(
+                      [
+                        { id: 'all' as const, label: 'All' },
+                        { id: 'referral' as const, label: COPY_REFERRAL },
+                        { id: 'regular' as const, label: 'Regular' },
+                      ] as const
+                    ).map(({ id, label }) => {
+                      const on = queueSourceFilter === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setQueueSourceFilter(id)}
+                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3 ${
+                            on
+                              ? 'bg-white text-nilink-ink shadow-sm'
+                              : 'text-gray-500 hover:bg-white hover:text-gray-700'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {selectedCandidates.size > 0 && (
+              {selectedEligibleCandidateIds.length > 0 && (
                 <button
                   type="button"
+                  onClick={() => {
+                    if (promotingToOffers) return;
+                    if (onSendSelectedToDeals) {
+                      setPromotingToOffers(true);
+                      void onSendSelectedToDeals(selectedEligibleCandidateIds)
+                        .then(() => setSelectedCandidates(new Set()))
+                        .catch(() => {})
+                        .finally(() => setPromotingToOffers(false));
+                      return;
+                    }
+                    if (!onPatchCampaignStatus) return;
+                    setPromotingToOffers(true);
+                    void onPatchCampaignStatus(campaign.id, 'Deal Creation in Progress').finally(() => {
+                      setPromotingToOffers(false);
+                    });
+                  }}
+                  disabled={
+                    promotingToOffers ||
+                    (!onSendSelectedToDeals && !onPatchCampaignStatus) ||
+                    selectedEligibleCandidateIds.length === 0
+                  }
                   className="flex items-center gap-2 rounded-lg bg-nilink-accent px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-nilink-accent-hover"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  Send Selected to Deals ({selectedCandidates.size})
+                  {promotingToOffers
+                    ? 'Moving to offer stage...'
+                    : `Send Shortlisted to Offers (${selectedEligibleCandidateIds.length})`}
                 </button>
               )}
             </div>
 
             {/* Candidates Table */}
             <div className="flex-1 overflow-auto pb-6 dash-main-gutter-x">
+              {campaign.candidates.length > 0 && referralApplicationCount === 0 ? (
+                <div
+                  className="mb-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/90 px-4 py-3 text-sm text-gray-600"
+                  role="status"
+                >
+                  <p className="font-semibold text-gray-800">No {COPY_REFERRAL} applications in this queue yet</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    When you use {COPY_INVITE_TO_CAMPAIGN} from an athlete profile, new rows appear here with the{' '}
+                    {COPY_REFERRAL} badge.
+                  </p>
+                </div>
+              ) : null}
               {campaign.candidates.length > 0 ? (
                 filteredCandidates.length > 0 ? (
                 <table className="w-full text-sm text-left">
@@ -391,11 +628,17 @@ export function CampaignDetail({
                     <tr>
                       <th className="px-5 py-3 rounded-l-xl w-10"></th>
                       <th className="px-5 py-3">Athlete</th>
+                      <th className="px-5 py-3" scope="col">
+                        Source <span className="sr-only">(Referral or Regular)</span>
+                      </th>
                       <th className="px-5 py-3">Sport</th>
                       <th className="px-5 py-3">Followers</th>
                       <th className="px-5 py-3">Engagement</th>
                       <th className="px-5 py-3">Status</th>
                       <th className="px-5 py-3">Applied</th>
+                      <th className="px-5 py-3" scope="col">
+                        {COPY_SEND_OFFER}
+                      </th>
                       <th className="px-5 py-3 rounded-r-xl w-10"></th>
                     </tr>
                   </thead>
@@ -409,8 +652,16 @@ export function CampaignDetail({
                           <input
                             type="checkbox"
                             checked={selectedCandidates.has(candidate.id)}
+                            disabled={!isEligibleForOffer(candidate.status)}
                             onChange={() => toggleCandidate(candidate.id)}
-                            className="rounded border-gray-300 accent-nilink-accent"
+                            className={`rounded border-gray-300 accent-nilink-accent ${
+                              isEligibleForOffer(candidate.status) ? '' : 'cursor-not-allowed opacity-40'
+                            }`}
+                            title={
+                              isEligibleForOffer(candidate.status)
+                                ? 'Selected for offer handoff'
+                                : 'Only candidates with Shortlisted status can be sent to offers'
+                            }
                           />
                         </td>
                         <td className="px-5 py-4">
@@ -426,6 +677,13 @@ export function CampaignDetail({
                             </div>
                           </div>
                         </td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border whitespace-nowrap ${applicationSourceStyles[candidate.applicationSource]}`}
+                          >
+                            {candidate.applicationSource === 'referral' ? COPY_REFERRAL : 'Regular'}
+                          </span>
+                        </td>
                         <td className="px-5 py-4 text-gray-600">{candidate.sport}</td>
                         <td className="px-5 py-4 font-medium text-gray-900">{candidate.followers}</td>
                         <td className="px-5 py-4 font-medium text-gray-900">{candidate.engagement}</td>
@@ -435,6 +693,32 @@ export function CampaignDetail({
                           </span>
                         </td>
                         <td className="px-5 py-4 text-gray-400 text-xs">{candidate.appliedDate}</td>
+                        <td className="px-5 py-4">
+                          {brandReviewMode && offersMapLoading ? (
+                            <span
+                              className="inline-flex items-center gap-1 text-xs text-gray-500"
+                              role="status"
+                              aria-live="polite"
+                            >
+                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                              Loading…
+                            </span>
+                          ) : brandReviewMode && offersMapError ? (
+                            <span className="text-xs text-red-600" role="alert" title={offersMapError}>
+                              Unavailable
+                            </span>
+                          ) : brandReviewMode && offerIdByApplicationId[candidate.id] ? (
+                            <button
+                              type="button"
+                              onClick={() => setWizardOfferId(offerIdByApplicationId[candidate.id])}
+                              className="text-xs font-bold uppercase tracking-wide text-nilink-accent underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-nilink-accent"
+                            >
+                              {COPY_SEND_OFFER}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </td>
                         <td className="relative px-5 py-4 text-right">
                           {brandReviewMode && onPatchApplication && (
                             <>
@@ -461,40 +745,63 @@ export function CampaignDetail({
                                     <MessageSquare className="h-3.5 w-3.5" />
                                     Message
                                   </button>
-                                  {candidate.status !== 'Shortlisted' && (
+                                  {candidate.status === 'Applied' && (
                                     <button
                                       type="button"
                                       className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                                       onClick={() => {
                                         setOpenMenuForId(null);
-                                        void onPatchApplication(candidate.id, 'shortlisted');
+                                        void (async () => {
+                                          const r = await onPatchApplication(candidate.id, 'under_review');
+                                          if (r?.warnings?.length) {
+                                            setApplicationPatchNotice(
+                                              r.warnings.map((w) => w.message).join(' ')
+                                            );
+                                          }
+                                        })();
+                                      }}
+                                    >
+                                      Move to review
+                                    </button>
+                                  )}
+                                  {(candidate.status === 'Applied' || candidate.status === 'Under Review') && (
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                      onClick={() => {
+                                        setOpenMenuForId(null);
+                                        void (async () => {
+                                          const r = await onPatchApplication(candidate.id, 'shortlisted');
+                                          if (r?.warnings?.length) {
+                                            setApplicationPatchNotice(
+                                              r.warnings.map((w) => w.message).join(' ')
+                                            );
+                                          }
+                                        })();
                                       }}
                                     >
                                       Shortlist
                                     </button>
                                   )}
-                                  {candidate.status !== 'Selected' && (
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
-                                      onClick={() => {
-                                        setOpenMenuForId(null);
-                                        void onPatchApplication(candidate.id, 'approved');
-                                      }}
-                                    >
-                                      Approve
-                                    </button>
-                                  )}
-                                  {candidate.status !== 'Declined' && (
+                                  {(candidate.status === 'Applied' ||
+                                    candidate.status === 'Under Review' ||
+                                    candidate.status === 'Shortlisted') && (
                                     <button
                                       type="button"
                                       className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                                       onClick={() => {
                                         setOpenMenuForId(null);
-                                        void onPatchApplication(candidate.id, 'declined');
+                                        void (async () => {
+                                          const r = await onPatchApplication(candidate.id, 'rejected');
+                                          if (r?.warnings?.length) {
+                                            setApplicationPatchNotice(
+                                              r.warnings.map((w) => w.message).join(' ')
+                                            );
+                                          }
+                                        })();
                                       }}
                                     >
-                                      Decline
+                                      Reject
                                     </button>
                                   )}
                                 </div>
@@ -507,9 +814,23 @@ export function CampaignDetail({
                   </tbody>
                 </table>
                 ) : (
-                  <p className="py-16 text-center text-sm text-gray-400">
-                    No candidates match this filter.
-                  </p>
+                  <div className="space-y-2 px-4 py-16 text-center text-sm text-gray-400">
+                    <p>No candidates match this filter.</p>
+                    {queueSourceFilter === 'referral' && referralApplicationCount === 0 ? (
+                      <p className="text-gray-500">
+                        No {COPY_REFERRAL} applications on this campaign yet — use {COPY_INVITE_TO_CAMPAIGN} from an
+                        athlete profile.
+                      </p>
+                    ) : null}
+                    {queueSourceFilter === 'referral' && referralApplicationCount > 0 ? (
+                      <p className="text-gray-500">
+                        No {COPY_REFERRAL} rows in this status view — try Status: All.
+                      </p>
+                    ) : null}
+                    {queueSourceFilter === 'regular' && campaign.candidates.length > 0 ? (
+                      <p className="text-gray-500">No regular (non-referral) rows in this status view.</p>
+                    ) : null}
+                  </div>
                 )
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -725,6 +1046,27 @@ export function CampaignDetail({
         )}
       </div>
 
+        {wizardOfferId && (
+          <OfferWizard
+            offerId={wizardOfferId}
+            onClose={() => {
+              setWizardOfferId(null);
+              void (async () => {
+                const res = await authFetch(`/api/campaigns/${campaign.id}/offers`);
+                const data = (await res.json()) as {
+                  offers?: { id: string; applicationId: string | null }[];
+                };
+                if (!res.ok || !data.offers) return;
+                const map: Record<string, string> = {};
+                for (const o of data.offers) {
+                  if (o.applicationId) map[o.applicationId] = o.id;
+                }
+                setOfferIdByApplicationId(map);
+              })();
+            }}
+          />
+        )}
+
         {messageAppId && (
           <>
             <button
@@ -746,10 +1088,17 @@ export function CampaignDetail({
                 </button>
               </div>
               <div className="min-h-0 flex-1 space-y-3 overflow-auto p-4">
+                {messageThreadError ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                    {messageThreadError}
+                  </p>
+                ) : null}
                 {threadLoading ? (
                   <p className="text-sm text-gray-400">Loading…</p>
                 ) : threadMessages.length === 0 ? (
-                  <p className="text-sm text-gray-400">No messages yet. Say hello.</p>
+                  !messageThreadError ? (
+                    <p className="text-sm text-gray-400">No messages yet. Say hello.</p>
+                  ) : null
                 ) : (
                   threadMessages.map((m) => (
                     <div

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
 import { createClient } from '@/lib/supabase/client';
 import type { DashboardUser } from '@/components/dashboard/DashboardShell';
+import { resolveSupabaseRole } from '@/lib/auth/supabaseRole';
 
 /* ── Context so child steps can access user ── */
 interface OnboardingContextValue {
@@ -23,9 +24,13 @@ function mapUser(supaUser: {
   id: string;
   email?: string;
   user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
 }): DashboardUser {
   const meta = supaUser.user_metadata ?? {};
-  const role = meta.role === 'brand' ? 'brand' : 'athlete';
+  const role = resolveSupabaseRole({
+    userMetadata: supaUser.user_metadata,
+    appMetadata: supaUser.app_metadata,
+  });
   const name =
     (meta.full_name as string) ||
     (meta.name as string) ||
