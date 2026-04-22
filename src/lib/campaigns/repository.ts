@@ -109,6 +109,25 @@ function fromDbGender(v: string): string {
   return 'Any';
 }
 
+/**
+ * Accept both ISO (YYYY-MM-DD) and human-formatted ("May 1, 2026")
+ * date strings. The CreateCampaignOverlay currently emits human format
+ * via its display helper, but the DB column is `date`, which rejects
+ * anything but ISO. Normalize here so older UI code keeps working.
+ */
+function parseDateForDb(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (s.length === 0) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function toDbGender(v: unknown): string {
   const s = String(v ?? '').toLowerCase();
   if (s === 'male' || s === 'female' || s === 'nonbinary') return s;
@@ -239,8 +258,8 @@ export async function createCampaign(input: Record<string, unknown>): Promise<St
     package_details: Array.isArray(input.packageDetails) ? (input.packageDetails as string[]) : [],
     platforms: Array.isArray(input.platforms) ? (input.platforms as string[]) : [],
     budget_label: String(input.budget ?? ''),
-    start_date: typeof input.startDate === 'string' && input.startDate.length > 0 ? input.startDate : null,
-    end_date:   typeof input.endDate   === 'string' && input.endDate.length   > 0 ? input.endDate   : null,
+    start_date: parseDateForDb(input.startDate),
+    end_date:   parseDateForDb(input.endDate),
     duration_label: String(input.duration ?? ''),
     target_sport: String(input.sport ?? 'All Sports'),
     target_gender: toDbGender(input.genderFilter),
