@@ -360,7 +360,7 @@ function buildScenarios(): Scenario[] {
       offerName: 'Commercial bundle — active',
       amount: '$1,200',
       assetCount: 1,
-      platforms: ['Instagram', 'YouTube'],
+      platforms: ['Instagram', 'TikTok'],
     },
     {
       dealId: SEED_DEAL_GRAPH_IDS[2],

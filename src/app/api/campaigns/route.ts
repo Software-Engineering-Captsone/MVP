@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     intent === 'draft'
       ? 'Draft'
       : acceptApplications
-        ? 'Open for Applications'
+        ? 'Active'
         : 'Ready to Launch';
 
   const payload: Record<string, unknown> = {

@@ -1,6 +1,7 @@
 {
   "aliases": {
-    "brandDemoUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11"
+    "brandDemoUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+    "athleteDemoUserId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48"
   },
   "threads": [
     {
@@ -20,6 +21,15 @@
       "athleteUserId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
       "createdAt": "2026-04-15T02:42:29.485Z",
       "updatedAt": "2026-04-15T02:43:29.485Z"
+    },
+    {
+      "id": "8567ea0f-cb05-408f-810d-a63c4ce7585f",
+      "applicationId": null,
+      "threadKind": "brand_outreach",
+      "brandUserId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "athleteUserId": "2",
+      "createdAt": "2026-04-21T03:38:03.927Z",
+      "updatedAt": "2026-04-21T03:38:03.927Z"
     }
   ],
   "participants": [
@@ -42,6 +52,16 @@
       "threadId": "28281ffd-1f53-47b2-800b-047dd2b75404",
       "userId": "cd9279de-b6fb-4c84-b486-20b5b72b4e48",
       "displayName": "Demo Athlete"
+    },
+    {
+      "threadId": "8567ea0f-cb05-408f-810d-a63c4ce7585f",
+      "userId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
+      "displayName": "Brand"
+    },
+    {
+      "threadId": "8567ea0f-cb05-408f-810d-a63c4ce7585f",
+      "userId": "2",
+      "displayName": "Mia Galella"
     }
   ],
   "messages": [
@@ -104,12 +124,12 @@
     {
       "threadId": "c7b8999b-d4df-4cc4-83ef-37596af9e42a",
       "userId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
-      "lastReadAt": "2026-04-15T02:45:07.889Z"
+      "lastReadAt": "2026-04-21T03:36:15.390Z"
     },
     {
       "threadId": "28281ffd-1f53-47b2-800b-047dd2b75404",
       "userId": "7dce3bb0-c389-46dc-a295-b103dcde3a11",
-      "lastReadAt": "2026-04-15T03:11:31.260Z"
+      "lastReadAt": "2026-04-21T03:36:15.666Z"
     }
   ],
   "seededAt": "2026-04-15T02:42:29.485Z"

@@ -34,7 +34,7 @@ import {
   assertCampaignStatusTransition,
 } from './stateTransitions';
 
-const OPEN_STATUSES = ['Open for Applications', 'Reviewing Candidates'] as const;
+const OPEN_STATUSES = ['Active', 'Reviewing Candidates'] as const;
 
 function idStr(doc: { _id?: unknown }): string {
   if (doc._id == null) return '';
@@ -778,7 +778,7 @@ export async function createApplication(
 
   await mutateLocalCampaignStore((draft) => {
     draft.applications.push(row);
-    if (campaign.status === 'Open for Applications') {
+    if (campaign.status === 'Active') {
       const idx = draft.campaigns.findIndex((c) => idStr(c) === campaignId);
       if (idx >= 0) {
         draft.campaigns[idx] = {
@@ -948,16 +948,16 @@ export async function withdrawApplicationByAthlete(
       return;
     }
     const status = String(app.status ?? 'applied');
+    if (status === 'rejected' && app.withdrawnByAthlete === true) {
+      result = { ok: true, application: app };
+      return;
+    }
     if (status !== 'applied' && status !== 'pending') {
       result = {
         ok: false,
         status: 400,
         error: 'Application can only be withdrawn before review starts',
       };
-      return;
-    }
-    if (status === 'rejected' && app.withdrawnByAthlete === true) {
-      result = { ok: true, application: app };
       return;
     }
     const next = {
@@ -1324,7 +1324,7 @@ export async function createReferralInviteApplication(
     application = row;
     created = true;
 
-    if (campInDraft.status === 'Open for Applications') {
+    if (campInDraft.status === 'Active') {
       const idx = draft.campaigns.findIndex((c) => idStr(c) === campaignId);
       if (idx >= 0) {
         draft.campaigns[idx] = {

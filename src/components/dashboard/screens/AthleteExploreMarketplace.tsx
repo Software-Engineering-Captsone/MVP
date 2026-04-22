@@ -62,7 +62,7 @@ const OPPORTUNITY_CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: 'ugc', label: 'UGC / creator content' },
 ];
 
-const OPPORTUNITY_PLATFORMS = ['Instagram', 'TikTok', 'YouTube'] as const;
+const OPPORTUNITY_PLATFORMS = ['Instagram', 'TikTok'] as const;
 
 function formatDate(value?: string): string {
   if (!value) return 'Recently';

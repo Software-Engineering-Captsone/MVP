@@ -7,7 +7,6 @@ function formatJoiError(err: Joi.ValidationError): string {
 const CAMPAIGN_STATUSES = [
   'Draft',
   'Ready to Launch',
-  'Open for Applications',
   'Reviewing Candidates',
   'Deal Creation in Progress',
   'Active',
@@ -27,11 +26,15 @@ const campaignSchema = Joi.object({
   campaignBriefV2: Joi.object().unknown(true).required(),
   status: Joi.string()
     .valid(...CAMPAIGN_STATUSES)
-    .default('Open for Applications'),
+    .default('Draft'),
 }).unknown(true);
 
 export function validateCampaignInput(data: Record<string, unknown>): Record<string, unknown> {
-  const { error, value } = campaignSchema.validate(data, {
+  const merged: Record<string, unknown> = { ...data };
+  if (merged.status === 'Open for Applications') {
+    merged.status = 'Active';
+  }
+  const { error, value } = campaignSchema.validate(merged, {
     abortEarly: false,
     stripUnknown: false,
   });

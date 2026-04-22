@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { Search, Instagram, Facebook, X, Twitter, Heart } from 'lucide-react';
+import { Search, Instagram, X, Twitter, Heart } from 'lucide-react';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { useDashboard } from '../DashboardShell';
 import { Athlete, Brand } from '@/lib/mockData';
@@ -132,6 +132,32 @@ export function AthleteDiscovery() {
         const matchesSport = activeSport ? a.sport === activeSport : true;
         return matchesSearch && matchesSport;
       });
+
+  const currentAthleteList = useMemo<Athlete[]>(() => {
+    if (isAthleteView) return [];
+
+    if (isFiltering) {
+      return filteredItems.filter((item): item is Athlete => !isBrandItem(item));
+    }
+
+    if (expandedCategory) {
+      const category = athleteCategories.find((cat) => cat.id === expandedCategory);
+      if (!category) return [];
+      return category.items.filter((item): item is Athlete => !isBrandItem(item));
+    }
+
+    return athletes;
+  }, [athleteCategories, athletes, expandedCategory, filteredItems, isAthleteView, isFiltering]);
+
+  const handleNextAthlete = () => {
+    if (!selectedAthlete || currentAthleteList.length === 0) return;
+
+    const currentIndex = currentAthleteList.findIndex((athlete) => athlete.id === selectedAthlete.id);
+    const nextIndex = currentIndex >= 0
+      ? (currentIndex + 1) % currentAthleteList.length
+      : 0;
+    setSelectedAthlete(currentAthleteList[nextIndex]);
+  };
 
   const displayCategory = isFiltering ? 'search' : expandedCategory;
   const activeFilter = isAthleteView ? activeIndustry : activeSport;
@@ -272,14 +298,20 @@ export function AthleteDiscovery() {
                         {item.verified && <VerifiedBadge />}
                       </div>
                       <p className="text-xs text-gray-500 mb-2 truncate">
-                        {isAthleteView ? `${item.industry} | ${item.location}` : `${item.sport} | ${item.school}`}
+                        {isBrandItem(item) ? `${item.industry} | ${item.location}` : `${item.sport} | ${item.school}`}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {item.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {item.stats.tiktok}</span>
                         <span className="flex items-center gap-1">
-                          {isAthleteView ? <Twitter className="w-3.5 h-3.5" /> : <Facebook className="w-3.5 h-3.5" />} {isAthleteView ? item.stats.twitter : item.stats.facebook}
+                          <Instagram className="h-3.5 w-3.5 text-pink-600" /> {item.stats.instagram}
                         </span>
+                        <span className="flex items-center gap-1">
+                          <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {item.stats.tiktok}
+                        </span>
+                        {isBrandItem(item) ? (
+                          <span className="flex items-center gap-1">
+                            <Twitter className="h-3.5 w-3.5 text-sky-500" /> {item.stats.twitter}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -346,14 +378,20 @@ export function AthleteDiscovery() {
                           {item.verified && <VerifiedBadge />}
                         </div>
                         <p className="text-xs text-gray-500 mb-2 truncate">
-                          {isAthleteView ? `${item.industry} | ${item.location}` : `${item.sport} | ${item.school}`}
+                          {isBrandItem(item) ? `${item.industry} | ${item.location}` : `${item.sport} | ${item.school}`}
                         </p>
                         <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                          <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {item.stats.instagram}</span>
-                          <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {item.stats.tiktok}</span>
                           <span className="flex items-center gap-1">
-                            {isAthleteView ? <Twitter className="w-3.5 h-3.5" /> : <Facebook className="w-3.5 h-3.5" />} {isAthleteView ? item.stats.twitter : item.stats.facebook}
+                            <Instagram className="h-3.5 w-3.5 text-pink-600" /> {item.stats.instagram}
                           </span>
+                          <span className="flex items-center gap-1">
+                            <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {item.stats.tiktok}
+                          </span>
+                          {isBrandItem(item) ? (
+                            <span className="flex items-center gap-1">
+                              <Twitter className="h-3.5 w-3.5 text-sky-500" /> {item.stats.twitter}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -399,9 +437,15 @@ export function AthleteDiscovery() {
                         {selectedBrand.industry} | {selectedBrand.location}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {selectedBrand.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {selectedBrand.stats.tiktok}</span>
-                        <span className="flex items-center gap-1"><Twitter className="w-3.5 h-3.5" /> {selectedBrand.stats.twitter}</span>
+                        <span className="flex items-center gap-1">
+                          <Instagram className="h-3.5 w-3.5 text-pink-600" /> {selectedBrand.stats.instagram}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {selectedBrand.stats.tiktok}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Twitter className="h-3.5 w-3.5 text-sky-500" /> {selectedBrand.stats.twitter}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -421,42 +465,34 @@ export function AthleteDiscovery() {
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
                   <button 
                     onClick={() => setSelectedAthlete(null)}
-                    className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center bg-black/20 hover:bg-black/40 rounded-full transition-colors z-10"
+                    className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/20 transition-colors hover:bg-black/40"
                   >
                     <X className="w-5 h-5 text-white" />
                   </button>
-                  {/* Banner */}
-                  <div className="h-32 bg-[#FFCD00] relative">
-                    {selectedAthlete.teamLogo && (
-                      <ImageWithFallback
-                        src={selectedAthlete.teamLogo}
-                        alt="Team Logo"
-                        className="absolute right-4 top-4 h-16 opacity-80"
-                      />
-                    )}
-                  </div>
-                  
                   {/* Profile Header */}
-                  <div className="px-6 relative pb-6 border-b border-gray-100">
-                    <div className="absolute -top-12 left-6">
+                  <div className="border-b border-gray-100 px-6 pb-6 pt-6">
+                    <div className="flex items-center gap-5">
                       <ImageWithFallback
                         src={selectedAthlete.image} 
                         alt={selectedAthlete.name} 
-                        className="w-24 h-24 rounded-full border-4 border-white object-cover shadow-sm bg-white" 
+                        className="h-56 w-56 rounded-full border-4 border-white bg-white object-cover shadow-sm" 
                       />
-                    </div>
-                    <div className="ml-28 pt-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h2 className="text-2xl font-bold">{selectedAthlete.name}</h2>
-                        {selectedAthlete.verified && <VerifiedBadge className="w-5 h-5 shrink-0" />}
-                      </div>
-                      <p className="text-xs text-gray-500 mb-2">
-                        {selectedAthlete.sport} | {selectedAthlete.school}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {selectedAthlete.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {selectedAthlete.stats.tiktok}</span>
-                        <span className="flex items-center gap-1"><Facebook className="w-3.5 h-3.5" /> {selectedAthlete.stats.facebook}</span>
+                      <div className="min-w-0">
+                        <div className="mb-1 flex items-center gap-2">
+                          <h2 className="text-3xl font-bold leading-tight">{selectedAthlete.name}</h2>
+                          {selectedAthlete.verified && <VerifiedBadge className="h-6 w-6 shrink-0" />}
+                        </div>
+                        <p className="mb-3 text-sm text-gray-500">
+                          {selectedAthlete.sport} | {selectedAthlete.school}
+                        </p>
+                        <div className="flex items-center gap-4 text-sm font-medium text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Instagram className="h-4 w-4 text-pink-600" /> {selectedAthlete.stats.instagram}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <TiktokIcon className="h-4 w-4 text-nilink-ink" /> {selectedAthlete.stats.tiktok}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -502,7 +538,7 @@ export function AthleteDiscovery() {
             ) : null}
 
             {/* Sticky Actions Footer */}
-            <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3 shrink-0">
+            <div className="flex shrink-0 justify-center gap-3 border-t border-gray-100 bg-white p-4">
               {isAthleteView && selectedBrand ? (
                 <button
                   type="button"
@@ -549,6 +585,7 @@ export function AthleteDiscovery() {
               )}
               <button
                 type="button"
+                onClick={handleNextAthlete}
                 className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
               >
                 Next {isAthleteView ? 'Brand' : 'Athlete'}

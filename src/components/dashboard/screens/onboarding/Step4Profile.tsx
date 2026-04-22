@@ -161,7 +161,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
               value={data.socials.other}
               onChange={(e) => updateSocial('other', e.target.value)}
               className={inputClass}
-              placeholder="YouTube, Snapchat, etc."
+              placeholder="Instagram, TikTok, etc."
             />
           </div>
         </div>

@@ -132,12 +132,10 @@ function asStringArray(value: unknown): string[] {
 export function normalizePlatformSlug(raw: string): string {
   const s = raw.trim().toLowerCase();
   if (!s) return 'other';
-  if (s === 'x' || s === 'twitter') return 'x';
   if (s === 'ig' || s === 'instagram') return 'instagram';
   if (s === 'tiktok' || s === 'tik tok') return 'tiktok';
-  if (s === 'youtube' || s === 'yt') return 'youtube';
-  if (s === 'linkedin') return 'linkedin';
-  return s.replace(/\s+/g, '_');
+  const normalized = s.replace(/\s+/g, '_');
+  return normalized === 'instagram' || normalized === 'tiktok' ? normalized : 'other';
 }
 
 /** Map V2 slug back to legacy wizard display casing. */
@@ -146,9 +144,6 @@ function platformSlugToLegacyLabel(slug: string): string {
   const map: Record<string, string> = {
     instagram: 'Instagram',
     tiktok: 'TikTok',
-    youtube: 'YouTube',
-    x: 'X',
-    linkedin: 'LinkedIn',
     other: 'Other',
   };
   return map[s] ?? slug.charAt(0).toUpperCase() + slug.slice(1);

@@ -1,7 +1,6 @@
 export type CampaignStatus =
   | 'Draft'
   | 'Ready to Launch'
-  | 'Open for Applications'
   | 'Reviewing Candidates'
   | 'Deal Creation in Progress'
   | 'Active'
@@ -17,6 +16,7 @@ export type CandidateStatus =
   | 'Offer Declined'
   | 'Withdrawn'
   | 'Rejected'
+  | 'Selected'
   | 'Sent to Deals'
   | 'Contracted'
   | 'Declined';

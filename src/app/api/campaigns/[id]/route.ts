@@ -186,7 +186,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       : (baselineBrief as Record<string, unknown>);
     patch.campaignBriefV2 = briefV2;
     Object.assign(patch, deriveRuntimePatchFromBrief(briefV2 as Record<string, unknown>));
-    patch.status = patch.acceptApplications ? 'Open for Applications' : 'Ready to Launch';
+    patch.status = patch.acceptApplications ? 'Active' : 'Ready to Launch';
   } else {
     if (typeof body.status === 'string') patch.status = body.status;
     if (typeof body.acceptApplications === 'boolean') patch.acceptApplications = body.acceptApplications;

@@ -64,7 +64,8 @@ export type V2ReviewRiskPreview = {
 
 export function computeV2ReviewRiskFlags(input: {
   secondaryKpi: string;
-  creatorExclusionsText: string;
+  /** Free-text exclusions; callers may omit while V2 fields stabilize. */
+  creatorExclusionsText?: unknown;
   preview: V2ReviewRiskPreview;
 }): string[] {
   const flags: string[] = [];
@@ -81,7 +82,8 @@ export function computeV2ReviewRiskFlags(input: {
   if (!input.secondaryKpi || String(input.secondaryKpi).trim() === '') {
     flags.push('No secondary KPI defined');
   }
-  if (!input.creatorExclusionsText.trim()) {
+  const creatorExclusionsText = typeof input.creatorExclusionsText === 'string' ? input.creatorExclusionsText : '';
+  if (!creatorExclusionsText.trim()) {
     flags.push('No creator exclusions set');
   }
   if (p?.status === 'broad_estimate') {

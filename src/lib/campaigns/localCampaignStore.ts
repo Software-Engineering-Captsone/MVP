@@ -96,7 +96,7 @@ export async function readLocalCampaignStore(): Promise<LocalCampaignStoreSnapsh
     const dealContracts = Array.isArray(o.dealContracts) ? o.dealContracts : [];
     const dealPayments = Array.isArray(o.dealPayments) ? o.dealPayments : [];
     const dealActivities = Array.isArray(o.dealActivities) ? o.dealActivities : [];
-    return {
+    const base: LocalCampaignStoreSnapshot = {
       campaigns: campaigns as StoredCampaign[],
       applications: applications as StoredApplication[],
       offers: offers as StoredOffer[],
@@ -108,6 +108,26 @@ export async function readLocalCampaignStore(): Promise<LocalCampaignStoreSnapsh
       dealPayments: dealPayments as StoredDealPayment[],
       dealActivities: dealActivities as StoredDealActivity[],
     };
+
+    let migrated = false;
+    const migratedCampaigns = base.campaigns.map((c) => {
+      if (String(c.status) === 'Open for Applications') {
+        migrated = true;
+        return { ...c, status: 'Active' } as StoredCampaign;
+      }
+      return c;
+    });
+    if (migrated) {
+      const next = { ...base, campaigns: migratedCampaigns };
+      try {
+        await writeLocalCampaignStore(next);
+      } catch (err) {
+        console.error('[localCampaignStore] Failed to persist Open→Active migration', err);
+      }
+      return next;
+    }
+
+    return base;
   } catch (e: unknown) {
     const err = e as NodeJS.ErrnoException;
     if (err?.code === 'ENOENT') return { ...EMPTY };

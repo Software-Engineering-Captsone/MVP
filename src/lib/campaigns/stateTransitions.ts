@@ -17,9 +17,9 @@ const APPLICATION_TRANSITIONS: Record<
   rejected: new Set(),
   offer_sent: new Set(['offer_declined']),
   offer_declined: new Set(),
-  // Legacy lifecycle aliases
-  pending: new Set(['shortlisted', 'approved', 'declined']),
-  approved: new Set(['declined']),
+  // Legacy lifecycle aliases (`from` keys). Targets use canonical statuses only.
+  pending: new Set(['shortlisted', 'offer_sent', 'rejected']),
+  approved: new Set(['offer_declined']),
   declined: new Set(),
 };
 
@@ -46,7 +46,7 @@ export function assertApplicationStatusTransition(
 }
 
 const DEAL_CREATION_SOURCES = new Set([
-  'Open for Applications',
+  'Active',
   'Reviewing Candidates',
   'Deal Creation in Progress',
 ]);
@@ -64,9 +64,6 @@ export function validateCampaignStatusTransition(
       ok: false,
       error: `Campaign cannot move to Deal Creation in Progress from status "${fromStatus}"`,
     };
-  }
-  if (toStatus === 'Active' && fromStatus === 'Draft') {
-    return { ok: false, error: 'Campaign cannot become Active directly from Draft' };
   }
   return { ok: true };
 }

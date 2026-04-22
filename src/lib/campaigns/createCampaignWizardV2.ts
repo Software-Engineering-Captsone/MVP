@@ -129,6 +129,16 @@ function splitLines(s: string): string[] {
     .filter(Boolean);
 }
 
+function normalizeWizardGender(genderFilter: string | undefined): string {
+  const g = (genderFilter ?? '').trim();
+  if (g === 'Any' || g === 'Male' || g === 'Female') return g;
+  if (/^men$/i.test(g)) return 'Male';
+  if (/^women$/i.test(g)) return 'Female';
+  if (/^male$/i.test(g)) return 'Male';
+  if (/^female$/i.test(g)) return 'Female';
+  return 'Any';
+}
+
 export function hydrateOverlayFromCampaignBriefV2(brief: CampaignBriefV2): HydrateOverlayFromBriefResult {
   const s = brief.strategy;
   const a = brief.audienceCreatorFit;
@@ -164,7 +174,7 @@ export function hydrateOverlayFromCampaignBriefV2(brief: CampaignBriefV2): Hydra
     startDate: isoDateToDateInput(s.flightStartDate),
     endDate: isoDateToDateInput(s.flightEndDate),
     sport: a.sportCategory || 'All Sports',
-    gender: a.genderFilter || 'Any',
+    gender: normalizeWizardGender(a.genderFilter),
     followerMin: followerSliderFromBriefFollowerRange(a.followerRangeMin),
     engagementMinPct: a.engagementRateMinPct ?? 0,
     brandFitTags: brandFitTags.length > 0 ? brandFitTags : [],
@@ -251,6 +261,8 @@ export type BuildCampaignBriefV2FromWizardArgs = {
 };
 
 export function buildCampaignBriefV2FromWizardState(args: BuildCampaignBriefV2FromWizardArgs): CampaignBriefV2 {
+  const safeTrim = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+
   const budgetStr = args.budgetMin || args.budgetMax ? `$${args.budgetMin || '0'} – $${args.budgetMax || '0'}` : '';
   const capFromRange = Math.max(parseBudgetCapHint(budgetStr), parseBudgetCapHint(args.budgetMax), parseBudgetCapHint(args.budgetMin));
   const minAmt = parseBudgetSingleAmount(args.budgetMin);
@@ -269,18 +281,18 @@ export function buildCampaignBriefV2FromWizardState(args: BuildCampaignBriefV2Fr
   const followerRangeMin =
     args.followerMin <= 0 ? 0 : args.followerMin <= 100 ? args.followerMin * 1000 : Math.round(args.followerMin);
 
-  const market = args.marketRegion.trim() || args.locationRadius.trim() || 'Global';
+  const market = safeTrim(args.marketRegion) || safeTrim(args.locationRadius) || 'Global';
 
   const secKpi = args.secondaryKpi && String(args.secondaryKpi).trim() ? (args.secondaryKpi as PrimaryKpiV2) : undefined;
-  const secT = args.secondaryKpiTarget.trim();
+  const secT = safeTrim(args.secondaryKpiTarget);
   const secTarget = secKpi && secT ? Number(secT) : undefined;
 
-  const langs = args.languagePreferencesText
+  const langs = (args.languagePreferencesText ?? '')
     .split(/[,;\n]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const exclusions = splitLines(args.creatorExclusionsText);
+  const exclusions = splitLines(args.creatorExclusionsText ?? '');
 
   const bundle =
     args.deliverableBundle.length > 0
@@ -292,23 +304,23 @@ export function buildCampaignBriefV2FromWizardState(args: BuildCampaignBriefV2Fr
   const raw: Record<string, unknown> = {
     schemaVersion: CAMPAIGN_BRIEF_V2_SCHEMA_VERSION,
     strategy: {
-      campaignName: args.campaignName.trim(),
+      campaignName: safeTrim(args.campaignName),
       objectiveType: args.objectiveType,
       primaryKpi: args.primaryKpi,
       primaryKpiTarget: args.primaryKpiTarget,
-      flightStartDate: args.startDate.trim(),
-      flightEndDate: args.endDate.trim(),
+      flightStartDate: safeTrim(args.startDate),
+      flightEndDate: safeTrim(args.endDate),
       marketRegion: market,
       secondaryKpi: secKpi,
       secondaryKpiTarget: secTarget !== undefined && Number.isFinite(secTarget) ? secTarget : undefined,
-      campaignSummary: args.opportunityContext.trim() || undefined,
+      campaignSummary: safeTrim(args.opportunityContext) || undefined,
     },
     audienceCreatorFit: {
-      audiencePersona: args.audiencePersona.trim() || args.opportunityContext.trim() || args.campaignName.trim(),
+      audiencePersona: safeTrim(args.audiencePersona) || safeTrim(args.opportunityContext) || safeTrim(args.campaignName),
       sportCategory: args.sport,
       followerRangeMin,
       engagementRateMinPct: args.engagementMinPct,
-      audienceGeoRequirement: args.audienceGeoRequirement,
+      audienceGeoRequirement: args.audienceGeoRequirement ?? 'open',
       genderFilter: args.gender,
       languagePreferences: langs.length ? langs : undefined,
       creatorExclusions: exclusions.length ? exclusions : undefined,
@@ -320,7 +332,7 @@ export function buildCampaignBriefV2FromWizardState(args: BuildCampaignBriefV2Fr
       messagePillars: pillars.length > 0 ? pillars : ['Brand alignment'],
       mustSay: splitLines(args.mustSayLines),
       mustAvoid: splitLines(args.mustAvoidLines),
-      creativeAngle: args.brief.trim() || undefined,
+      creativeAngle: safeTrim(args.brief) || undefined,
       draftRequired: args.draftRequired,
       revisionRounds: Math.max(0, Math.round(args.revisionRounds)),
     },

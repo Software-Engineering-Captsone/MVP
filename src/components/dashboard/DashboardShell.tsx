@@ -51,23 +51,18 @@ const athleteNavigation: NavItem[] = [
   { href: '/dashboard/offers', icon: Handshake, label: 'Offers' },
   { href: '/dashboard/deals', icon: FileText, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
+  { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
 ];
 
 const businessNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
-  { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
   { href: '/dashboard/search', icon: Search, label: 'Explore' },
+  { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
   { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
   { href: '/dashboard/deals', icon: CreditCard, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
+  { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
 ];
-
-/** Inbox sits above profile (below main nav), not in the scrollable list. */
-const inboxNavItem: NavItem = {
-  href: '/dashboard/messages',
-  icon: MessageSquare,
-  label: 'Inbox',
-};
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -209,9 +204,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     email: sessionUser.email,
   };
 
-  const InboxIcon = inboxNavItem.icon;
-  const inboxActive = pathname.startsWith(inboxNavItem.href);
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setIsProfileMenuOpen(false);
@@ -306,44 +298,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </nav>
 
           <div className="mt-auto shrink-0 bg-nilink-sidebar px-3 pb-3 pt-3">
-            <ul className="space-y-1.5">
-              <li>
-                <Link
-                  href={inboxNavItem.href}
-                  className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
-                >
-                  <motion.div
-                    className={`group/link flex min-h-[44px] w-full items-center justify-start gap-2 rounded-xl px-2 py-2 text-sm font-medium tracking-wide transition-colors duration-200 ${
-                      inboxActive
-                        ? 'bg-stone-100 text-zinc-700 shadow-sm'
-                        : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'
-                    }`}
-                    whileTap={{ scale: 0.99 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center">
-                      <InboxIcon
-                        className={`h-5 w-5 ${inboxActive ? 'text-zinc-700' : 'text-current'}`}
-                        strokeWidth={inboxActive ? 2.25 : 2}
-                      />
-                    </span>
-                    <div className="relative flex min-w-0 max-w-0 flex-1 items-center justify-between overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:opacity-100 whitespace-nowrap">
-                      <span
-                        className={
-                          inboxActive
-                            ? 'font-medium text-zinc-700'
-                            : 'text-gray-400 group-hover/link:text-white'
-                        }
-                      >
-                        {inboxNavItem.label}
-                      </span>
-                    </div>
-                  </motion.div>
-                </Link>
-              </li>
-            </ul>
-
-            <div className="mt-3 border-t border-nilink-sidebar-muted pt-3">
+            <div className="border-t border-nilink-sidebar-muted pt-3">
               <div className="relative">
                 <motion.button
                   type="button"

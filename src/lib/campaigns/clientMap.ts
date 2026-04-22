@@ -242,11 +242,11 @@ function apiDateToDateInputValue(raw: string | undefined): string {
 
 function normalizeGenderForOverlay(genderFilter: string | undefined): string {
   const g = (genderFilter ?? '').trim();
-  if (g === 'Men' || g === 'Women' || g === 'Any') return g;
-  if (/^male$/i.test(g)) return 'Men';
-  if (/^female$/i.test(g)) return 'Women';
-  if (/^men$/i.test(g)) return 'Men';
-  if (/^women$/i.test(g)) return 'Women';
+  if (g === 'Male' || g === 'Female' || g === 'Any') return g;
+  if (/^male$/i.test(g)) return 'Male';
+  if (/^female$/i.test(g)) return 'Female';
+  if (/^men$/i.test(g)) return 'Male';
+  if (/^women$/i.test(g)) return 'Female';
   return 'Any';
 }
 
@@ -302,12 +302,19 @@ export function apiCampaignRowToDraftOverlayPrefill(row: ApiCampaignRow): Campai
   };
 }
 
+/** Maps legacy stored statuses to the current `CampaignStatus` union (UI + types). */
+export function normalizeUiCampaignStatus(raw: string | undefined): CampaignStatus {
+  const s = (raw ?? '').trim() || 'Draft';
+  if (s === 'Open for Applications') return 'Active';
+  return s as CampaignStatus;
+}
+
 export function apiCampaignToUi(
   c: ApiCampaignRow,
   applications: ApiApplicationRow[] = []
 ): Campaign {
   const candidates = mapApplicationsToCandidates(sortApplicationsForBrandQueue(applications));
-  const status = (c.status || 'Draft') as CampaignStatus;
+  const status = normalizeUiCampaignStatus(c.status);
   return {
     id: c.id,
     name: c.name,
