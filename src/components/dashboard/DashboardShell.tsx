@@ -50,7 +50,6 @@ const athleteNavigation: NavItem[] = [
   { href: '/dashboard/applications', icon: ClipboardList, label: 'Applications' },
   { href: '/dashboard/offers', icon: Handshake, label: 'Offers' },
   { href: '/dashboard/deals', icon: FileText, label: 'Deals' },
-  { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
 ];
 
 const businessNavigation: NavItem[] = [

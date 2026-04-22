@@ -93,6 +93,205 @@ export type ApiDealDetail = {
   activities: ApiActivity[];
 };
 
+const mockNow = new Date();
+const daysAgo = (n: number) => new Date(mockNow.getTime() - n * 24 * 60 * 60 * 1000).toISOString();
+const daysFromNow = (n: number) => new Date(mockNow.getTime() + n * 24 * 60 * 60 * 1000).toISOString();
+
+const MOCK_ATHLETE_DEALS: ApiDeal[] = [
+  {
+    id: 'mock-deal-1',
+    offerId: 'mock-offer-1',
+    brandUserId: 'powerfuel-energy',
+    athleteUserId: 'mock-athlete',
+    campaignId: null,
+    applicationId: 'mock-app-1',
+    chatThreadId: null,
+    termsSnapshot: {
+      notes: 'Deliverables align with spring training block.',
+      frozen: {
+        compensationSummary: { amount: 2500, amountLabel: '$2,500 total', currency: 'USD' },
+        deliverables: [{ title: 'IG Reel + Story Set', type: 'reel', instructions: 'Energy routine content', dueAt: daysFromNow(5), revisionLimit: 1, draftRequired: true }],
+      },
+    },
+    status: 'active',
+    contractId: 'mock-contract-1',
+    paymentId: 'mock-payment-1',
+    nextActionOwner: 'brand',
+    nextActionLabel: 'Brand reviewing submitted content',
+    createdAt: daysAgo(8),
+    updatedAt: daysAgo(1),
+  },
+  {
+    id: 'mock-deal-2',
+    offerId: 'mock-offer-2',
+    brandUserId: 'campus-threads',
+    athleteUserId: 'mock-athlete',
+    campaignId: null,
+    applicationId: 'mock-app-2',
+    chatThreadId: null,
+    termsSnapshot: {
+      notes: '2 lookbook posts and one giveaway mention.',
+      frozen: {
+        compensationSummary: { amount: 1800, amountLabel: '$1,800 + apparel kit', currency: 'USD' },
+        deliverables: [{ title: 'Lookbook Post', type: 'image', instructions: 'Spring collection feature', dueAt: daysFromNow(10), revisionLimit: 2, draftRequired: true }],
+      },
+    },
+    status: 'under_review',
+    contractId: 'mock-contract-2',
+    paymentId: 'mock-payment-2',
+    nextActionOwner: 'brand',
+    nextActionLabel: 'Awaiting revision notes from brand',
+    createdAt: daysAgo(14),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'mock-deal-3',
+    offerId: 'mock-offer-3',
+    brandUserId: 'techgear-pro',
+    athleteUserId: 'mock-athlete',
+    campaignId: null,
+    applicationId: 'mock-app-3',
+    chatThreadId: null,
+    termsSnapshot: {
+      notes: 'Completed event appearance recap and tag requirements.',
+      frozen: {
+        compensationSummary: { amount: 3200, amountLabel: '$3,200 total', currency: 'USD' },
+        deliverables: [{ title: 'Launch Event Appearance', type: 'event', instructions: 'In-person appearance + recap post', dueAt: daysAgo(7), revisionLimit: 0, draftRequired: false }],
+      },
+    },
+    status: 'paid',
+    contractId: 'mock-contract-3',
+    paymentId: 'mock-payment-3',
+    nextActionOwner: 'system',
+    nextActionLabel: 'Deal completed',
+    createdAt: daysAgo(24),
+    updatedAt: daysAgo(4),
+  },
+];
+
+const MOCK_DEAL_DETAILS: Record<string, ApiDealDetail> = {
+  'mock-deal-1': {
+    deal: MOCK_ATHLETE_DEALS[0],
+    contract: { id: 'mock-contract-1', dealId: 'mock-deal-1', fileUrl: null, status: 'signed', signedAt: daysAgo(7) },
+    payment: { id: 'mock-payment-1', dealId: 'mock-deal-1', amount: 2500, currency: 'USD', status: 'pending', provider: 'manual', providerReference: 'mock-ref-1', releaseCondition: 'deliverable_approved', paidAt: null },
+    deliverables: [
+      {
+        id: 'mock-deliverable-1',
+        dealId: 'mock-deal-1',
+        title: 'IG Reel + Story Set',
+        type: 'reel',
+        instructions: 'Post one training reel and two stories with brand tag + #ad.',
+        status: 'submitted',
+        dueAt: daysFromNow(5),
+        draftRequired: true,
+        publishRequired: true,
+        proofRequired: true,
+        disclosureRequired: true,
+        revisionLimit: 1,
+        revisionCountUsed: 0,
+      },
+    ],
+    activities: [{ id: 'mock-act-1', entityType: 'deal', entityId: 'mock-deal-1', actorType: 'athlete', actorId: 'mock-athlete', eventType: 'submission_submitted', metadata: {}, createdAt: daysAgo(1) }],
+  },
+  'mock-deal-2': {
+    deal: MOCK_ATHLETE_DEALS[1],
+    contract: { id: 'mock-contract-2', dealId: 'mock-deal-2', fileUrl: null, status: 'signed', signedAt: daysAgo(12) },
+    payment: { id: 'mock-payment-2', dealId: 'mock-deal-2', amount: 1800, currency: 'USD', status: 'pending', provider: 'manual', providerReference: 'mock-ref-2', releaseCondition: 'deal_completed', paidAt: null },
+    deliverables: [
+      {
+        id: 'mock-deliverable-2',
+        dealId: 'mock-deal-2',
+        title: 'Lookbook Post',
+        type: 'image',
+        instructions: 'One static feed post in full outfit with product tag.',
+        status: 'submitted',
+        dueAt: daysFromNow(10),
+        draftRequired: true,
+        publishRequired: true,
+        proofRequired: true,
+        disclosureRequired: true,
+        revisionLimit: 2,
+        revisionCountUsed: 1,
+      },
+    ],
+    activities: [{ id: 'mock-act-2', entityType: 'submission', entityId: 'mock-deliverable-2', actorType: 'brand', actorId: 'mock-brand', eventType: 'revision_requested', metadata: {}, createdAt: daysAgo(2) }],
+  },
+  'mock-deal-3': {
+    deal: MOCK_ATHLETE_DEALS[2],
+    contract: { id: 'mock-contract-3', dealId: 'mock-deal-3', fileUrl: null, status: 'signed', signedAt: daysAgo(22) },
+    payment: { id: 'mock-payment-3', dealId: 'mock-deal-3', amount: 3200, currency: 'USD', status: 'paid', provider: 'manual', providerReference: 'mock-ref-3', releaseCondition: 'deal_completed', paidAt: daysAgo(4) },
+    deliverables: [
+      {
+        id: 'mock-deliverable-3',
+        dealId: 'mock-deal-3',
+        title: 'Launch Event Appearance',
+        type: 'event',
+        instructions: 'Attend launch event and publish same-day recap.',
+        status: 'completed',
+        dueAt: daysAgo(7),
+        draftRequired: false,
+        publishRequired: true,
+        proofRequired: true,
+        disclosureRequired: true,
+        revisionLimit: 0,
+        revisionCountUsed: 0,
+      },
+    ],
+    activities: [{ id: 'mock-act-3', entityType: 'payment', entityId: 'mock-payment-3', actorType: 'system', actorId: null, eventType: 'payment_paid', metadata: {}, createdAt: daysAgo(4) }],
+  },
+};
+
+const MOCK_SUBMISSIONS_BY_DELIVERABLE: Record<string, ApiSubmission[]> = {
+  'mock-deliverable-1': [
+    {
+      id: 'mock-sub-1',
+      deliverableId: 'mock-deliverable-1',
+      version: 1,
+      submittedBy: 'mock-athlete',
+      submittedAt: daysAgo(1),
+      submissionType: 'content',
+      artifacts: [{ kind: 'url', ref: 'https://instagram.com/p/mock-reel-1', label: 'Draft Reel' }],
+      notes: '[Draft] First cut submitted for review',
+      status: 'submitted',
+      reviewedBy: null,
+      reviewedAt: null,
+      feedback: null,
+    },
+  ],
+  'mock-deliverable-2': [
+    {
+      id: 'mock-sub-2',
+      deliverableId: 'mock-deliverable-2',
+      version: 1,
+      submittedBy: 'mock-athlete',
+      submittedAt: daysAgo(3),
+      submissionType: 'content',
+      artifacts: [{ kind: 'url', ref: 'https://instagram.com/p/mock-lookbook-1', label: 'Lookbook Post' }],
+      notes: '[Final] Submitted for final review',
+      status: 'changes_requested',
+      reviewedBy: 'mock-brand',
+      reviewedAt: daysAgo(2),
+      feedback: 'Please add product close-up in first frame.',
+    },
+  ],
+  'mock-deliverable-3': [
+    {
+      id: 'mock-sub-3',
+      deliverableId: 'mock-deliverable-3',
+      version: 1,
+      submittedBy: 'mock-athlete',
+      submittedAt: daysAgo(8),
+      submissionType: 'content',
+      artifacts: [{ kind: 'url', ref: 'https://instagram.com/p/mock-event-1', label: 'Event Recap' }],
+      notes: '[Final] Event recap completed',
+      status: 'approved',
+      reviewedBy: 'mock-brand',
+      reviewedAt: daysAgo(7),
+      feedback: null,
+    },
+  ],
+};
+
 export type BusinessDealSection = 'needs_action' | 'awaiting_athlete' | 'awaiting_review' | 'completed';
 
 export async function readApiError(res: Response): Promise<string> {
@@ -111,6 +310,18 @@ export async function fetchDealsList(status?: string): Promise<ApiDeal[]> {
   if (!res.ok) throw new Error(await readApiError(res));
   const j = (await res.json()) as { deals?: ApiDeal[] };
   return Array.isArray(j.deals) ? j.deals : [];
+}
+
+export function getMockAthleteDeals(): ApiDeal[] {
+  return MOCK_ATHLETE_DEALS;
+}
+
+export function getMockAthleteDealDetail(dealId: string): ApiDealDetail | null {
+  return MOCK_DEAL_DETAILS[dealId] ?? null;
+}
+
+export function getMockAthleteSubmissions(deliverableId: string): ApiSubmission[] {
+  return MOCK_SUBMISSIONS_BY_DELIVERABLE[deliverableId] ?? [];
 }
 
 export async function fetchDealDetail(dealId: string): Promise<ApiDealDetail> {

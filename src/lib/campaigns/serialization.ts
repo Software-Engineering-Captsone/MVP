@@ -163,6 +163,33 @@ function referralMetaToJSON(meta: unknown): Record<string, unknown> | undefined 
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+function applicationStatusHistoryToJSON(a: StoredApplication): { status: string; at: string }[] {
+  const raw = (a as Record<string, unknown>).statusHistory;
+  if (Array.isArray(raw) && raw.length > 0) {
+    const out: { status: string; at: string }[] = [];
+    for (const e of raw) {
+      if (!e || typeof e !== 'object') continue;
+      const o = e as Record<string, unknown>;
+      const status = typeof o.status === 'string' ? o.status : '';
+      let at = '';
+      if (o.at instanceof Date) {
+        at = o.at.toISOString();
+      } else if (typeof o.at === 'string') {
+        at = o.at;
+      }
+      if (status && at) out.push({ status, at });
+    }
+    if (out.length > 0) return out;
+  }
+  const fallbackAt =
+    typeof a.updatedAt === 'string'
+      ? a.updatedAt
+      : typeof a.createdAt === 'string'
+        ? a.createdAt
+        : new Date().toISOString();
+  return [{ status: String(a.status ?? 'applied'), at: fallbackAt }];
+}
+
 export function applicationToJSON(a: StoredApplication) {
   const source = a.source === 'referral' ? 'referral' : 'regular';
   const referralMeta = referralMetaToJSON(a.referralMeta);
@@ -176,6 +203,7 @@ export function applicationToJSON(a: StoredApplication) {
     ...(a.withdrawnByAthlete === true ? { withdrawnByAthlete: true } : {}),
     ...(a.withdrawnAt ? { withdrawnAt: a.withdrawnAt } : {}),
     pitch: a.pitch ?? '',
+    hasPreviousPitch: Boolean(typeof a.previousPitch === 'string' && a.previousPitch.length > 0),
     athleteSnapshot: a.athleteSnapshot ?? {},
     messages: (Array.isArray(a.messages) ? a.messages : []).map((m: Record<string, unknown>) => ({
       id: m._id != null ? String(m._id) : '',
@@ -185,6 +213,7 @@ export function applicationToJSON(a: StoredApplication) {
     })),
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
+    statusHistory: applicationStatusHistoryToJSON(a),
   };
 }
 

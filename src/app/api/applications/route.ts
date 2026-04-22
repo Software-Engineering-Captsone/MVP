@@ -4,10 +4,17 @@ import { createClient } from '@/lib/supabase/server';
 import { jsonError } from '@/lib/api/jsonError';
 import {
   getCampaignById,
+  isPastCampaignApplicationDeadline,
   listApplicationsForAthlete,
 } from '@/lib/campaigns/repository';
 import { applicationToJSON } from '@/lib/campaigns/serialization';
 import { findUserById } from '@/lib/auth/localUserRepository';
+import { readLocalCampaignStore } from '@/lib/campaigns/localCampaignStore';
+import { getThreadByApplicationId } from '@/lib/chat/service';
+import {
+  athleteMaySendOnApplication,
+  athleteMayViewApplicationThread,
+} from '@/lib/chat/messagingEligibility';
 
 export async function GET() {
   const supabase = await createClient();
@@ -16,11 +23,31 @@ export async function GET() {
   if (session.role !== 'athlete') return jsonError(403, 'Forbidden');
 
   const rows = await listApplicationsForAthlete(session.id);
+  const snap = await readLocalCampaignStore();
+  const offers = snap.offers ?? [];
   const mapped = await Promise.all(
     rows.map(async (app) => {
       const campaign = await getCampaignById(String(app.campaignId ?? ''));
       const brandId = campaign?.brandUserId != null ? String(campaign.brandUserId) : '';
       const brandUser = brandId ? await findUserById(brandId) : null;
+      let canSend = false;
+      let canViewThread = false;
+      try {
+        const existingThread = await getThreadByApplicationId(supabase, String(app._id ?? ''));
+        canSend = athleteMaySendOnApplication(app, offers);
+        canViewThread = brandId
+          ? await athleteMayViewApplicationThread(
+              supabase,
+              app,
+              brandId,
+              offers,
+              existingThread?.id ?? null
+            )
+          : false;
+      } catch (e) {
+        // Keep applications API resilient even if chat infra is unavailable.
+        console.error('Failed to resolve application messaging availability', e);
+      }
       return {
         application: applicationToJSON(app),
         campaign: campaign
@@ -33,8 +60,13 @@ export async function GET() {
                 (typeof campaign.brandDisplayName === 'string' && campaign.brandDisplayName.trim()) ||
                 (brandUser && typeof brandUser.name === 'string' && brandUser.name.trim()) ||
                 'Brand',
+              applicationDeadlinePassed: isPastCampaignApplicationDeadline(campaign),
             }
           : null,
+        applicationMessaging: {
+          canViewThread,
+          canSend,
+        },
       };
     })
   );

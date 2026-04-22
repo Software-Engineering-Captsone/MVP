@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useVirtualizer, measureElement } from '@tanstack/react-virtual';
 import { ChevronDown, Loader2, MapPin, Search, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
@@ -147,6 +148,7 @@ function opportunityRowInnerGridClass(cols: number): string {
 }
 
 export function AthleteExploreMarketplace() {
+  const searchParams = useSearchParams();
   const { brands } = useMarketplaceCatalog();
   const [activeTab, setActiveTab] = useState<ExploreTab>('opportunities');
   const [brandProfileTab, setBrandProfileTab] = useState<BrandProfileTab>('overview');
@@ -180,6 +182,7 @@ export function AthleteExploreMarketplace() {
   const [applyPitch, setApplyPitch] = useState('');
   const [applyTargetCampaignId, setApplyTargetCampaignId] = useState<string | null>(null);
   const [savedCampaignIds, setSavedCampaignIds] = useState<string[]>([]);
+  const [consumedCampaignParam, setConsumedCampaignParam] = useState<string | null>(null);
 
   const appendAthleteCampaignFilters = useCallback((sp: URLSearchParams) => {
     if (opportunitySport.trim()) sp.set('sport', opportunitySport.trim());
@@ -499,6 +502,18 @@ export function AthleteExploreMarketplace() {
     const selectedName = selectedBrand.name.trim().toLowerCase();
     return campaigns.filter((c) => String(c.brandDisplayName ?? '').trim().toLowerCase() === selectedName);
   }, [campaigns, selectedBrand]);
+
+  useEffect(() => {
+    const campaignIdParam = (searchParams.get('campaignId') ?? '').trim();
+    if (!campaignIdParam) return;
+    if (consumedCampaignParam === campaignIdParam) return;
+    const match = campaigns.find((c) => String(c.id) === campaignIdParam);
+    if (!match) return;
+    setActiveTab('opportunities');
+    setSelectedBrand(null);
+    setSelectedCampaign(match);
+    setConsumedCampaignParam(campaignIdParam);
+  }, [searchParams, campaigns, consumedCampaignParam]);
 
   const savedCampaigns = useMemo(() => {
     const set = new Set(savedCampaignIds);

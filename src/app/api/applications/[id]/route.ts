@@ -3,6 +3,7 @@ import { getChatSessionUser } from '@/lib/chat/session';
 import {
   getApplicationById,
   getCampaignById,
+  restorePreviousApplicationPitchByAthlete,
   updateApplicationPitchByAthlete,
   updateApplicationStatus,
   withdrawApplicationByAthlete,
@@ -57,6 +58,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (intent === 'edit') {
       const pitch = typeof body.pitch === 'string' ? body.pitch : '';
       const result = await updateApplicationPitchByAthlete(id, user.userId, pitch);
+      if (!result.ok) return jsonError(result.status, result.error);
+      return NextResponse.json({ application: applicationToJSON(result.application) });
+    }
+    if (intent === 'restore_previous_pitch') {
+      const result = await restorePreviousApplicationPitchByAthlete(id, user.userId);
       if (!result.ok) return jsonError(result.status, result.error);
       return NextResponse.json({ application: applicationToJSON(result.application) });
     }

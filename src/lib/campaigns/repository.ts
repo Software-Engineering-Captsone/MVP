@@ -57,6 +57,33 @@ function resolveCampaignApplicationDeadline(campaign: StoredCampaign): string {
   return '';
 }
 
+/** Matches `createApplication` deadline gate: true when a deadline exists and is in the past. */
+export function isPastCampaignApplicationDeadline(campaign: StoredCampaign): boolean {
+  const deadline = resolveCampaignApplicationDeadline(campaign);
+  if (!deadline) return false;
+  const deadlineMs = new Date(deadline).getTime();
+  if (Number.isNaN(deadlineMs)) return false;
+  return Date.now() > deadlineMs;
+}
+
+export type ApplicationStatusHistoryEntry = { status: string; at: string };
+
+function appendApplicationStatusHistory(
+  existing: unknown,
+  status: string,
+  atIso?: string
+): ApplicationStatusHistoryEntry[] {
+  const at = atIso ?? new Date().toISOString();
+  const prev = Array.isArray(existing)
+    ? (existing as ApplicationStatusHistoryEntry[]).filter(
+        (e) => e && typeof e.status === 'string' && typeof e.at === 'string'
+      )
+    : [];
+  const last = prev[prev.length - 1];
+  if (last && last.status === status) return prev;
+  return [...prev, { status, at }];
+}
+
 /** Merge demo campaigns once per process when any seed id is missing (cheap read first). */
 export async function ensureSeedCampaignsPresent(): Promise<void> {
   const snap = await readLocalCampaignStore();
@@ -746,12 +773,16 @@ export async function createApplication(
       await mutateLocalCampaignStore((draft) => {
         const idx = draft.applications.findIndex((a) => idStr(a) === idStr(duplicate));
         if (idx < 0) return;
+        const nowIso = new Date().toISOString();
+        const cur = draft.applications[idx] as StoredApplication;
         const next = {
-          ...draft.applications[idx],
+          ...cur,
           status: 'applied',
           withdrawnByAthlete: false,
           withdrawnAt: null,
           pitch: typeof input.pitch === 'string' ? input.pitch : '',
+          updatedAt: nowIso,
+          statusHistory: appendApplicationStatusHistory(cur.statusHistory, 'applied', nowIso),
         };
         validateApplicationInput(next as Record<string, unknown>);
         draft.applications[idx] = next as StoredApplication;
@@ -768,11 +799,14 @@ export async function createApplication(
   }
 
   const _id = newObjectIdHex();
+  const nowIso = new Date().toISOString();
+  const initialStatus = String(input.status ?? 'applied');
   const raw = validateApplicationInput({
     ...input,
     _id,
-    status: input.status ?? 'applied',
+    status: initialStatus,
     messages: input.messages ?? [],
+    statusHistory: appendApplicationStatusHistory(undefined, initialStatus, nowIso),
   });
   const row = { ...raw, _id: idStr(raw) || _id } as StoredApplication;
 
@@ -833,7 +867,13 @@ export async function updateApplicationStatus(
       };
       return;
     }
-    const next = { ...app, status };
+    const nowIso = new Date().toISOString();
+    const next = {
+      ...app,
+      status,
+      updatedAt: nowIso,
+      statusHistory: appendApplicationStatusHistory(app.statusHistory, status, nowIso),
+    };
     validateApplicationInput(next as Record<string, unknown>);
     draft.applications[aidx] = next as StoredApplication;
     updated = draft.applications[aidx];
@@ -874,7 +914,7 @@ export async function appendApplicationMessage(
       body: body.trim(),
       createdAt: new Date(),
     });
-    const next = { ...app, messages };
+    const next = { ...app, messages, updatedAt: new Date().toISOString() };
     validateApplicationInput(next as Record<string, unknown>);
     draft.applications[aidx] = next as StoredApplication;
     result = draft.applications[aidx];
@@ -911,7 +951,62 @@ export async function updateApplicationPitchByAthlete(
       result = { ok: false, status: 400, error: 'Application can only be edited before review starts' };
       return;
     }
-    const next = { ...app, status: 'applied', pitch: pitch.trim() };
+    const next = {
+      ...app,
+      status: 'applied',
+      previousPitch: typeof app.pitch === 'string' ? app.pitch : '',
+      pitch: pitch.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      validateApplicationInput(next as Record<string, unknown>);
+    } catch (e) {
+      result = {
+        ok: false,
+        status: 400,
+        error: e instanceof Error ? e.message : 'Validation failed',
+      };
+      return;
+    }
+    draft.applications[idx] = next as StoredApplication;
+    result = { ok: true, application: draft.applications[idx] as StoredApplication };
+  });
+  return result ?? { ok: false, status: 500, error: 'Unexpected error' };
+}
+
+export async function restorePreviousApplicationPitchByAthlete(
+  applicationId: string,
+  athleteUserId: string
+): Promise<UpdateApplicationByAthleteResult> {
+  let result: UpdateApplicationByAthleteResult | null = null;
+  await mutateLocalCampaignStore((draft) => {
+    const idx = draft.applications.findIndex((a) => idStr(a) === applicationId);
+    if (idx < 0) {
+      result = { ok: false, status: 404, error: 'Application not found' };
+      return;
+    }
+    const app = draft.applications[idx] as StoredApplication;
+    if (String(app.athleteUserId ?? '') !== athleteUserId) {
+      result = { ok: false, status: 403, error: 'Forbidden' };
+      return;
+    }
+    const status = String(app.status ?? 'applied');
+    if (status !== 'applied' && status !== 'pending') {
+      result = { ok: false, status: 400, error: 'Application can only be edited before review starts' };
+      return;
+    }
+    const previousPitch = typeof app.previousPitch === 'string' ? app.previousPitch : '';
+    if (!previousPitch && !(app.pitch ?? '')) {
+      result = { ok: false, status: 400, error: 'No previous version to restore' };
+      return;
+    }
+    const next = {
+      ...app,
+      status: 'applied',
+      pitch: previousPitch,
+      previousPitch: typeof app.pitch === 'string' ? app.pitch : '',
+      updatedAt: new Date().toISOString(),
+    };
     try {
       validateApplicationInput(next as Record<string, unknown>);
     } catch (e) {
@@ -960,11 +1055,14 @@ export async function withdrawApplicationByAthlete(
       result = { ok: true, application: app };
       return;
     }
+    const wAt = new Date().toISOString();
     const next = {
       ...app,
       status: 'rejected',
       withdrawnByAthlete: true,
-      withdrawnAt: new Date().toISOString(),
+      withdrawnAt: wAt,
+      updatedAt: wAt,
+      statusHistory: appendApplicationStatusHistory(app.statusHistory, 'withdrawn', wAt),
     };
     try {
       validateApplicationInput(next as Record<string, unknown>);
@@ -1290,6 +1388,14 @@ export async function createReferralInviteApplication(
         // Re-inviting a declined row should reopen it for review.
         mergedInput.status = 'under_review';
       }
+      const nextStatus = String(mergedInput.status ?? dup.status ?? '');
+      const dupStatus = String(dup.status ?? '');
+      if (nextStatus !== dupStatus) {
+        mergedInput.statusHistory = appendApplicationStatusHistory(
+          (dup as StoredApplication).statusHistory,
+          nextStatus
+        );
+      }
       if (sourceBefore !== 'referral' || mergedInput.status !== dup.status) {
         const raw = validateApplicationInput(mergedInput);
         const row = { ...raw, _id: idStr(dup) || idStr(raw) } as StoredApplication;
@@ -1308,6 +1414,7 @@ export async function createReferralInviteApplication(
     }
 
     const _id = newObjectIdHex();
+    const refNow = new Date().toISOString();
     const raw = validateApplicationInput({
       _id,
       campaignId,
@@ -1318,6 +1425,7 @@ export async function createReferralInviteApplication(
       pitch: '',
       athleteSnapshot: athleteSnapshotFromStoredUser(athlete),
       messages: [],
+      statusHistory: appendApplicationStatusHistory(undefined, 'under_review', refNow),
     });
     const row = { ...raw, _id: idStr(raw) || _id } as StoredApplication;
     draft.applications.push(row);

@@ -66,8 +66,17 @@ const applicationSchema = Joi.object({
     )
     .default('applied'),
   pitch: Joi.string().allow('').optional(),
+  previousPitch: Joi.string().allow('').optional(),
   athleteSnapshot: Joi.object().unknown(true).optional(),
   messages: Joi.array().items(applicationMessageSchema).optional(),
+  statusHistory: Joi.array()
+    .items(
+      Joi.object({
+        status: Joi.string().required(),
+        at: Joi.string().required(),
+      })
+    )
+    .optional(),
 }).unknown(true);
 
 /** Legacy applications without `source` default to `regular` before validation. */
