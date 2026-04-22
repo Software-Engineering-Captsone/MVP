@@ -131,11 +131,16 @@ export default function AuthForm() {
         const fullName = `${signupFirstName.trim()} ${signupLastName.trim()}`;
 
         try {
+            // Both roles land on the onboarding page after email verification.
+            // The dashboard's onboarding gate also redirects there for any
+            // user with a null onboarding_completed_at, so this is belt-and-
+            // suspenders — but it avoids an extra redirect on first sign-in.
+            const postVerifyPath = '/dashboard/onboarding';
             const { error } = await supabase.auth.signUp({
                 email: signupEmail,
                 password: signupPassword,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=${postVerifyPath}`,
                     data: {
                         full_name: fullName,
                         role: role,

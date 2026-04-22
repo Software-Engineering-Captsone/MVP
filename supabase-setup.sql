@@ -20,6 +20,11 @@
 --   • onboarding_completed_at → hide incomplete profiles from discovery
 --   • verified             → platform-level badge (separate from .edu)
 --   • banner_url           → profile hero image, distinct from avatar
+--   • gender               → brand campaign filter (genderFilter in
+--                            CreateCampaignPayload). Nullable for brands.
+--   • hometown             → "where they're from" vs. current city/state.
+--                            Used on athlete profile cards; brands also
+--                            use it for regional campaign alignment.
 -- ─────────────────────────────────────────────────────────────────
 create table if not exists public.profiles (
   id                      uuid references auth.users(id) on delete cascade primary key,
@@ -32,6 +37,8 @@ create table if not exists public.profiles (
   country                 text default 'United States',
   state                   text default '',
   city                    text default '',
+  hometown                text default '',
+  gender                  text check (gender in ('male', 'female', 'nonbinary', 'prefer_not_to_say', '')) default '',
   avatar_url              text default '',
   banner_url              text default '',
   bio                     text default '',
@@ -41,6 +48,23 @@ create table if not exists public.profiles (
   created_at              timestamptz default now(),
   updated_at              timestamptz default now()
 );
+
+-- Additive columns for existing deployments (idempotent)
+alter table public.profiles add column if not exists hometown text default '';
+alter table public.profiles add column if not exists gender   text default '';
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_gender_check'
+  ) then
+    alter table public.profiles
+      add constraint profiles_gender_check
+      check (gender in ('male', 'female', 'nonbinary', 'prefer_not_to_say', ''));
+  end if;
+end $$;
+
+create index if not exists idx_profiles_gender on public.profiles(gender)
+  where role = 'athlete' and gender <> '';
 
 create index if not exists idx_profiles_role on public.profiles(role);
 create index if not exists idx_profiles_availability on public.profiles(availability_status)
@@ -493,6 +517,57 @@ create policy "Users can send messages in own conversations"
   );
 
 
+-- ─────────────────────────────────────────────────────────────────
+-- 8. ATHLETE_CONTENT TABLE (one-to-many)
+-- ─────────────────────────────────────────────────────────────────
+-- Content gallery items surfaced on the athlete's public profile.
+-- Mirrors `Athlete.contentItems` in mockData: posts, reels, videos
+-- that brands scroll through to judge content quality before reaching
+-- out. Separate from `athlete_achievements` because the shape and
+-- access pattern differ (metrics + media URLs, ranked by recency).
+--
+-- Elevations:
+--   • content_type enum     → 'image' | 'video' so UI can render
+--                             correct player / thumbnail overlay
+--   • views / likes         → integers so brands can sort by reach
+--   • posted_at date        → recency sort; staler posts drop off
+--   • caption / overlay_text→ preserves original post context
+--   • sport_id FK           → optional link so a multi-sport athlete's
+--                             volleyball clips sit under volleyball
+--   • display_order         → athlete curates which clips lead
+-- ─────────────────────────────────────────────────────────────────
+create table if not exists public.athlete_content (
+  id             uuid default gen_random_uuid() primary key,
+  athlete_id     uuid references public.profiles(id) on delete cascade not null,
+  content_type   text not null check (content_type in ('image', 'video')),
+  media_url      text not null,
+  thumbnail_url  text default '',
+  caption        text default '',
+  overlay_text   text default '',
+  views          integer default 0,
+  likes          integer default 0,
+  posted_at      date,
+  sport_id       uuid references public.athlete_sports(id) on delete set null,
+  display_order  integer default 0,
+  created_at     timestamptz default now()
+);
+
+create index if not exists idx_athlete_content_athlete on public.athlete_content(athlete_id, posted_at desc);
+create index if not exists idx_athlete_content_views on public.athlete_content(views desc);
+
+-- RLS
+alter table public.athlete_content enable row level security;
+
+create policy "Athletes can manage own content"
+  on public.athlete_content for all
+  using (athlete_id = auth.uid())
+  with check (athlete_id = auth.uid());
+
+create policy "Anyone can view athlete content"
+  on public.athlete_content for select
+  using (true);
+
+
 -- ═══════════════════════════════════════════════════════════════════
 -- RELATIONSHIP MAP
 -- ═══════════════════════════════════════════════════════════════════
@@ -508,6 +583,7 @@ create policy "Users can send messages in own conversations"
 --               ├──→ athlete_academics    (1:1 — school + NIL compliance)
 --               ├──→ athlete_socials      (1:1 — handles + metrics)
 --               ├──→ athlete_achievements (1:many — awards, honors)
+--               ├──→ athlete_content      (1:many — posts, reels, clips)
 --               │
 --               ├──→ conversations        (many — as participant_one or _two)
 --               │       │

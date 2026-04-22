@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUserFromRequest } from '@/lib/campaigns/getAuthUser';
+import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import {
   appendApplicationMessage,
   getApplicationById,
@@ -10,7 +10,7 @@ import { applicationToJSON } from '@/lib/campaigns/serialization';
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  const user = getAuthUserFromRequest(request);
+  const user = await getAuthUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
-  const user = getAuthUserFromRequest(request);
+  const user = await getAuthUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

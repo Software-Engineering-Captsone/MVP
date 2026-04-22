@@ -1,88 +1,109 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Loader2, PartyPopper } from 'lucide-react';
-import { useOnboardingStorage } from '@/hooks/useOnboardingStorage';
-import { markOnboardingComplete } from '@/lib/onboardingPersist';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-import { Step1Basics } from './Step1Basics';
-import { Step2Athletic } from './Step2Athletic';
-import { Step3Academic } from './Step3Academic';
-import { Step3Compliance } from './Step3Compliance';
-import { Step4Profile } from './Step4Profile';
+import {
+  loadBrandOnboardingState,
+  hydrateBrandDraft,
+  defaultBrandDraft,
+  type BrandOnboardingDraft,
+} from '@/lib/brandOnboardingHydrate';
+import {
+  persistBrandCompanyInfo,
+  markBrandOnboardingComplete,
+  type BrandCompanyInfo,
+  type BrandProfileBasics,
+} from '@/lib/brandOnboardingPersist';
+import { BrandStep1Company } from './BrandStep1Company';
+import { BrandStep2Location } from './BrandStep2Location';
 
-const TOTAL_STEPS = 5;
-
-const STEP_META: { label: string; short: string }[] = [
-  { label: 'The Basics', short: 'Basics' },
-  { label: 'Athletic Identity', short: 'Sports' },
-  { label: 'University', short: 'School' },
-  { label: 'Verification', short: 'Verify' },
-  { label: 'Profile & Socials', short: 'Profile' },
+const TOTAL_STEPS = 2;
+const STEPS: { short: string; label: string }[] = [
+  { short: 'Company',  label: 'Your Company' },
+  { short: 'Location', label: 'Location & Contact' },
 ];
 
-export function AthleteOnboarding() {
+export function BrandOnboarding() {
   const router = useRouter();
   const { user } = useDashboard();
-  const {
-    draft,
-    hydrated,
-    syncing,
-    syncError,
-    updateDraft,
-    updateBasics,
-    updateAthletic,
-    updateAcademic,
-    updateCompliance,
-    updateProfile,
-    commitStep,
-  } = useOnboardingStorage();
 
+  const [draft, setDraft] = useState<BrandOnboardingDraft>(defaultBrandDraft());
+  const [hydrated, setHydrated] = useState(false);
+  const [step, setStep] = useState(1);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
-  const [completeError, setCompleteError] = useState<string | null>(null);
 
-  const step = draft.currentStep;
-
-  const goTo = useCallback(
-    (s: number) => updateDraft({ currentStep: Math.max(1, Math.min(s, TOTAL_STEPS)) }),
-    [updateDraft],
-  );
-
-  // Wraps a step advance: commit the current step's section to the DB
-  // first, then move forward only if the write succeeded. Errors are
-  // surfaced via syncError; the user stays on the same step to retry.
-  const advanceFromStep = useCallback(
-    async (currentStepNum: number) => {
-      if (syncing) return;
+  // ── Hydrate from DB on mount. No localStorage cache for brand —
+  //    data volume is small and every step commits anyway.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
       try {
-        await commitStep(currentStepNum);
-        goTo(currentStepNum + 1);
+        const state = await loadBrandOnboardingState();
+        const next = hydrateBrandDraft(state);
+        if (cancelled) return;
+        setDraft(next);
+        // Defensive — the dashboard gate should already have redirected
+        // an onboarded brand away, but flip to success if they land here.
+        if (next.completedAt) setCompleted(true);
       } catch {
-        // syncError already populated by the hook
+        // Fall back to defaults — still usable, just no resume.
+      } finally {
+        if (!cancelled) setHydrated(true);
       }
-    },
-    [syncing, commitStep, goTo],
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const patchBasics = useCallback(
+    (patch: Partial<BrandProfileBasics>) =>
+      setDraft(d => ({ ...d, basics: { ...d.basics, ...patch } })),
+    [],
   );
+  const patchCompany = useCallback(
+    (patch: Partial<BrandCompanyInfo>) =>
+      setDraft(d => ({ ...d, company: { ...d.company, ...patch } })),
+    [],
+  );
+
+  // Advance a step: commit the full draft first, then move forward.
+  // Same expectation as athlete side — failure keeps the user on the
+  // current step so they can retry without losing input.
+  const advance = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      await persistBrandCompanyInfo(draft.basics, draft.company);
+      setStep(s => Math.min(TOTAL_STEPS, s + 1));
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Could not save this step');
+    } finally {
+      setSyncing(false);
+    }
+  }, [draft, syncing]);
 
   const handleComplete = useCallback(async () => {
     if (syncing) return;
-    setCompleteError(null);
+    setSyncing(true);
+    setSyncError(null);
     try {
-      await commitStep(5);
-      const ts = await markOnboardingComplete();
-      updateDraft({ completedAt: ts });
+      await persistBrandCompanyInfo(draft.basics, draft.company);
+      const ts = await markBrandOnboardingComplete();
+      setDraft(d => ({ ...d, completedAt: ts }));
       setCompleted(true);
     } catch (err) {
-      setCompleteError(err instanceof Error ? err.message : 'Could not finish onboarding');
+      setSyncError(err instanceof Error ? err.message : 'Could not finish onboarding');
+    } finally {
+      setSyncing(false);
     }
-  }, [syncing, commitStep, updateDraft]);
+  }, [draft, syncing]);
 
-  const banner = completeError ?? syncError;
-
-  /* Percentage calc for progress bar */
   const pct = useMemo(() => Math.round(((step - 1) / TOTAL_STEPS) * 100), [step]);
 
   /* ──────────────── Loading state ──────────────── */
@@ -120,7 +141,7 @@ export function AthleteOnboarding() {
             YOU&apos;RE ALL SET!
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm font-medium text-gray-500">
-            Your athlete profile is complete. Brands can now discover you and send deal offers.
+            Your brand profile is live. You can start creating campaigns and discovering athletes.
           </p>
         </motion.div>
         <motion.button
@@ -139,22 +160,20 @@ export function AthleteOnboarding() {
   /* ──────────────── Main wizard ──────────────── */
   return (
     <div className="flex flex-1 flex-col bg-nilink-page font-sans text-nilink-ink">
-      {/* Header bar */}
       <div className="shrink-0 border-b border-gray-100 bg-white py-8 dash-main-gutter-x">
         <DashboardPageHeader
-          title="Athlete Onboarding"
-          subtitle="Set up your NIL-ready profile in 5 simple steps"
+          title="Brand Onboarding"
+          subtitle={`Set up your brand in ${TOTAL_STEPS} quick steps`}
           className="mb-0"
         />
       </div>
 
       <div className="flex-1 py-8 dash-main-gutter-x md:py-10">
         <div className="mx-auto w-full max-w-2xl">
-          {/* ── Progress tracker ── */}
+          {/* Progress tracker */}
           <div className="mb-10">
-            {/* Step indicators */}
             <div className="mb-3 flex items-center justify-between">
-              {STEP_META.map((m, i) => {
+              {STEPS.map((m, i) => {
                 const sNum = i + 1;
                 const done = step > sNum;
                 const active = step === sNum;
@@ -162,9 +181,7 @@ export function AthleteOnboarding() {
                   <button
                     key={m.short}
                     type="button"
-                    onClick={() => {
-                      if (done) goTo(sNum);
-                    }}
+                    onClick={() => { if (done) setStep(sNum); }}
                     disabled={!done && !active}
                     className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest transition ${
                       done
@@ -183,19 +200,13 @@ export function AthleteOnboarding() {
                             : 'border border-gray-200 bg-gray-50 text-gray-400'
                       }`}
                     >
-                      {done ? (
-                        <CheckCircle2 className="h-4 w-4" />
-                      ) : (
-                        sNum
-                      )}
+                      {done ? <CheckCircle2 className="h-4 w-4" /> : sNum}
                     </span>
                     <span className="hidden md:inline">{m.short}</span>
                   </button>
                 );
               })}
             </div>
-
-            {/* Progress bar */}
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-nilink-accent to-nilink-accent-bright"
@@ -209,60 +220,35 @@ export function AthleteOnboarding() {
             </p>
           </div>
 
-          {banner && (
+          {syncError && (
             <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span className="flex-1">{banner}</span>
+              <span className="flex-1">{syncError}</span>
             </div>
           )}
 
-          {/* ── Step content ── */}
           <AnimatePresence mode="wait">
             {step === 1 && (
-              <Step1Basics
-                key="step1"
-                data={draft.basics}
-                sessionName={user?.name ?? ''}
-                sessionEmail={user?.email ?? ''}
-                onChange={updateBasics}
-                onNext={() => void advanceFromStep(1)}
+              <BrandStep1Company
+                key="brand-step-1"
+                data={draft.company}
+                sessionEmail={user?.email ?? draft.email}
+                onChange={patchCompany}
+                onNext={() => void advance()}
+                isBusy={syncing}
               />
             )}
             {step === 2 && (
-              <Step2Athletic
-                key="step2"
-                data={draft.athletic}
-                onChange={updateAthletic}
-                onNext={() => void advanceFromStep(2)}
-                onBack={() => goTo(1)}
-              />
-            )}
-            {step === 3 && (
-              <Step3Academic
-                key="step3"
-                data={draft.academic}
-                sessionEmail={user?.email ?? ''}
-                onChange={updateAcademic}
-                onNext={() => void advanceFromStep(3)}
-                onBack={() => goTo(2)}
-              />
-            )}
-            {step === 4 && (
-              <Step3Compliance
-                key="step4"
-                data={draft.compliance}
-                onChange={updateCompliance}
-                onNext={() => void advanceFromStep(4)}
-                onBack={() => goTo(3)}
-              />
-            )}
-            {step === 5 && (
-              <Step4Profile
-                key="step5"
-                data={draft.profile}
-                onChange={updateProfile}
-                onBack={() => goTo(4)}
-                onComplete={handleComplete}
+              <BrandStep2Location
+                key="brand-step-2"
+                basics={draft.basics}
+                company={draft.company}
+                sessionName={user?.name ?? ''}
+                onChangeBasics={patchBasics}
+                onChangeCompany={patchCompany}
+                onBack={() => setStep(1)}
+                onComplete={() => void handleComplete()}
+                isBusy={syncing}
               />
             )}
           </AnimatePresence>

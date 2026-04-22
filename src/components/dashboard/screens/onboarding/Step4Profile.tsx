@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Sparkles,
@@ -8,8 +9,13 @@ import {
   Twitter,
   ImagePlus,
   Check,
+  Loader2,
+  Upload,
 } from 'lucide-react';
 import type { OnboardingProfile } from '@/hooks/useOnboardingStorage';
+import { uploadAvatar } from '@/lib/avatarUpload';
+import { PhotoCropModal } from '@/components/ui/PhotoCropModal';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
 
 const inputClass =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-nilink-ink outline-none transition placeholder:text-gray-400 focus:border-nilink-accent-border focus:ring-2 focus:ring-nilink-accent/20';
@@ -36,10 +42,49 @@ interface Step4Props {
 }
 
 export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props) {
+  const { refreshUser } = useDashboard();
   const filled = data.bio.trim().length > 0 && data.availabilityStatus !== '';
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const updateSocial = (key: keyof OnboardingProfile['socials'], value: string) => {
     onChange({ socials: { ...data.socials, [key]: value } });
+  };
+
+  const handlePickPhoto = () => fileInputRef.current?.click();
+
+  const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadError(null);
+    setPendingFile(file);
+  };
+
+  const handleCropConfirm = async (cropped: File) => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const url = await uploadAvatar(cropped);
+      onChange({ profilePictureUrl: url });
+      // Persist imageUrl to Supabase user_metadata so legacy surfaces
+      // reading /api/auth/me still see the photo. profiles.avatar_url is
+      // already written by uploadAvatar.
+      await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athleteProfile: { imageUrl: url } }),
+      });
+      await refreshUser();
+      setPendingFile(null);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -70,21 +115,49 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {/* Picture */}
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/60 p-5 text-center transition hover:border-nilink-accent-border hover:bg-nilink-accent-soft/30">
-          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
-            <ImagePlus className="h-6 w-6 text-gray-400" />
+          <div className="mx-auto mb-3 h-20 w-20 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-gray-100">
+            {data.profilePictureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={data.profilePictureUrl}
+                alt="Profile preview"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <ImagePlus className="h-6 w-6 text-gray-400" />
+              </div>
+            )}
           </div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Profile Picture</p>
-          <label className={`${labelClass} mt-3`} htmlFor="ob-pic-url">
-            Image URL
-          </label>
           <input
-            id="ob-pic-url"
-            type="url"
-            value={data.profilePictureUrl}
-            onChange={(e) => onChange({ profilePictureUrl: e.target.value })}
-            className={inputClass}
-            placeholder="https://…"
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={handleFilePicked}
+            className="hidden"
           />
+          <button
+            type="button"
+            onClick={handlePickPhoto}
+            disabled={uploading}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-nilink-ink shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                Uploading…
+              </>
+            ) : (
+              <>
+                <Upload className="h-3.5 w-3.5" aria-hidden />
+                {data.profilePictureUrl ? 'Change Photo' : 'Upload Photo'}
+              </>
+            )}
+          </button>
+          {uploadError && (
+            <p className="mt-2 text-[11px] font-medium text-amber-700">{uploadError}</p>
+          )}
         </div>
 
         {/* Banner */}
@@ -243,6 +316,14 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
           Complete Profile
         </motion.button>
       </div>
+
+      {pendingFile && (
+        <PhotoCropModal
+          file={pendingFile}
+          onCancel={() => setPendingFile(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </motion.div>
   );
 }

@@ -1,0 +1,10 @@
+{
+  "enabledPlugins": {
+    "andrej-karpathy-skills@karpathy-skills": true,
+    "engineering-skills@claude-code-skills": true,
+    "engineering-advanced-skills@claude-code-skills": true,
+    "supabase@claude-plugins-official": true,
+    "postgres-best-practices@supabase-agent-skills": true,
+    "everything-claude-code@everything-claude-code": true
+  }
+}

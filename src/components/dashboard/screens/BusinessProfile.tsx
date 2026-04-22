@@ -1,233 +1,485 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useState } from 'react';
 import {
-  Building2,
-  MapPin,
-  Globe,
-  Users,
-  Star,
-  Edit3,
-  Save,
-  Megaphone,
-  MessageSquare,
-  Heart,
-  ChevronRight,
+  Save, Eye, Loader2, Upload, Building2, MapPin, DollarSign, User,
 } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
-import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
-import { mockAthletes } from '@/lib/mockData';
+import { PhotoCropModal } from '@/components/ui/PhotoCropModal';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
+import { authFetch } from '@/lib/authFetch';
+import { uploadAvatar } from '@/lib/avatarUpload';
+import { userAvatarDataUrl } from '@/lib/userAvatar';
+import {
+  loadBrandOnboardingState,
+  hydrateBrandDraft,
+  defaultBrandDraft,
+  type BrandOnboardingDraft,
+} from '@/lib/brandOnboardingHydrate';
+import {
+  persistBrandCompanyInfo,
+  markBrandOnboardingComplete,
+  type BrandCompanyInfo,
+  type BrandProfileBasics,
+} from '@/lib/brandOnboardingPersist';
 
-/** Demo roster on the public-facing business profile (replace with API-backed saves later). */
-const DUMMY_SAVED_ATHLETES = mockAthletes.slice(0, 4);
+/* ── Option lists ─────────────────────────────────────────────── */
+const INDUSTRIES = [
+  'Sports Nutrition', 'Apparel', 'Fitness Tech', 'Beverages',
+  'Footwear', 'Fitness Equipment', 'Other',
+] as const;
+
+const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-1000', '1000+'] as const;
+
+const BUDGET_TIERS: { value: string; label: string }[] = [
+  { value: 'micro',      label: 'Micro ($0–$1K)' },
+  { value: 'small',      label: 'Small ($1K–$5K)' },
+  { value: 'mid',        label: 'Mid ($5K–$25K)' },
+  { value: 'large',      label: 'Large ($25K–$100K)' },
+  { value: 'enterprise', label: 'Enterprise ($100K+)' },
+];
+
+const CONTACT_PREFS: { value: BrandProfileBasics['contactPreference']; label: string }[] = [
+  { value: 'email', label: 'Email' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'both',  label: 'Both' },
+];
+
+const inputClass =
+  'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-nilink-ink outline-none transition placeholder:text-gray-400 focus:border-nilink-accent-border focus:ring-1 focus:ring-nilink-accent/30';
+const labelClass = 'mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400';
+
+function SectionCard({
+  title, subtitle, icon: Icon, children,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+      <header className="mb-5 flex items-start gap-3">
+        {Icon && (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-nilink-accent-soft text-nilink-accent">
+            <Icon className="h-4 w-4" />
+          </span>
+        )}
+        <div>
+          <h2
+            className="text-xl font-black uppercase tracking-wide text-nilink-ink"
+            style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+          >
+            {title}
+          </h2>
+          {subtitle && <p className="mt-1 text-xs text-gray-500">{subtitle}</p>}
+        </div>
+      </header>
+      {children}
+    </section>
+  );
+}
 
 export function BusinessProfile() {
-  const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    companyName: 'PowerFuel Energy',
-    industry: 'Sports Nutrition',
-    location: 'Austin, TX',
-    website: 'www.powerfuelenergy.com',
-    description: 'PowerFuel Energy is a leading sports nutrition brand dedicated to powering athletes at every level. We specialize in energy drinks, protein supplements, and recovery products designed for peak performance.',
-    founded: '2018',
-    employees: '50-100',
-    campaignsRun: 12,
-    athletePartnerships: 38,
-    totalInvestment: '$185,000',
-  });
+  const { refreshUser } = useDashboard();
 
-  const campaigns = [
-    { id: 1, name: 'Spring Training Fuel', status: 'Active', athletes: 8, budget: '$15,000' },
-    { id: 2, name: 'Basketball Season Sponsorship', status: 'Active', athletes: 5, budget: '$25,000' },
-    { id: 3, name: 'Track & Field Partnership', status: 'Active', athletes: 12, budget: '$10,000' },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveOk, setSaveOk] = useState(false);
 
-  const testimonials = [
-    { name: 'Marcus Johnson', sport: 'Basketball', text: 'Working with PowerFuel has been amazing. They truly care about their athlete partners.', rating: 5 },
-    { name: 'Sarah Chen', sport: 'Soccer', text: 'Professional, supportive, and great products. Highly recommend partnering with them!', rating: 5 },
-    { name: 'Tyler Washington', sport: 'Football', text: 'PowerFuel understands what athletes need. A great brand to work with.', rating: 4 },
-  ];
+  const [draft, setDraft] = useState<BrandOnboardingDraft>(defaultBrandDraft());
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const state = await loadBrandOnboardingState();
+      setDraft(hydrateBrandDraft(state));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Could not load profile');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  /* ── Field updaters ── */
+  const patchBasics  = (p: Partial<BrandProfileBasics>) =>
+    setDraft(d => ({ ...d, basics: { ...d.basics, ...p } }));
+  const patchCompany = (p: Partial<BrandCompanyInfo>) =>
+    setDraft(d => ({ ...d, company: { ...d.company, ...p } }));
+  const patchTopLevel = (p: Partial<Pick<BrandOnboardingDraft, 'bio' | 'bannerUrl' | 'avatarUrl'>>) =>
+    setDraft(d => ({ ...d, ...p }));
+
+  /* ── Photo upload (Storage + profiles.avatar_url) ── */
+  const handlePickPhoto = () => fileInputRef.current?.click();
+  const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadError(null);
+    setPendingFile(file);
+  };
+  const handleCropConfirm = async (cropped: File) => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const url = await uploadAvatar(cropped);
+      patchTopLevel({ avatarUrl: url });
+      await refreshUser();
+      setPendingFile(null);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /* ── Save ── */
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaveOk(false);
+    try {
+      await persistBrandCompanyInfo(draft.basics, draft.company);
+
+      // Shell display name comes from auth.user_metadata, not profiles —
+      // keep the two in sync when the brand edits their primary contact.
+      const trimmedName = draft.basics.fullName.trim();
+      if (trimmedName) {
+        await authFetch('/api/auth/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: trimmedName }),
+        });
+      }
+
+      // Until the brand onboarding wizard (Option B) exists, the first
+      // successful save from this editor is how a brand finishes
+      // onboarding. Safe to call repeatedly — the RPC is idempotent.
+      if (!draft.completedAt) {
+        const ts = await markBrandOnboardingComplete();
+        setDraft(d => ({ ...d, completedAt: ts }));
+      }
+
+      await refreshUser();
+      setSaveOk(true);
+      window.setTimeout(() => setSaveOk(false), 4000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const avatarSrc =
+    draft.avatarUrl?.trim().length > 0
+      ? draft.avatarUrl.trim()
+      : userAvatarDataUrl(draft.company.companyName || draft.basics.fullName || 'Brand');
+
+  if (loading) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-nilink-page py-20 font-sans text-nilink-ink">
+        <Loader2 className="h-8 w-8 animate-spin text-nilink-accent" aria-hidden />
+        <p className="text-sm text-gray-500">Loading profile…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="dash-main-gutter-x min-h-full bg-nilink-page py-12 font-sans text-nilink-ink">
+        <p className="text-sm text-amber-800">
+          {loadError}{' '}
+          <button type="button" className="font-semibold underline" onClick={() => void load()}>
+            Retry
+          </button>
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="border-b border-gray-200 bg-white py-8 dash-main-gutter-x">
-        <div>
-          <div className="mb-6 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            <DashboardPageHeader
-              title="Business profile"
-              subtitle="How partners see your brand on NILINK"
-              className="min-w-0 flex-1"
-            />
-            <button
-              type="button"
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex shrink-0 items-center gap-2 rounded-lg bg-nilink-accent px-6 py-3 font-bold text-white transition-colors hover:bg-nilink-accent-hover"
-            >
-              {isEditing ? (
-                <>
-                  <Save className="h-5 w-5" /> SAVE CHANGES
-                </>
-              ) : (
-                <>
-                  <Edit3 className="h-5 w-5" /> EDIT PROFILE
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Company Card */}
-          <div className="flex items-start gap-8">
-            <div className="w-32 h-32 rounded-xl bg-[#6CC3DA] flex items-center justify-center text-white shadow-lg">
-              <Building2 className="w-16 h-16" />
-            </div>
-            <div className="flex-1">
-              {isEditing ? (
-                <input
-                  type="text" value={profile.companyName}
-                  onChange={(e) => setProfile({ ...profile, companyName: e.target.value })}
-                  className="text-4xl font-bold border-b-2 border-[#6CC3DA] focus:outline-none text-gray-900 mb-2 w-full leading-snug"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                />
-              ) : (
-                <h2 className="text-4xl font-bold mb-2 text-gray-900 leading-snug" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                  {profile.companyName.toUpperCase()}
-                </h2>
-              )}
-              <div className="flex items-center gap-6 text-gray-600 mb-4">
-                <span className="flex items-center gap-2"><Building2 className="w-4 h-4" />{profile.industry}</span>
-                <span className="flex items-center gap-2"><MapPin className="w-4 h-4" />{profile.location}</span>
-                <span className="flex items-center gap-2"><Globe className="w-4 h-4" />{profile.website}</span>
-              </div>
-              <div className="grid grid-cols-4 gap-4">
-                {[
-                  { label: 'Founded', value: profile.founded },
-                  { label: 'Campaigns', value: profile.campaignsRun },
-                  { label: 'Partnerships', value: profile.athletePartnerships },
-                  { label: 'Investment', value: profile.totalInvestment },
-                ].map(stat => (
-                  <div key={stat.label} className="text-center">
-                    <p className="text-2xl font-bold" style={{ color: '#6CC3DA' }}>{stat.value}</p>
-                    <p className="text-xs text-gray-500">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+    <div className="flex min-h-full flex-col bg-nilink-page font-sans text-nilink-ink">
+      <div className="shrink-0 border-b border-gray-100 bg-white py-8 dash-main-gutter-x">
+        <div className="mb-2 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <DashboardPageHeader
+            title="Business profile"
+            subtitle="How athletes see your brand on NILINK"
+            className="min-w-0 flex-1"
+          />
+          <Link
+            href="/dashboard/profile/view"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-nilink-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nilink-accent-hover"
+          >
+            <Eye className="h-4 w-4" aria-hidden />
+            View public profile
+          </Link>
         </div>
       </div>
 
-      <div className="space-y-8 py-8 dash-main-gutter-x">
-        {/* About */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-2xl mb-4 tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ABOUT</h3>
-          {isEditing ? (
-            <textarea
-              value={profile.description}
-              onChange={(e) => setProfile({ ...profile, description: e.target.value })}
-              rows={4}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-[#6CC3DA] resize-none text-gray-900"
-            />
-          ) : (
-            <p className="text-gray-700 leading-relaxed">{profile.description}</p>
-          )}
-        </div>
+      <div className="flex-1 space-y-6 py-8 dash-main-gutter-x md:py-10">
+        {saveError && (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {saveError}
+          </p>
+        )}
+        {saveOk && (
+          <p className="rounded-xl border border-nilink-accent-border bg-nilink-accent-soft px-4 py-3 text-sm font-medium text-nilink-ink">
+            Profile saved.
+          </p>
+        )}
 
-        {/* Saved athletes (dummy preview for brand profile) */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <Heart className="h-6 w-6 fill-[#6CC3DA]/20 text-[#6CC3DA]" />
-              <div>
-                <h3
-                  className="text-2xl tracking-wide text-gray-900"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}
-                >
-                  SAVED ATHLETES
-                </h3>
-                <p className="text-sm text-gray-500">Athletes you are tracking for upcoming campaigns</p>
-              </div>
+        {/* ── Logo ── */}
+        <SectionCard title="Brand logo" icon={Building2}>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-50 shadow-sm">
+              <ImageWithFallback src={avatarSrc} alt="" className="h-full w-full object-cover" />
             </div>
-            <Link
-              href="/dashboard/saved"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-[#6CC3DA] hover:underline"
-            >
-              View all saved
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {DUMMY_SAVED_ATHLETES.map((athlete) => (
-              <Link
-                key={athlete.id}
-                href={`/dashboard/profile/view?id=${athlete.id}`}
-                className="group flex gap-4 rounded-xl border border-gray-100 bg-gray-50/80 p-4 transition-colors hover:border-[#6CC3DA]/40 hover:bg-white"
+            <div className="min-w-0 flex-1 space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleFilePicked}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handlePickPhoto}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-nilink-ink shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-white shadow-sm">
-                  <ImageWithFallback src={athlete.image} alt="" className="h-full w-full object-cover" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
-                    <p className="truncate font-bold text-gray-900 group-hover:text-[#6CC3DA]">{athlete.name}</p>
-                    {athlete.verified ? <VerifiedBadge className="h-4 w-4 shrink-0" /> : null}
-                  </div>
-                  <p className="truncate text-xs text-gray-500">{athlete.sport}</p>
-                  <p className="truncate text-xs text-gray-400">{athlete.school}</p>
-                  <p className="mt-1 text-xs font-semibold text-[#6CC3DA]">{athlete.compatibilityScore}% match</p>
-                </div>
-              </Link>
-            ))}
+                {uploading ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Uploading…</>
+                ) : (
+                  <><Upload className="h-4 w-4" aria-hidden /> {draft.avatarUrl ? 'Change logo' : 'Upload logo'}</>
+                )}
+              </button>
+              {uploadError ? (
+                <p className="text-xs font-medium text-amber-700">{uploadError}</p>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  JPEG, PNG, WebP or GIF, up to 5 MB. Saved instantly.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        </SectionCard>
 
-        {/* Active Campaigns */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <Megaphone className="w-6 h-6" style={{ color: '#6CC3DA' }} />
-            <h3 className="text-2xl tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ACTIVE CAMPAIGNS</h3>
+        {/* ── Company details ── */}
+        <SectionCard title="Company" icon={Building2}>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className={labelClass} htmlFor="co-name">Company name</label>
+              <input
+                id="co-name" type="text" className={inputClass}
+                value={draft.company.companyName}
+                onChange={(e) => patchCompany({ companyName: e.target.value })}
+                placeholder="Your brand"
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="co-industry">Industry</label>
+              <select
+                id="co-industry" className={inputClass}
+                value={draft.company.industry}
+                onChange={(e) => patchCompany({ industry: e.target.value })}
+              >
+                {INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="co-size">Company size</label>
+              <select
+                id="co-size" className={inputClass}
+                value={draft.company.companySize}
+                onChange={(e) => patchCompany({ companySize: e.target.value })}
+              >
+                <option value="">Select…</option>
+                {COMPANY_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="co-website">Website</label>
+              <input
+                id="co-website" type="text" className={inputClass}
+                value={draft.company.website}
+                onChange={(e) => patchCompany({ website: e.target.value })}
+                placeholder="example.com"
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="co-founded">Founded</label>
+              <input
+                id="co-founded" type="number" min={1800} max={2100} className={inputClass}
+                value={draft.company.foundedYear}
+                onChange={(e) => patchCompany({ foundedYear: e.target.value })}
+                placeholder="2018"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass} htmlFor="co-tagline">Tagline</label>
+              <input
+                id="co-tagline" type="text" className={inputClass}
+                value={draft.company.tagline}
+                onChange={(e) => patchCompany({ tagline: e.target.value })}
+                placeholder="Short one-liner"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass} htmlFor="co-about">About</label>
+              <textarea
+                id="co-about" rows={4} className={`${inputClass} resize-none`}
+                value={draft.company.about}
+                onChange={(e) => patchCompany({ about: e.target.value })}
+                placeholder="What your brand stands for — longer-form."
+              />
+            </div>
           </div>
-          <div className="space-y-4">
-            {campaigns.map(campaign => (
-              <div key={campaign.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div>
-                  <h4 className="font-bold text-gray-900">{campaign.name}</h4>
-                  <div className="flex items-center gap-4 mt-1">
-                    <span className="text-sm text-gray-600 flex items-center gap-1"><Users className="w-3 h-3" />{campaign.athletes} athletes</span>
-                    <span className="text-sm font-bold" style={{ color: '#6CC3DA' }}>{campaign.budget}</span>
-                  </div>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">{campaign.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        </SectionCard>
 
-        {/* Testimonials */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <MessageSquare className="w-6 h-6" style={{ color: '#6CC3DA' }} />
-            <h3 className="text-2xl tracking-wide text-gray-900" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ATHLETE TESTIMONIALS</h3>
+        {/* ── Headquarters ── */}
+        <SectionCard title="Headquarters" icon={MapPin}>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            <div>
+              <label className={labelClass} htmlFor="hq-country">Country</label>
+              <input
+                id="hq-country" type="text" className={inputClass}
+                value={draft.company.hqCountry}
+                onChange={(e) => patchCompany({ hqCountry: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="hq-state">State</label>
+              <input
+                id="hq-state" type="text" className={inputClass}
+                value={draft.company.hqState}
+                onChange={(e) => patchCompany({ hqState: e.target.value })}
+                placeholder="TX"
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="hq-city">City</label>
+              <input
+                id="hq-city" type="text" className={inputClass}
+                value={draft.company.hqCity}
+                onChange={(e) => patchCompany({ hqCity: e.target.value })}
+                placeholder="Austin"
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-6">
-            {testimonials.map(testimonial => (
-              <div key={testimonial.name} className="bg-gray-50 rounded-lg p-6">
-                <div className="flex items-center gap-1 mb-3">
-                  {Array.from({ length: testimonial.rating }).map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-gray-700 mb-4 italic">&ldquo;{testimonial.text}&rdquo;</p>
-                <div>
-                  <p className="font-bold text-gray-900">{testimonial.name}</p>
-                  <p className="text-sm text-gray-500">{testimonial.sport}</p>
-                </div>
-              </div>
-            ))}
+        </SectionCard>
+
+        {/* ── Budget posture ── */}
+        <SectionCard
+          title="Deal posture"
+          subtitle="Helps athletes gauge fit before reaching out."
+          icon={DollarSign}
+        >
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div>
+              <label className={labelClass} htmlFor="bp-tier">Typical deal size</label>
+              <select
+                id="bp-tier" className={inputClass}
+                value={draft.company.budgetTier}
+                onChange={(e) => patchCompany({ budgetTier: e.target.value })}
+              >
+                <option value="">Select…</option>
+                {BUDGET_TIERS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="bp-range">Deal range (human-facing)</label>
+              <input
+                id="bp-range" type="text" className={inputClass}
+                value={draft.company.typicalDealRange}
+                onChange={(e) => patchCompany({ typicalDealRange: e.target.value })}
+                placeholder="$500 – $5,000"
+              />
+            </div>
           </div>
+        </SectionCard>
+
+        {/* ── Primary contact ── */}
+        <SectionCard title="Primary contact" icon={User}>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className={labelClass} htmlFor="pc-name">Name</label>
+              <input
+                id="pc-name" type="text" className={inputClass}
+                value={draft.basics.fullName}
+                onChange={(e) => patchBasics({ fullName: e.target.value })}
+                placeholder="Full name"
+                autoComplete="name"
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="pc-role">Role / title</label>
+              <input
+                id="pc-role" type="text" className={inputClass}
+                value={draft.company.primaryContactRole}
+                onChange={(e) => patchCompany({ primaryContactRole: e.target.value })}
+                placeholder="Head of Partnerships"
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="pc-phone">Phone</label>
+              <input
+                id="pc-phone" type="tel" className={inputClass}
+                value={draft.basics.phone}
+                onChange={(e) => patchBasics({ phone: e.target.value })}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="pc-pref">Preferred contact</label>
+              <select
+                id="pc-pref" className={inputClass}
+                value={draft.basics.contactPreference}
+                onChange={(e) =>
+                  patchBasics({
+                    contactPreference: e.target.value as BrandProfileBasics['contactPreference'],
+                  })
+                }
+              >
+                <option value="">Select…</option>
+                {CONTACT_PREFS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+          </div>
+        </SectionCard>
+
+        <div className="flex justify-end pb-4">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void handleSave()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-nilink-accent px-8 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Save className="h-4 w-4" aria-hidden />}
+            Save profile
+          </button>
         </div>
       </div>
+
+      {pendingFile && (
+        <PhotoCropModal
+          file={pendingFile}
+          onCancel={() => setPendingFile(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }

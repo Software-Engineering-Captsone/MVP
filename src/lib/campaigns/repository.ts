@@ -1,221 +1,439 @@
-import mongoose from 'mongoose';
-import {
-  mutateLocalCampaignStore,
-  readLocalCampaignStore,
-  type StoredApplication,
-  type StoredCampaign,
-} from './localCampaignStore';
-import { buildSeedCampaignTemplates, SEED_CAMPAIGN_IDS } from './seedCampaigns';
-import { validateApplicationInput, validateCampaignInput } from './validateWithMongoose';
+import { createClient } from '@/lib/supabase/server';
 
-const OPEN_STATUSES = ['Open for Applications', 'Reviewing Candidates'] as const;
+/* ─────────────────────────────────────────────────────────────────
+ * API shape types
+ * These intentionally match the legacy Mongoose/local-JSON shape so
+ * serialization.ts and the 5 route handlers don't change. Column-name
+ * translation happens inside the DB row mappers below.
+ * ───────────────────────────────────────────────────────────────── */
 
-function idStr(doc: { _id?: unknown }): string {
-  if (doc._id == null) return '';
-  return String(doc._id);
+export interface StoredCampaign {
+  _id: string;
+  brandUserId: string;
+  brandDisplayName?: string;
+  name: string;
+  subtitle?: string;
+  packageName?: string;
+  packageId?: string;
+  goal?: string;
+  brief?: string;
+  budget?: string;
+  duration?: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  visibility: 'Public' | 'Private';
+  acceptApplications: boolean;
+  sport?: string;
+  genderFilter?: string;
+  followerMin?: number;
+  packageDetails?: string[];
+  platforms?: string[];
+  image?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-/** Merge demo campaigns once per process when any seed id is missing (cheap read first). */
-async function ensureSeedCampaignsPresent(): Promise<void> {
-  const snap = await readLocalCampaignStore();
-  const idSet = new Set(snap.campaigns.map((c) => idStr(c)));
-  if (SEED_CAMPAIGN_IDS.every((id) => idSet.has(id))) return;
-
-  await mutateLocalCampaignStore((draft) => {
-    const ids = new Set(draft.campaigns.map((c) => idStr(c)));
-    for (const template of buildSeedCampaignTemplates()) {
-      const id = String(template._id ?? '');
-      if (!id || ids.has(id)) continue;
-      try {
-        const raw = validateCampaignInput(template as Record<string, unknown>);
-        const row = { ...raw, _id: idStr(raw) || id } as StoredCampaign;
-        draft.campaigns.push(row);
-        ids.add(row._id);
-      } catch (e) {
-        console.error('[campaigns] Seed campaign skipped:', id, e);
-      }
-    }
-  });
+export interface StoredApplicationMessage {
+  _id: string;
+  fromUserId: string;
+  body: string;
+  createdAt: string;
 }
+
+export interface StoredApplication {
+  _id: string;
+  campaignId: string;
+  athleteUserId: string;
+  status: string;
+  pitch?: string;
+  athleteSnapshot?: Record<string, string>;
+  messages?: StoredApplicationMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * DB row shapes (raw Supabase response)
+ * ───────────────────────────────────────────────────────────────── */
+
+interface DbCampaignRow {
+  id: string;
+  brand_id: string;
+  name: string;
+  subtitle: string;
+  goal: string;
+  brief: string;
+  image_url: string;
+  status: string;
+  visibility: string;
+  accept_applications: boolean;
+  package_id: string;
+  package_name: string;
+  package_details: string[] | null;
+  platforms: string[] | null;
+  budget_label: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  duration_label: string;
+  target_sport: string;
+  target_gender: string;
+  target_follower_min: number;
+  target_location: string;
+  created_at: string;
+  updated_at: string;
+  brand?: { company_name: string | null } | null;
+}
+
+interface DbApplicationRow {
+  id: string;
+  campaign_id: string;
+  athlete_id: string;
+  status: string;
+  pitch: string;
+  athlete_snapshot: unknown;
+  messages: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Shape translators
+ * ───────────────────────────────────────────────────────────────── */
+
+function fromDbGender(v: string): string {
+  if (v === 'male') return 'Male';
+  if (v === 'female') return 'Female';
+  if (v === 'nonbinary') return 'Nonbinary';
+  return 'Any';
+}
+
+function toDbGender(v: unknown): string {
+  const s = String(v ?? '').toLowerCase();
+  if (s === 'male' || s === 'female' || s === 'nonbinary') return s;
+  return 'any';
+}
+
+function dbCampaignToStored(row: DbCampaignRow): StoredCampaign {
+  return {
+    _id: row.id,
+    brandUserId: row.brand_id,
+    brandDisplayName: row.brand?.company_name ?? '',
+    name: row.name,
+    subtitle: row.subtitle ?? '',
+    packageName: row.package_name ?? '',
+    packageId: row.package_id ?? '',
+    goal: row.goal ?? '',
+    brief: row.brief ?? '',
+    budget: row.budget_label ?? '',
+    duration: row.duration_label ?? '',
+    location: row.target_location ?? '',
+    startDate: row.start_date ?? '',
+    endDate: row.end_date ?? '',
+    visibility: row.visibility === 'Private' ? 'Private' : 'Public',
+    acceptApplications: !!row.accept_applications,
+    sport: row.target_sport ?? '',
+    genderFilter: fromDbGender(row.target_gender),
+    followerMin: row.target_follower_min ?? 0,
+    packageDetails: row.package_details ?? [],
+    platforms: row.platforms ?? [],
+    image: row.image_url ?? '',
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeMessages(raw: unknown): StoredApplicationMessage[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m): m is Record<string, unknown> => !!m && typeof m === 'object')
+    .map((m) => ({
+      _id: String(m._id ?? ''),
+      fromUserId: String(m.fromUserId ?? ''),
+      body: String(m.body ?? ''),
+      createdAt: String(m.createdAt ?? ''),
+    }));
+}
+
+function dbApplicationToStored(row: DbApplicationRow): StoredApplication {
+  const snapshot =
+    row.athlete_snapshot && typeof row.athlete_snapshot === 'object'
+      ? (row.athlete_snapshot as Record<string, string>)
+      : {};
+  return {
+    _id: row.id,
+    campaignId: row.campaign_id,
+    athleteUserId: row.athlete_id,
+    status: row.status,
+    pitch: row.pitch ?? '',
+    athleteSnapshot: snapshot,
+    messages: normalizeMessages(row.messages),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Embedded select — every campaign read joins brand_profiles so the
+ * returned StoredCampaign carries brandDisplayName without a separate
+ * round-trip. The FK campaigns.brand_id → brand_profiles.brand_id is
+ * what PostgREST uses to resolve the embed.
+ * ───────────────────────────────────────────────────────────────── */
+const CAMPAIGN_SELECT = '*, brand:brand_profiles(company_name)';
+
+/* ─────────────────────────────────────────────────────────────────
+ * Exported repository API — identical to the pre-Supabase version.
+ * ───────────────────────────────────────────────────────────────── */
 
 export async function listCampaignsForBrand(brandUserId: string): Promise<StoredCampaign[]> {
-  const { campaigns } = await readLocalCampaignStore();
-  return campaigns.filter((c) => c.brandUserId === brandUserId);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select(CAMPAIGN_SELECT)
+    .eq('brand_id', brandUserId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbCampaignToStored(r as unknown as DbCampaignRow));
 }
 
 export async function listOpenCampaignsForAthlete(): Promise<StoredCampaign[]> {
-  await ensureSeedCampaignsPresent();
-  const { campaigns } = await readLocalCampaignStore();
-  const open = campaigns.filter(
-    (c) =>
-      c.visibility === 'Public' &&
-      c.acceptApplications === true &&
-      OPEN_STATUSES.includes(c.status as (typeof OPEN_STATUSES)[number])
-  );
-  return open.sort((a, b) => {
-    const ta = new Date(String(a.createdAt ?? 0)).getTime();
-    const tb = new Date(String(b.createdAt ?? 0)).getTime();
-    return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
-  });
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select(CAMPAIGN_SELECT)
+    .eq('visibility', 'Public')
+    .eq('accept_applications', true)
+    .in('status', ['Open for Applications', 'Reviewing Candidates'])
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbCampaignToStored(r as unknown as DbCampaignRow));
 }
 
 export async function getCampaignById(campaignId: string): Promise<StoredCampaign | null> {
-  const { campaigns } = await readLocalCampaignStore();
-  return campaigns.find((c) => idStr(c) === campaignId) ?? null;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select(CAMPAIGN_SELECT)
+    .eq('id', campaignId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? dbCampaignToStored(data as unknown as DbCampaignRow) : null;
 }
 
-export async function createCampaign(
-  input: Record<string, unknown>
-): Promise<StoredCampaign> {
-  const _id = new mongoose.Types.ObjectId().toString();
-  const raw = validateCampaignInput({ ...input, _id });
-  const row = { ...raw, _id: idStr(raw) || _id } as StoredCampaign;
+export async function createCampaign(input: Record<string, unknown>): Promise<StoredCampaign> {
+  const supabase = await createClient();
+  const supabaseRow = {
+    brand_id: String(input.brandUserId ?? ''),
+    name: String(input.name ?? ''),
+    subtitle: String(input.subtitle ?? ''),
+    goal: String(input.goal ?? ''),
+    brief: String(input.brief ?? ''),
+    image_url: String(input.image ?? ''),
+    status: String(input.status ?? 'Draft'),
+    visibility: input.visibility === 'Private' ? 'Private' : 'Public',
+    accept_applications: input.acceptApplications !== false,
+    package_id: String(input.packageId ?? ''),
+    package_name: String(input.packageName ?? ''),
+    package_details: Array.isArray(input.packageDetails) ? (input.packageDetails as string[]) : [],
+    platforms: Array.isArray(input.platforms) ? (input.platforms as string[]) : [],
+    budget_label: String(input.budget ?? ''),
+    start_date: typeof input.startDate === 'string' && input.startDate.length > 0 ? input.startDate : null,
+    end_date:   typeof input.endDate   === 'string' && input.endDate.length   > 0 ? input.endDate   : null,
+    duration_label: String(input.duration ?? ''),
+    target_sport: String(input.sport ?? 'All Sports'),
+    target_gender: toDbGender(input.genderFilter),
+    target_follower_min:
+      typeof input.followerMin === 'number'
+        ? input.followerMin
+        : Number(input.followerMin) || 0,
+    target_location: String(input.location ?? ''),
+  };
 
-  await mutateLocalCampaignStore((draft) => {
-    draft.campaigns.push(row);
-  });
-  return row;
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert(supabaseRow)
+    .select(CAMPAIGN_SELECT)
+    .single();
+  if (error) throw new Error(error.message);
+  return dbCampaignToStored(data as unknown as DbCampaignRow);
 }
 
 export async function updateCampaign(
   campaignId: string,
   brandUserId: string,
-  patch: Partial<Pick<StoredCampaign, 'status' | 'acceptApplications'>>
+  patch: Partial<Pick<StoredCampaign, 'status' | 'acceptApplications'>>,
 ): Promise<StoredCampaign | null> {
-  let updated: StoredCampaign | null = null;
-  await mutateLocalCampaignStore((draft) => {
-    const idx = draft.campaigns.findIndex((c) => idStr(c) === campaignId);
-    if (idx === -1) return;
-    const c = draft.campaigns[idx];
-    if (c.brandUserId !== brandUserId) return;
-    const next = { ...c, ...patch };
-    validateCampaignInput(next as Record<string, unknown>);
-    draft.campaigns[idx] = next as StoredCampaign;
-    updated = draft.campaigns[idx];
-  });
-  return updated;
+  const supabase = await createClient();
+  const update: Record<string, unknown> = {};
+  if (patch.status !== undefined) update.status = patch.status;
+  if (patch.acceptApplications !== undefined) update.accept_applications = patch.acceptApplications;
+  if (Object.keys(update).length === 0) return getCampaignById(campaignId);
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update(update)
+    .eq('id', campaignId)
+    .eq('brand_id', brandUserId)
+    .select(CAMPAIGN_SELECT)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? dbCampaignToStored(data as unknown as DbCampaignRow) : null;
 }
 
 export async function listApplicationsForCampaign(campaignId: string): Promise<StoredApplication[]> {
-  const { applications } = await readLocalCampaignStore();
-  return applications.filter((a) => a.campaignId === campaignId);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('campaign_id', campaignId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbApplicationToStored(r as unknown as DbApplicationRow));
 }
 
 export async function getApplicationById(applicationId: string): Promise<StoredApplication | null> {
-  const { applications } = await readLocalCampaignStore();
-  return applications.find((a) => idStr(a) === applicationId) ?? null;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? dbApplicationToStored(data as unknown as DbApplicationRow) : null;
 }
 
 export async function createApplication(
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
 ): Promise<{ application: StoredApplication; error?: 'duplicate' }> {
+  const supabase = await createClient();
   const campaignId = String(input.campaignId ?? '');
   const athleteUserId = String(input.athleteUserId ?? '');
+
+  // Fail fast on missing campaign so the route handler returns 404 with
+  // a useful message. The BEFORE-INSERT trigger would also reject, but
+  // with a less specific error.
   const campaign = await getCampaignById(campaignId);
   if (!campaign) {
     throw new Error('Campaign not found');
   }
-  if (campaign.visibility !== 'Public' || !campaign.acceptApplications) {
-    throw new Error('Campaign is not accepting applications');
-  }
-  if (!OPEN_STATUSES.includes(campaign.status as (typeof OPEN_STATUSES)[number])) {
-    throw new Error('Campaign is not open for applications');
-  }
 
-  const existing = await readLocalCampaignStore();
-  if (
-    existing.applications.some(
-      (a) => a.campaignId === campaignId && a.athleteUserId === athleteUserId
-    )
-  ) {
+  // Duplicate-application check. Cheaper than catching the unique-
+  // constraint violation on INSERT because it avoids a round-trip when
+  // duplicate is expected.
+  const { data: existing, error: existingErr } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('campaign_id', campaignId)
+    .eq('athlete_id', athleteUserId)
+    .maybeSingle();
+  if (existingErr) throw new Error(existingErr.message);
+  if (existing) {
     return {
       error: 'duplicate',
-      application: existing.applications.find(
-        (a) => a.campaignId === campaignId && a.athleteUserId === athleteUserId
-      )!,
+      application: dbApplicationToStored(existing as unknown as DbApplicationRow),
     };
   }
 
-  const _id = new mongoose.Types.ObjectId().toString();
-  const raw = validateApplicationInput({
-    ...input,
-    _id,
-    status: input.status ?? 'pending',
-    messages: input.messages ?? [],
-  });
-  const row = { ...raw, _id: idStr(raw) || _id } as StoredApplication;
+  const snapshot =
+    input.athleteSnapshot && typeof input.athleteSnapshot === 'object'
+      ? (input.athleteSnapshot as Record<string, string>)
+      : {};
 
-  await mutateLocalCampaignStore((draft) => {
-    draft.applications.push(row);
-    if (campaign.status === 'Open for Applications') {
-      const idx = draft.campaigns.findIndex((c) => idStr(c) === campaignId);
-      if (idx >= 0) {
-        draft.campaigns[idx] = {
-          ...draft.campaigns[idx],
-          status: 'Reviewing Candidates',
-        } as StoredCampaign;
-      }
-    }
-  });
-
-  return { application: row };
+  const { data, error } = await supabase
+    .from('applications')
+    .insert({
+      campaign_id: campaignId,
+      athlete_id: athleteUserId,
+      status: 'pending',
+      pitch: String(input.pitch ?? ''),
+      athlete_snapshot: snapshot,
+    })
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return { application: dbApplicationToStored(data as unknown as DbApplicationRow) };
 }
 
 export async function updateApplicationStatus(
   applicationId: string,
   brandUserId: string,
-  status: 'pending' | 'shortlisted' | 'approved' | 'declined'
+  status: 'pending' | 'shortlisted' | 'approved' | 'declined',
 ): Promise<StoredApplication | null> {
-  let updated: StoredApplication | null = null;
-  await mutateLocalCampaignStore((draft) => {
-    const aidx = draft.applications.findIndex((a) => idStr(a) === applicationId);
-    if (aidx === -1) return;
-    const app = draft.applications[aidx];
-    const camp = draft.campaigns.find((c) => idStr(c) === app.campaignId);
-    if (!camp || camp.brandUserId !== brandUserId) return;
-    const next = { ...app, status };
-    validateApplicationInput(next as Record<string, unknown>);
-    draft.applications[aidx] = next as StoredApplication;
-    updated = draft.applications[aidx];
-  });
-  return updated;
+  const supabase = await createClient();
+
+  // Verify the brand owns the campaign before the RLS-gated update.
+  // Gives us a clean null return for "not found / forbidden" without
+  // surfacing a cryptic RLS error to the caller.
+  const { data: app } = await supabase
+    .from('applications')
+    .select('campaign_id')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (!app) return null;
+
+  const { data: camp } = await supabase
+    .from('campaigns')
+    .select('brand_id')
+    .eq('id', app.campaign_id)
+    .maybeSingle();
+  if (!camp || camp.brand_id !== brandUserId) return null;
+
+  const { data, error } = await supabase
+    .from('applications')
+    .update({ status })
+    .eq('id', applicationId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? dbApplicationToStored(data as unknown as DbApplicationRow) : null;
 }
 
 export async function appendApplicationMessage(
   applicationId: string,
   userId: string,
-  body: string
+  body: string,
 ): Promise<{ application: StoredApplication | null; error?: 'forbidden' | 'not_found' }> {
-  let result: StoredApplication | null = null;
-  let error: 'forbidden' | 'not_found' | undefined;
-  await mutateLocalCampaignStore((draft) => {
-    const aidx = draft.applications.findIndex((a) => idStr(a) === applicationId);
-    if (aidx === -1) {
-      error = 'not_found';
-      return;
-    }
-    const app = draft.applications[aidx];
-    const camp = draft.campaigns.find((c) => idStr(c) === app.campaignId);
-    if (!camp) {
-      error = 'not_found';
-      return;
-    }
-    const allowed = app.athleteUserId === userId || camp.brandUserId === userId;
-    if (!allowed) {
-      error = 'forbidden';
-      return;
-    }
-    const messages = Array.isArray(app.messages) ? [...app.messages] : [];
-    messages.push({
-      _id: new mongoose.Types.ObjectId().toString(),
+  const supabase = await createClient();
+
+  const { data: app, error: readErr } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  if (!app) return { application: null, error: 'not_found' };
+
+  const { data: camp } = await supabase
+    .from('campaigns')
+    .select('brand_id')
+    .eq('id', app.campaign_id)
+    .maybeSingle();
+  if (!camp) return { application: null, error: 'not_found' };
+
+  const isAthlete = userId === app.athlete_id;
+  const isBrand = userId === camp.brand_id;
+  if (!isAthlete && !isBrand) return { application: null, error: 'forbidden' };
+
+  const existing = normalizeMessages(app.messages);
+  const nextMessages: StoredApplicationMessage[] = [
+    ...existing,
+    {
+      _id: crypto.randomUUID(),
       fromUserId: userId,
       body: body.trim(),
-      createdAt: new Date(),
-    });
-    const next = { ...app, messages };
-    validateApplicationInput(next as Record<string, unknown>);
-    draft.applications[aidx] = next as StoredApplication;
-    result = draft.applications[aidx];
-  });
-  return { application: result, error };
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  const { data: updated, error: upErr } = await supabase
+    .from('applications')
+    .update({ messages: nextMessages })
+    .eq('id', applicationId)
+    .select('*')
+    .maybeSingle();
+  if (upErr) throw new Error(upErr.message);
+  if (!updated) return { application: null, error: 'forbidden' };
+  return { application: dbApplicationToStored(updated as unknown as DbApplicationRow) };
 }

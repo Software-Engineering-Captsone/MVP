@@ -71,6 +71,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const router = useRouter();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [booting, setBooting] = useState(true);
   const signOutRequestedRef = useRef(false);
 
@@ -95,18 +96,31 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     };
   }, []);
 
+  const fetchAvatar = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', userId)
+      .single();
+    setAvatarUrl(data?.avatar_url ?? '');
+  }, [supabase]);
+
   const refreshUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) setSessionUser(mapSupabaseUser(user));
-  }, [supabase, mapSupabaseUser]);
+    if (user) {
+      setSessionUser(mapSupabaseUser(user));
+      await fetchAvatar(user.id);
+    }
+  }, [supabase, mapSupabaseUser, fetchAvatar]);
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setSessionUser(mapSupabaseUser(user));
+        void fetchAvatar(user.id);
       } else {
-        router.replace('/auth');
+        router.replace(signOutRequestedRef.current ? '/' : '/auth');
       }
       setBooting(false);
     });
@@ -116,8 +130,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       (_event, session) => {
         if (session?.user) {
           setSessionUser(mapSupabaseUser(session.user));
+          void fetchAvatar(session.user.id);
         } else {
           setSessionUser(null);
+          setAvatarUrl('');
           router.replace(signOutRequestedRef.current ? '/' : '/auth');
         }
       }
@@ -126,30 +142,62 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, mapSupabaseUser]);
+  }, [supabase, router, mapSupabaseUser, fetchAvatar]);
 
-  /* ── Onboarding gate for athletes ── */
+  /* ── Onboarding gate for athletes ──
+   * Source of truth: profiles.onboarding_completed_at. We query it once
+   * per signed-in user, then cache the verdict in onboardingCheckedFor
+   * so the dashboard doesn't pay the round-trip on every navigation.
+   */
+  const [onboardingCheckedFor, setOnboardingCheckedFor] = useState<string | null>(null);
+
   useEffect(() => {
     if (booting || !sessionUser) return;
-    if (sessionUser.role !== 'athlete') return;
-    // Don't redirect if already on onboarding
-    if (pathname.startsWith('/dashboard/onboarding')) return;
-
-    try {
-      const raw = localStorage.getItem('athlete_onboarding_draft');
-      if (raw) {
-        const draft = JSON.parse(raw) as { completedAt?: string };
-        if (draft.completedAt) return; // already onboarded
-      }
-      // No draft or no completedAt → redirect to onboarding
-      router.replace('/dashboard/onboarding');
-    } catch {
-      // Malformed JSON — treat as not onboarded
-      router.replace('/dashboard/onboarding');
+    // Gate applies to both roles now — brands have their own wizard at
+    // /dashboard/onboarding and share the onboarding_completed_at column.
+    // Already decided for this user — nothing to do.
+    if (onboardingCheckedFor === sessionUser.id) return;
+    // Don't gate the wizard itself.
+    if (pathname.startsWith('/dashboard/onboarding')) {
+      setOnboardingCheckedFor(sessionUser.id);
+      return;
     }
-  }, [booting, sessionUser, pathname, router]);
 
-  if (booting) {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('onboarding_completed_at')
+          .eq('id', sessionUser.id)
+          .single();
+        if (cancelled) return;
+        if (!error && !data?.onboarding_completed_at) {
+          router.replace('/dashboard/onboarding');
+        }
+      } catch {
+        /* network error — don't trap the user; treat as decided */
+      } finally {
+        if (!cancelled) setOnboardingCheckedFor(sessionUser.id);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [booting, sessionUser, pathname, router, supabase, onboardingCheckedFor]);
+
+  // Hold the dashboard chrome until: (a) we know who's signed in, and
+  // (b) we've checked their onboarding state. Without (b), a non-onboarded
+  // user (athlete or brand) would see the dashboard for one frame before
+  // the redirect kicks in.
+  const onAuthenticatedShellRoute = pathname.startsWith('/dashboard/onboarding');
+  const gateUndecided =
+    !!sessionUser &&
+    onboardingCheckedFor !== sessionUser.id &&
+    !onAuthenticatedShellRoute;
+
+  if (booting || gateUndecided) {
     return (
       <div className="flex h-screen items-center justify-center bg-nilink-page text-nilink-ink">
         <p className="text-sm text-gray-500">Loading your workspace…</p>
@@ -165,7 +213,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const navigation = accountType === 'business' ? businessNavigation : athleteNavigation;
 
   const userDisplay = {
-    avatar: userAvatarDataUrl(sessionUser.name),
+    avatar: avatarUrl || userAvatarDataUrl(sessionUser.name),
     name: sessionUser.name,
     email: sessionUser.email,
   };
@@ -176,6 +224,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const handleSignOut = async () => {
     signOutRequestedRef.current = true;
     await supabase.auth.signOut();
+    // Drop per-browser onboarding state so the next sign-in (potentially a
+    // different account) hydrates cleanly from the DB instead of inheriting
+    // this user's localStorage draft.
+    try {
+      localStorage.removeItem('athlete_onboarding_draft');
+      localStorage.removeItem('nilink_last_user_id');
+    } catch {
+      /* localStorage unavailable — nothing to clean */
+    }
     setIsProfileMenuOpen(false);
     router.push('/');
     router.refresh();

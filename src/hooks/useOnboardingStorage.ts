@@ -1,6 +1,14 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { loadOnboardingState, hydrateOnboardingDraft } from '@/lib/onboardingHydrate';
+import {
+  persistBasics,
+  persistAthletic,
+  persistAcademic,
+  persistCompliance,
+  persistProfileSection,
+} from '@/lib/onboardingPersist';
 
 /* ──────────────────────────────────────────────────────────────
  *  Onboarding draft types
@@ -178,10 +186,47 @@ function persistDraft(draft: OnboardingDraft) {
 export function useOnboardingStorage() {
   const [draft, setDraft] = useState<OnboardingDraft>(defaultDraft);
   const [hydrated, setHydrated] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraft(loadDraft());
-    setHydrated(true);
+    let cancelled = false;
+    void (async () => {
+      const localDraft = loadDraft();
+      const localKeyExists =
+        typeof window !== 'undefined' && window.localStorage.getItem(STORAGE_KEY) !== null;
+      const localCompleted = !!localDraft.completedAt;
+
+      // If the user has unsaved typing on this device (key present, not yet
+      // marked complete), trust localStorage so we don't clobber their work.
+      // Otherwise — fresh device, or "Re-run onboarding" — pull truth from DB.
+      if (localKeyExists && !localCompleted) {
+        if (!cancelled) {
+          setDraft(localDraft);
+          setHydrated(true);
+        }
+        return;
+      }
+
+      try {
+        const state = await loadOnboardingState();
+        const dbDraft = hydrateOnboardingDraft(state);
+        if (!cancelled) {
+          setDraft(dbDraft);
+          persistDraft(dbDraft);
+        }
+      } catch {
+        // DB unreachable — fall back to whatever localStorage has (may be defaults).
+        if (!cancelled) {
+          setDraft(localDraft);
+        }
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const updateDraft = useCallback(
@@ -266,9 +311,51 @@ export function useOnboardingStorage() {
     setDraft(fresh);
   }, []);
 
+  /**
+   * Pushes the given step's section to the DB via its persist helper.
+   * Caller (the wizard) is expected to await this BEFORE advancing the
+   * step so failures keep the user on the page they need to retry.
+   */
+  const commitStep = useCallback(
+    async (step: number): Promise<void> => {
+      setSyncing(true);
+      setSyncError(null);
+      try {
+        switch (step) {
+          case 1:
+            await persistBasics(draft.basics);
+            break;
+          case 2:
+            await persistAthletic(draft.athletic);
+            break;
+          case 3:
+            await persistAcademic(draft.academic);
+            break;
+          case 4:
+            await persistCompliance(draft.compliance);
+            break;
+          case 5:
+            await persistProfileSection(draft.profile);
+            break;
+          default:
+            break;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Could not save this step';
+        setSyncError(msg);
+        throw err;
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [draft]
+  );
+
   return {
     draft,
     hydrated,
+    syncing,
+    syncError,
     updateDraft,
     updateBasics,
     updateAthletic,
@@ -276,5 +363,6 @@ export function useOnboardingStorage() {
     updateCompliance,
     updateProfile,
     resetDraft,
+    commitStep,
   } as const;
 }

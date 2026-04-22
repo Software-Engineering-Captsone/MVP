@@ -1,4 +1,4 @@
-import type { StoredApplication, StoredCampaign } from './localCampaignStore';
+import type { StoredApplication, StoredCampaign } from './repository';
 
 function idOf(row: { _id?: unknown }): string {
   return row._id != null ? String(row._id) : '';

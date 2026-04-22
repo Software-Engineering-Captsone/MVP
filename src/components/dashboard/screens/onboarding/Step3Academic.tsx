@@ -19,7 +19,12 @@ const labelClass =
   'mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400';
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Graduate / 5th Year'] as const;
-const ELIGIBILITY = ['1 year', '2 years', '3 years', '4 years'] as const;
+const ELIGIBILITY: { value: string; label: string }[] = [
+  { value: '1', label: '1 year' },
+  { value: '2', label: '2 years' },
+  { value: '3', label: '3 years' },
+  { value: '4', label: '4 years' },
+];
 
 interface Step3Props {
   data: OnboardingAcademic;
@@ -276,19 +281,19 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
         <label className={labelClass}>Remaining Eligibility</label>
         <div className="flex flex-wrap gap-2">
           {ELIGIBILITY.map((opt) => {
-            const active = data.eligibilityYears === opt;
+            const active = data.eligibilityYears === opt.value;
             return (
               <button
-                key={opt}
+                key={opt.value}
                 type="button"
-                onClick={() => onChange({ eligibilityYears: opt })}
+                onClick={() => onChange({ eligibilityYears: opt.value })}
                 className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
                   active
                     ? 'border-nilink-accent bg-nilink-accent text-white shadow-sm'
                     : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                {opt}
+                {opt.label}
               </button>
             );
           })}
