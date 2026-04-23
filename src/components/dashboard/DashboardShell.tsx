@@ -13,6 +13,7 @@ import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
 import { pageTransition } from '@/components/dashboard/dashboardMotion';
 import { createClient } from '@/lib/supabase/client';
 import { userAvatarDataUrl } from '@/lib/userAvatar';
+import { resolveSupabaseRole } from '@/lib/auth/supabaseRole';
 
 export type AccountType = 'athlete' | 'business';
 
@@ -81,9 +82,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     id: string;
     email?: string;
     user_metadata?: Record<string, unknown>;
+    app_metadata?: Record<string, unknown>;
   }): DashboardUser => {
     const meta = supaUser.user_metadata ?? {};
-    const role = meta.role === 'brand' ? 'brand' : 'athlete';
+    const role = resolveSupabaseRole({
+      userMetadata: supaUser.user_metadata,
+      appMetadata: supaUser.app_metadata,
+    });
     const name = (meta.full_name as string)
       || (meta.name as string)
       || supaUser.email?.split('@')[0]

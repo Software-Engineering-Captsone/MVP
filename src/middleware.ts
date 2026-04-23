@@ -12,7 +12,9 @@ export function middleware(request: NextRequest) {
   const forceAuthView = searchParams.get('force') === '1';
   const isSignedIn = hasSupabaseAuthCookie(request);
 
-  if (!isSignedIn && pathname.startsWith('/dashboard')) {
+  const isProtected =
+    pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding');
+  if (!isSignedIn && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth';
     url.search = '?mode=signin';
