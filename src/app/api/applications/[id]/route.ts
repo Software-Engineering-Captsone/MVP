@@ -6,6 +6,11 @@ import {
   updateApplicationStatus,
 } from '@/lib/campaigns/repository';
 import { applicationToJSON } from '@/lib/campaigns/serialization';
+import { createClient } from '@/lib/supabase/server';
+import {
+  ensureApplicationCampaignThread,
+  insertApplicationApprovedNoticeOnce,
+} from '@/lib/chat/service';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -42,6 +47,30 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (!updated) {
       return NextResponse.json({ error: 'Not found or forbidden' }, { status: 404 });
     }
+
+    // On approval, spin up (or return) the application-linked chat thread
+    // and drop a one-time system notice. Chat failure must not fail approval.
+    if (status === 'approved') {
+      try {
+        const campaign = await getCampaignById(String(updated.campaignId));
+        if (campaign) {
+          const supabase = await createClient();
+          // Repository types are structurally compatible with the chat
+          // helper's StoredApplication/StoredCampaign (Record<string, unknown>
+          // & { _id }); cast through unknown to bridge the nominal gap.
+          const thread = await ensureApplicationCampaignThread(
+            supabase,
+            id,
+            updated as unknown as import('@/lib/campaigns/localCampaignStore').StoredApplication,
+            campaign as unknown as import('@/lib/campaigns/localCampaignStore').StoredCampaign
+          );
+          await insertApplicationApprovedNoticeOnce(supabase, thread.id, user.userId);
+        }
+      } catch (chatErr) {
+        console.error('[approve] chat thread setup failed', chatErr);
+      }
+    }
+
     return NextResponse.json({ application: applicationToJSON(updated) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Validation failed';
