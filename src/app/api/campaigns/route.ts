@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { createCampaign, listCampaignsForBrand, listOpenCampaignsForAthlete } from '@/lib/campaigns/repository';
 import { campaignToJSON } from '@/lib/campaigns/serialization';
+import { createClient } from '@/lib/supabase/server';
+
+/**
+ * Ensure a brand_profiles row exists for this user. campaigns.brand_id has a
+ * FK to brand_profiles.brand_id; without this row the insert fails with
+ * a 23503. Brands who skipped the brand onboarding wizard still get unblocked —
+ * they can fill in details later from their profile page.
+ */
+async function ensureBrandProfile(userId: string, brandDisplayName: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('brand_profiles')
+    .upsert(
+      { brand_id: userId, company_name: brandDisplayName },
+      { onConflict: 'brand_id', ignoreDuplicates: true }
+    );
+  if (error) return error.message;
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser();
@@ -65,6 +84,22 @@ export async function POST(request: NextRequest) {
     image: typeof body.image === 'string' && body.image.trim() ? body.image.trim() : '',
     status,
   };
+
+  // Guarantee the brand_profiles row exists before inserting the campaign.
+  // Without it, the FK campaigns.brand_id → brand_profiles.brand_id fails.
+  const brandProfileErr = await ensureBrandProfile(
+    user.userId,
+    String(body.brandDisplayName ?? '')
+  );
+  if (brandProfileErr) {
+    return NextResponse.json(
+      {
+        error: `Could not initialise brand profile: ${brandProfileErr}`,
+        hint: 'Complete brand onboarding from Profile settings, then retry.',
+      },
+      { status: 400 }
+    );
+  }
 
   try {
     const row = await createCampaign(payload);
