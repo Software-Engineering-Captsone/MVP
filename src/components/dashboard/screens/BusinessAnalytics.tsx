@@ -1,29 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 
 export function BusinessAnalytics() {
   const { accountType } = useDashboard();
-  const [dateRange, setDateRange] = useState('last30');
-
-  const engagementData = [
-    { month: 'Jan', engagement: 8.5, reach: 180000 },
-    { month: 'Feb', engagement: 9.2, reach: 210000 },
-    { month: 'Mar', engagement: 8.8, reach: 195000 },
-    { month: 'Apr', engagement: 9.5, reach: 225000 },
-    { month: 'May', engagement: 10.2, reach: 250000 },
-    { month: 'Jun', engagement: 9.8, reach: 235000 },
-  ];
-
-  const campaignPerformance = [
-    { name: 'Spring Training', reach: 185000, engagement: 9.2, roi: 3.5 },
-    { name: 'Basketball Season', reach: 210000, engagement: 8.8, roi: 4.2 },
-    { name: 'Track & Field', reach: 165000, engagement: 10.1, roi: 3.8 },
-    { name: 'Summer Wellness', reach: 145000, engagement: 7.5, roi: 2.9 },
-  ];
 
   const sportDistribution = [
     { sport: 'Basketball', athletes: 8 },
@@ -34,12 +15,10 @@ export function BusinessAnalytics() {
     { sport: 'Other', athletes: 3 },
   ];
 
-  const budgetAllocation = [
-    { category: 'Content Creation', amount: 45000 },
-    { category: 'Athlete Payments', amount: 85000 },
-    { category: 'Platform Fees', amount: 12000 },
-    { category: 'Marketing', amount: 18000 },
-    { category: 'Production', amount: 25000 },
+  /** Share of partnership offers by platform (mock — wire to deals/outreach when available). */
+  const channelMix = [
+    { channel: 'Instagram', offers: 18 },
+    { channel: 'TikTok', offers: 24 },
   ];
 
   const audienceDemographics = {
@@ -50,13 +29,16 @@ export function BusinessAnalytics() {
       { age: '45+', percentage: 10 },
     ],
     gender: [
-      { name: 'Male', value: 58 },
-      { name: 'Female', value: 40 },
-      { name: 'Other', value: 2 },
+      { gender: 'Male', percentage: 58 },
+      { gender: 'Female', percentage: 40 },
+      { gender: 'Other', percentage: 2 },
     ],
   };
 
-  const COLORS = ['#2A90B0', '#6CC3DA', '#94A3B8', '#64748B', '#1C1C1E', '#267594'];
+  const sportTotal = sportDistribution.reduce((sum, s) => sum + s.athletes, 0);
+  const channelTotal = channelMix.reduce((sum, c) => sum + c.offers, 0);
+
+  const sectionDescriptionClass = 'text-sm text-gray-600 mb-4 max-w-prose leading-snug';
 
   return (
     <div className="min-h-screen bg-nilink-page">
@@ -66,19 +48,11 @@ export function BusinessAnalytics() {
             title="Analytics"
             subtitle={
               accountType === 'business'
-                ? 'Campaign reach, engagement, and partnership performance'
-                : 'Reach, engagement, and growth across your channels'
+                ? 'Campaign and partnership performance'
+                : 'Growth and performance across your channels'
             }
             className="mb-6"
           />
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-bold">Date Range</label>
-              <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-nilink-accent text-gray-900">
-                <option value="last7">Last 7 Days</option><option value="last30">Last 30 Days</option><option value="last90">Last 90 Days</option><option value="last6months">Last 6 Months</option>
-              </select>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -104,131 +78,102 @@ export function BusinessAnalytics() {
             ))}
           </div>
 
-          {/* Charts Row 1 */}
+          {/* Sport distribution & channel mix */}
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ENGAGEMENT TRENDS</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={engagementData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" stroke="#6B7280" />
-                  <YAxis stroke="#6B7280" />
-                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '8px' }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="engagement" stroke="#2A90B0" strokeWidth={3} name="Engagement Rate %" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>REACH OVER TIME</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={engagementData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="month" stroke="#6B7280" />
-                  <YAxis stroke="#6B7280" />
-                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '8px' }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="reach" stroke="#34D399" strokeWidth={3} name="Total Reach" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Campaign Performance */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>CAMPAIGN PERFORMANCE COMPARISON</h3>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={campaignPerformance}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="name" stroke="#6B7280" />
-                <YAxis yAxisId="left" stroke="#6B7280" />
-                <YAxis yAxisId="right" orientation="right" stroke="#6B7280" />
-                <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '8px' }} />
-                <Legend />
-                <Bar yAxisId="left" dataKey="reach" fill="#2A90B0" name="Reach" />
-                <Bar yAxisId="left" dataKey="engagement" fill="#34D399" name="Engagement %" />
-                <Bar yAxisId="right" dataKey="roi" fill="#FBBF24" name="ROI" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Sport Distribution & Budget */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ATHLETES BY SPORT</h3>
-              <div className="flex items-center">
-                <ResponsiveContainer width="50%" height={250}>
-                  <PieChart>
-                    <Pie data={sportDistribution} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="athletes">
-                      {sportDistribution.map((_, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex-1 space-y-2">
-                  {sportDistribution.map((item, index) => (
-                    <div key={item.sport} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="text-sm text-black">{item.sport}</span>
-                      </div>
+              <h3 className="text-2xl mb-2 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>ATHLETES BY SPORT</h3>
+              <p className={sectionDescriptionClass}>
+                Shows how many athletes you partner with in each sport so you can see where your roster is concentrated.
+              </p>
+              <div className="space-y-3">
+                {sportDistribution.map((item) => (
+                  <div key={item.sport}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-black">{item.sport}</span>
                       <span className="text-sm font-bold text-black">{item.athletes}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full bg-nilink-accent"
+                        style={{ width: `${sportTotal > 0 ? (item.athletes / sportTotal) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>BUDGET ALLOCATION</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={budgetAllocation} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis type="number" stroke="#6B7280" />
-                  <YAxis dataKey="category" type="category" stroke="#6B7280" width={120} />
-                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #E5E7EB', borderRadius: '8px' }} formatter={(value) => `$${Number(value).toLocaleString()}`} />
-                  <Bar dataKey="amount" fill="#2A90B0" />
-                </BarChart>
-              </ResponsiveContainer>
+              <h3 className="text-2xl mb-2 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>CHANNEL MIX</h3>
+              <p className={sectionDescriptionClass}>
+                Shows which social platforms your collaboration offers emphasize most relative to the rest.
+              </p>
+              <div className="space-y-3">
+                {channelMix.map((item) => (
+                  <div key={item.channel}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-black">{item.channel}</span>
+                      <span className="text-sm font-bold text-black">{item.offers}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full bg-nilink-accent"
+                        style={{ width: `${channelTotal > 0 ? (item.offers / channelTotal) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Demographics */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-2xl mb-6 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>AUDIENCE DEMOGRAPHICS</h3>
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <h4 className="text-lg font-bold text-black mb-4">Age Distribution</h4>
-                <div className="space-y-3">
-                  {audienceDemographics.ageGroups.map(group => (
-                    <div key={group.age}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-black">{group.age}</span>
-                        <span className="text-sm font-bold text-black">{group.percentage}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="h-2 rounded-full bg-nilink-accent" style={{ width: `${group.percentage}%` }}></div>
-                      </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+              <h3 className="text-2xl mb-2 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>AGE DISTRIBUTION</h3>
+              <p className={sectionDescriptionClass}>
+                Breaks down the age bands of the audience your campaigns reach so you can see who you are hitting.
+              </p>
+              <div className="space-y-3">
+                {audienceDemographics.ageGroups.map(group => (
+                  <div key={group.age}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-black">{group.age}</span>
+                      <span className="text-sm font-bold text-black">{group.percentage}%</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="h-2 rounded-full bg-nilink-accent" style={{ width: `${group.percentage}%` }}></div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div>
-                <h4 className="text-lg font-bold text-black mb-4">Gender Distribution</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={audienceDemographics.gender} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value}%`} outerRadius={80} fill="#8884d8" dataKey="value">
-                      {audienceDemographics.gender.map((_, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+              <h3 className="text-2xl mb-2 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>GENDER DISTRIBUTION</h3>
+              <p className={sectionDescriptionClass}>
+                Summarizes how your reached audience splits across gender so you can spot skew at a glance.
+              </p>
+              <div className="space-y-3">
+                {audienceDemographics.gender.map((group) => (
+                  <div key={group.gender}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-black">{group.gender}</span>
+                      <span className="text-sm font-bold text-black">{group.percentage}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="h-2 rounded-full bg-nilink-accent" style={{ width: `${group.percentage}%` }}></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
           {/* Top Athletes Table */}
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-2xl mb-4 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>TOP PERFORMING ATHLETES</h3>
+            <h3 className="text-2xl mb-2 tracking-wide text-black" style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700 }}>TOP PERFORMING ATHLETES</h3>
+            <p className={sectionDescriptionClass}>
+              Surfaces the athletes driving the strongest reach, engagement, and ROI so you can compare leaders quickly.
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="border-b border-gray-200">

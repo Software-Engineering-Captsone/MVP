@@ -38,21 +38,10 @@ export function Step1Basics({ data, sessionName, sessionEmail, onChange, onNext 
       transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
       className="space-y-6"
     >
-      {/* Header */}
-      <div className="mb-2">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
-          <User className="h-6 w-6" strokeWidth={2} />
-        </div>
-        <h2
-          className="text-2xl tracking-wide text-nilink-ink"
-          style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-        >
-          THE BASICS
-        </h2>
-        <p className="mt-1 text-sm font-medium text-gray-500">
-          Let&apos;s start with who you are. This info helps brands find and reach you.
-        </p>
-      </div>
+      {/* Helper text */}
+      <p className="text-sm leading-relaxed text-gray-500">
+        Let&apos;s start with who you are. This info helps brands find and reach you.
+      </p>
 
       {/* Full name — locked from signup */}
       <div>
@@ -184,7 +173,7 @@ export function Step1Basics({ data, sessionName, sessionEmail, onChange, onNext 
           type="button"
           disabled={!filled}
           onClick={onNext}
-          className="inline-flex items-center gap-2 rounded-xl bg-nilink-accent px-8 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-2xl bg-nilink-accent px-8 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           whileHover={filled ? { scale: 1.02 } : {}}
           whileTap={filled ? { scale: 0.98 } : {}}
         >

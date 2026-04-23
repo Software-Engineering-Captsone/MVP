@@ -35,21 +35,10 @@ export function Step3Compliance({ data, onChange, onNext, onBack }: Step3Props) 
       transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
       className="space-y-6"
     >
-      {/* Header */}
-      <div className="mb-2">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
-          <ShieldCheck className="h-6 w-6" strokeWidth={2} />
-        </div>
-        <h2
-          className="text-2xl tracking-wide text-nilink-ink"
-          style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-        >
-          VERIFICATION & COMPLIANCE
-        </h2>
-        <p className="mt-1 text-sm font-medium text-gray-500">
-          Verify your student-athlete status to unlock full platform features and brand trust.
-        </p>
-      </div>
+      {/* Helper text */}
+      <p className="text-sm leading-relaxed text-gray-500">
+        Verify your student-athlete status to unlock full platform features and brand trust.
+      </p>
 
       {/* School Email Verification */}
       <div className="rounded-2xl border border-gray-100 bg-white p-5">
@@ -179,7 +168,7 @@ export function Step3Compliance({ data, onChange, onNext, onBack }: Step3Props) 
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
+          className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-6 py-3.5 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -188,7 +177,7 @@ export function Step3Compliance({ data, onChange, onNext, onBack }: Step3Props) 
           type="button"
           disabled={!filled}
           onClick={onNext}
-          className="inline-flex items-center gap-2 rounded-xl bg-nilink-accent px-8 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-2xl bg-nilink-accent px-8 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           whileHover={filled ? { scale: 1.02 } : {}}
           whileTap={filled ? { scale: 0.98 } : {}}
         >

@@ -1,14 +1,60 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Plus, Search, Eye, ChevronRight, Megaphone } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { Plus, Search, Eye, ChevronRight, Megaphone, Trash2 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
-import { CreateCampaignOverlay, type CreateCampaignPayload } from './CreateCampaignOverlay';
+import {
+  CreateCampaignOverlay,
+  type DraftResumeSession,
+  type SubmitCampaignArgs,
+} from './CreateCampaignOverlay';
 import { CampaignDetail } from './CampaignDetail';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
-import { apiCampaignToUi, type ApiApplicationRow, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
+import {
+  CampaignPublishRejectedError,
+  type CampaignPublishValidationIssue,
+  type CampaignPublishValidationResult,
+} from '@/lib/campaigns/publishValidation';
+import {
+  apiCampaignRowToDraftOverlayPrefill,
+  apiCampaignToUi,
+  normalizeUiCampaignStatus,
+  type ApiApplicationRow,
+  type ApiCampaignRow,
+} from '@/lib/campaigns/clientMap';
 import type { Campaign, CampaignStatus, ContractedAthlete } from '@/components/dashboard/screens/campaignDashboardTypes';
+
+const WIZARD_SESSION_KEY = 'nilink:dashboard-campaign-create-session';
+
+type WizardSessionPayloadV1 = {
+  v: 1;
+  open: true;
+  step: number;
+  draftCampaignId: string | null;
+};
+
+function clampWizardSessionStep(step: number): number {
+  return Math.min(6, Math.max(1, Math.round(step)));
+}
+
+function parseWizardSession(raw: string | null): WizardSessionPayloadV1 | null {
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw) as Partial<WizardSessionPayloadV1>;
+    if (o?.v !== 1 || o.open !== true) return null;
+    const step = typeof o.step === 'number' && Number.isFinite(o.step) ? clampWizardSessionStep(o.step) : 1;
+    const draftCampaignId =
+      o.draftCampaignId === null || o.draftCampaignId === undefined
+        ? null
+        : typeof o.draftCampaignId === 'string'
+          ? o.draftCampaignId
+          : null;
+    return { v: 1, open: true, step, draftCampaignId };
+  } catch {
+    return null;
+  }
+}
 
 export type {
   ActivityItem,
@@ -20,15 +66,14 @@ export type {
   Deliverable,
 } from '@/components/dashboard/screens/campaignDashboardTypes';
 
-/* ── Status Badge ───────────────────────────────────────────── */
+/* ── Status Badge (aligned with dashboard stat card palette) ── */
 const statusStyles: Record<CampaignStatus, string> = {
-  'Draft': 'bg-gray-100 text-gray-500 border-gray-200',
+  Draft: 'bg-gray-100 text-gray-500 border-gray-200',
   'Ready to Launch': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
-  'Open for Applications': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
-  'Reviewing Candidates': 'bg-amber-50 text-amber-700 border-amber-200',
-  'Deal Creation in Progress': 'bg-gray-100 text-nilink-ink border-gray-300',
-  'Active': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'Completed': 'bg-gray-100 text-gray-600 border-gray-300',
+  'Reviewing Candidates': 'bg-red-50 text-red-700 border-red-200',
+  'Deal Creation in Progress': 'bg-red-50 text-red-800 border-red-200',
+  Active: 'bg-amber-50 text-amber-700 border-amber-200',
+  Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 function StatusBadge({ status }: { status: CampaignStatus }) {
@@ -71,12 +116,34 @@ function AvatarGroup({ athletes, count }: { athletes: ContractedAthlete[]; count
 export function BusinessCampaigns() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [showCreateOverlay, setShowCreateOverlay] = useState(false);
+  const [draftResumeSession, setDraftResumeSession] = useState<DraftResumeSession | null>(null);
+  const [wizardInstanceKey, setWizardInstanceKey] = useState(0);
+  const [wizardInitialStep, setWizardInitialStep] = useState(1);
+  const [wizardPersistedStep, setWizardPersistedStep] = useState(1);
+  const [wizardPersistedDraftId, setWizardPersistedDraftId] = useState<string | null>(null);
+  /** Bumps when the user starts a wizard intentionally, so stale session-restore async cannot overwrite it. */
+  const wizardRestoreGenerationRef = useRef(0);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [listLoading, setListLoading] = useState(true);
   const [brandDisplayName, setBrandDisplayName] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
+  type CampaignListFilter = 'All' | 'Drafts' | 'Reviewing' | 'Active' | 'Completed';
+  const [activeFilter, setActiveFilter] = useState<CampaignListFilter>('All');
   const [searchQuery, setSearchQuery] = useState('');
+
+  /**
+   * If the user navigates away from Campaigns mid-wizard, we don't want to force-open
+   * the create overlay when they come back. Drafts are still accessible from the table.
+   */
+  useEffect(() => {
+    return () => {
+      try {
+        sessionStorage.removeItem(WIZARD_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
 
   const loadCampaignList = useCallback(async () => {
     setListLoading(true);
@@ -103,6 +170,99 @@ export function BusinessCampaigns() {
     void loadCampaignList();
   }, [loadCampaignList]);
 
+  /** Restore create wizard from sessionStorage when returning to this page with an open session. */
+  useEffect(() => {
+    let cancelled = false;
+    const generationAtRestoreStart = wizardRestoreGenerationRef.current;
+    try {
+      const parsed = parseWizardSession(sessionStorage.getItem(WIZARD_SESSION_KEY));
+      if (!parsed) return;
+
+      const step = clampWizardSessionStep(parsed.step);
+
+      const finishOpen = (session: DraftResumeSession | null, errorMsg?: string) => {
+        if (cancelled || wizardRestoreGenerationRef.current !== generationAtRestoreStart) return;
+        if (errorMsg) {
+          setListError(errorMsg);
+        }
+        setDraftResumeSession(session);
+        setWizardInitialStep(step);
+        setWizardPersistedStep(step);
+        setWizardPersistedDraftId(session?.campaignId ?? null);
+        setWizardInstanceKey((k) => k + 1);
+        setShowCreateOverlay(true);
+      };
+
+      if (parsed.draftCampaignId) {
+        void (async () => {
+          try {
+            const res = await authFetch(`/api/campaigns/${parsed.draftCampaignId}`);
+            const data = (await res.json()) as {
+              campaign?: ApiCampaignRow;
+              error?: string;
+            };
+            if (cancelled) return;
+            if (!res.ok || !data.campaign) {
+              finishOpen(
+                null,
+                data.error ||
+                  'Could not restore your draft. You can start a new campaign or open a draft from the list.'
+              );
+              return;
+            }
+            const apiRow = data.campaign;
+            const remoteStatus = normalizeUiCampaignStatus(apiRow.status);
+            if (remoteStatus !== 'Draft') {
+              finishOpen(
+                null,
+                'Saved session pointed to a campaign that is no longer a draft. Open it from the list if you need to continue.'
+              );
+              await loadCampaignList();
+              return;
+            }
+            finishOpen({
+              campaignId: apiRow.id,
+              prefill: apiCampaignRowToDraftOverlayPrefill(apiRow),
+            });
+          } catch {
+            if (!cancelled) {
+              finishOpen(
+                null,
+                'Could not restore your draft. You can start a new campaign or open a draft from the list.'
+              );
+            }
+          }
+        })();
+      } else {
+        finishOpen(null);
+      }
+    } catch {
+      try {
+        sessionStorage.removeItem(WIZARD_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [loadCampaignList]);
+
+  useEffect(() => {
+    if (!showCreateOverlay) return;
+    try {
+      const payload: WizardSessionPayloadV1 = {
+        v: 1,
+        open: true,
+        step: clampWizardSessionStep(wizardPersistedStep),
+        draftCampaignId: wizardPersistedDraftId ?? draftResumeSession?.campaignId ?? null,
+      };
+      sessionStorage.setItem(WIZARD_SESSION_KEY, JSON.stringify(payload));
+    } catch {
+      /* ignore */
+    }
+  }, [showCreateOverlay, wizardPersistedStep, wizardPersistedDraftId, draftResumeSession?.campaignId]);
+
   useEffect(() => {
     void (async () => {
       try {
@@ -115,6 +275,117 @@ export function BusinessCampaigns() {
       }
     })();
   }, []);
+
+  const closeCreateWizard = useCallback(() => {
+    setShowCreateOverlay(false);
+    setDraftResumeSession(null);
+    try {
+      sessionStorage.removeItem(WIZARD_SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
+    setWizardPersistedDraftId(null);
+    setWizardPersistedStep(1);
+    setWizardInitialStep(1);
+  }, []);
+
+  const handleWizardStepPersist = useCallback((s: number) => {
+    setWizardPersistedStep(clampWizardSessionStep(s));
+  }, []);
+
+  const handleWizardPersistedIdChange = useCallback((id: string | null) => {
+    setWizardPersistedDraftId(id);
+  }, []);
+
+  const openDraftInWizard = useCallback(async (row: Campaign) => {
+    wizardRestoreGenerationRef.current += 1;
+    if (row.status !== 'Draft') {
+      setListError('Only draft campaigns can be opened in the campaign editor.');
+      return;
+    }
+    setListError(null);
+    try {
+      const res = await authFetch(`/api/campaigns/${row.id}`);
+      const data = (await res.json()) as {
+        campaign?: ApiCampaignRow;
+        error?: string;
+      };
+      if (!res.ok || !data.campaign) {
+        setListError(data.error || 'Could not load campaign');
+        return;
+      }
+      const apiRow = data.campaign;
+      const remoteStatus = normalizeUiCampaignStatus(apiRow.status);
+      if (remoteStatus !== 'Draft') {
+        setListError(
+          'This campaign is no longer a draft. Use the row to open details, or refresh the list.'
+        );
+        await loadCampaignList();
+        return;
+      }
+      setDraftResumeSession({
+        campaignId: apiRow.id,
+        prefill: apiCampaignRowToDraftOverlayPrefill(apiRow),
+      });
+      setWizardInitialStep(1);
+      setWizardPersistedStep(1);
+      setWizardPersistedDraftId(apiRow.id);
+      setWizardInstanceKey((k) => k + 1);
+      setShowCreateOverlay(true);
+    } catch {
+      setListError('Network error');
+    }
+  }, [loadCampaignList]);
+
+  const openEditDraft = useCallback(
+    async (e: MouseEvent, row: Campaign) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await openDraftInWizard(row);
+    },
+    [openDraftInWizard]
+  );
+
+  const discardPersistedDraftById = useCallback(
+    async (campaignId: string) => {
+      let res: Response;
+      try {
+        res = await authFetch(`/api/campaigns/${campaignId}`, {
+          method: 'DELETE',
+        });
+      } catch {
+        setListError('Network error');
+        throw new Error('Network error');
+      }
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        const msg = data.error || 'Could not discard draft';
+        setListError(msg);
+        throw new Error(msg);
+      }
+      await loadCampaignList();
+    },
+    [loadCampaignList]
+  );
+
+  const handleDiscardDraft = useCallback(
+    async (e: MouseEvent, row: Campaign) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (row.status !== 'Draft') return;
+      const ok = window.confirm(`Discard draft "${row.name}"? This cannot be undone.`);
+      if (!ok) return;
+      try {
+        await discardPersistedDraftById(row.id);
+        if (draftResumeSession?.campaignId === row.id) {
+          closeCreateWizard();
+        }
+      } catch {
+        /* listError set in discardPersistedDraftById */
+      }
+    },
+    [closeCreateWizard, discardPersistedDraftById, draftResumeSession?.campaignId]
+  );
 
   const openCampaignDetail = useCallback(
     async (row: Campaign) => {
@@ -144,56 +415,198 @@ export function BusinessCampaigns() {
     await openCampaignDetail(selectedCampaign);
   }, [openCampaignDetail, selectedCampaign]);
 
-  const handleLaunchCampaign = async (payload: CreateCampaignPayload) => {
+  const handleSubmitCampaign = async ({
+    body,
+    intent,
+    campaignId,
+    quiet,
+  }: SubmitCampaignArgs): Promise<{ campaignId: string }> => {
+    const jsonBody = {
+      ...body,
+      intent,
+      brandDisplayName: brandDisplayName || undefined,
+    };
     try {
+      if (campaignId) {
+        const res = await authFetch(`/api/campaigns/${campaignId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(jsonBody),
+        });
+        const data = (await res.json()) as {
+          campaign?: { id: string };
+          error?: string;
+          details?: {
+            blockingIssues?: CampaignPublishValidationIssue[];
+            warningIssues?: CampaignPublishValidationIssue[];
+            completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
+          };
+          blockingIssues?: CampaignPublishValidationIssue[];
+          warningIssues?: CampaignPublishValidationIssue[];
+          completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
+        };
+        if (!res.ok) {
+          const blockingIssues =
+            data.details?.blockingIssues ?? data.blockingIssues;
+          if (Array.isArray(blockingIssues) && blockingIssues.length > 0) {
+            throw new CampaignPublishRejectedError({
+              blockingIssues,
+              warningIssues: Array.isArray(data.details?.warningIssues)
+                ? data.details.warningIssues
+                : Array.isArray(data.warningIssues)
+                  ? data.warningIssues
+                  : [],
+              completenessBySection:
+                data.details?.completenessBySection ?? data.completenessBySection ?? {},
+            });
+          }
+          throw new Error(data.error || 'Could not update campaign');
+        }
+        const id = data.campaign?.id;
+        if (!id) {
+          throw new Error('Missing campaign id');
+        }
+        await loadCampaignList();
+        return { campaignId: id };
+      }
+
       const res = await authFetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          brandDisplayName: brandDisplayName || undefined,
-        }),
+        body: JSON.stringify(jsonBody),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as {
+        campaign?: { id: string };
+        error?: string;
+        details?: {
+          blockingIssues?: CampaignPublishValidationIssue[];
+          warningIssues?: CampaignPublishValidationIssue[];
+          completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
+        };
+        blockingIssues?: CampaignPublishValidationIssue[];
+        warningIssues?: CampaignPublishValidationIssue[];
+        completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
+      };
       if (!res.ok) {
-        setListError(data.error || 'Could not create campaign');
-        return;
+        const blockingIssues = data.details?.blockingIssues ?? data.blockingIssues;
+        if (Array.isArray(blockingIssues) && blockingIssues.length > 0) {
+          throw new CampaignPublishRejectedError({
+            blockingIssues,
+            warningIssues: Array.isArray(data.details?.warningIssues)
+              ? data.details.warningIssues
+              : Array.isArray(data.warningIssues)
+                ? data.warningIssues
+                : [],
+            completenessBySection:
+              data.details?.completenessBySection ?? data.completenessBySection ?? {},
+          });
+        }
+        throw new Error(data.error || 'Could not create campaign');
       }
-      setShowCreateOverlay(false);
+      const id = data.campaign?.id;
+      if (!id) {
+        throw new Error('Missing campaign id');
+      }
       await loadCampaignList();
-    } catch {
-      setListError('Network error');
+      return { campaignId: id };
+    } catch (e) {
+      if (!quiet) {
+        const msg = e instanceof Error ? e.message : 'Network error';
+        setListError(msg);
+      }
+      throw e;
     }
   };
 
   const handlePatchApplication = async (
     applicationId: string,
-    status: 'shortlisted' | 'approved' | 'declined'
+    status: 'under_review' | 'shortlisted' | 'rejected'
   ) => {
     const res = await authFetch(`/api/applications/${applicationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
+    const data = (await res.json()) as {
+      error?: string;
+      warnings?: { code?: string; message: string }[];
+    };
+    if (!res.ok) {
+      setListError(data.error || 'Update failed');
+      return undefined;
+    }
+    await refreshSelectedCampaign();
+    await loadCampaignList();
+    return { warnings: data.warnings };
+  };
+
+  const handlePatchCampaignStatus = async (campaignId: string, status: CampaignStatus) => {
+    const res = await authFetch(`/api/campaigns/${campaignId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
     if (!res.ok) {
       const data = (await res.json()) as { error?: string };
-      setListError(data.error || 'Update failed');
+      setListError(data.error || 'Could not update campaign status');
       return;
     }
     await refreshSelectedCampaign();
     await loadCampaignList();
   };
 
+  /** Offer handoff (POST /api/campaigns/[id]/offers) then advance campaign to deal creation. */
+  const handleSendSelectedToDeals = async (campaignId: string, applicationIds: string[]) => {
+    setListError(null);
+    const offerRes = await authFetch(`/api/campaigns/${campaignId}/offers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicationIds }),
+    });
+    const offerData = (await offerRes.json()) as {
+      error?: string;
+      details?: { applicationId: string; reason: string }[];
+    };
+    if (!offerRes.ok) {
+      const detailMsg =
+        offerData.details?.length ?
+          ` — ${offerData.details.map((d) => `${d.applicationId}: ${d.reason}`).join('; ')}`
+        : '';
+      setListError((offerData.error || 'Offer handoff failed') + detailMsg);
+      throw new Error(offerData.error || 'Offer handoff failed');
+    }
+    const patchRes = await authFetch(`/api/campaigns/${campaignId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Deal Creation in Progress' as CampaignStatus }),
+    });
+    const patchData = (await patchRes.json()) as { error?: string };
+    if (!patchRes.ok) {
+      setListError(patchData.error || 'Could not update campaign status');
+      throw new Error(patchData.error || 'Could not update campaign status');
+    }
+    await refreshSelectedCampaign();
+    await loadCampaignList();
+  };
+
   // Stats
-  const activeCampaigns = campaigns.filter((c) => c.status === 'Active');
-  const openCampaigns = campaigns.filter((c) => c.status === 'Open for Applications');
+  const draftCampaigns = campaigns.filter((c) => c.status === 'Draft');
   const reviewingCampaigns = campaigns.filter(
     (c) => c.status === 'Reviewing Candidates' || c.status === 'Deal Creation in Progress'
   );
+  const activeCampaigns = campaigns.filter((c) => c.status === 'Active');
   const completedCampaigns = campaigns.filter((c) => c.status === 'Completed');
 
-  // Filters
+  // Filters (order matches stat cards; "All" stays first in the chip row)
   const filteredCampaigns = campaigns.filter((c) => {
+    if (activeFilter === 'Drafts' && c.status !== 'Draft') return false;
+    if (
+      activeFilter === 'Reviewing' &&
+      c.status !== 'Reviewing Candidates' &&
+      c.status !== 'Deal Creation in Progress'
+    ) {
+      return false;
+    }
     if (activeFilter === 'Active' && c.status !== 'Active') return false;
     if (activeFilter === 'Completed' && c.status !== 'Completed') return false;
     if (searchQuery && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -204,17 +617,33 @@ export function BusinessCampaigns() {
     <>
       {/* ── Campaigns Home (list view) ── */}
       {!selectedCampaign && (
-        <div className="h-full flex flex-col bg-white overflow-hidden text-nilink-ink">
-        {/* ── Title + Stats ── */}
-        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 py-6">
-          <DashboardPageHeader
-            title="Campaigns"
-            subtitle="Create, manage, and track NIL campaigns (saved to server file data/local-campaign-store.json)"
-            className="mb-6"
-          />
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-nilink-ink">
+        {/* ── Title (+ stats) in list mode; create wizard keeps only compact errors for vertical space ── */}
+        <div
+          className={
+            showCreateOverlay
+              ? listError
+                ? 'dash-main-gutter-x shrink-0 border-b border-gray-100 py-2'
+                : 'hidden'
+              : 'dash-main-gutter-x shrink-0 border-b border-gray-100 py-6'
+          }
+        >
+          {!showCreateOverlay && (
+            <DashboardPageHeader
+              title="Campaigns"
+              subtitle="Create, manage, and track NIL campaigns"
+              className="mb-6"
+            />
+          )}
 
           {listError && (
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div
+              className={
+                showCreateOverlay
+                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900'
+                  : 'mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'
+              }
+            >
               {listError}
               <button
                 type="button"
@@ -229,26 +658,28 @@ export function BusinessCampaigns() {
             </div>
           )}
 
+          {!showCreateOverlay && (
+          <>
           {/* Stats — light tint matched to value color */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
               {
-                label: 'Active',
-                value: activeCampaigns.length,
-                valueClass: 'text-emerald-700',
-                cardClass: 'border-emerald-200/80 bg-emerald-50/90',
-                labelClass: 'text-emerald-700/70',
-              },
-              {
-                label: 'Open for Apps',
-                value: openCampaigns.length,
-                valueClass: 'text-nilink-accent',
-                cardClass: 'border-nilink-accent-border bg-nilink-accent-soft',
-                labelClass: 'text-nilink-accent/80',
+                label: 'Drafts',
+                value: draftCampaigns.length,
+                valueClass: 'text-gray-600',
+                cardClass: 'border-gray-200 bg-gray-100/80',
+                labelClass: 'text-gray-500',
               },
               {
                 label: 'Reviewing',
                 value: reviewingCampaigns.length,
+                valueClass: 'text-red-700',
+                cardClass: 'border-red-200/80 bg-red-50/90',
+                labelClass: 'text-red-800/70',
+              },
+              {
+                label: 'Active',
+                value: activeCampaigns.length,
                 valueClass: 'text-amber-700',
                 cardClass: 'border-amber-200/80 bg-amber-50/90',
                 labelClass: 'text-amber-800/70',
@@ -256,9 +687,9 @@ export function BusinessCampaigns() {
               {
                 label: 'Completed',
                 value: completedCampaigns.length,
-                valueClass: 'text-gray-600',
-                cardClass: 'border-gray-200 bg-gray-100/80',
-                labelClass: 'text-gray-500',
+                valueClass: 'text-emerald-700',
+                cardClass: 'border-emerald-200/80 bg-emerald-50/90',
+                labelClass: 'text-emerald-700/70',
               },
             ].map((stat) => (
               <div
@@ -274,8 +705,12 @@ export function BusinessCampaigns() {
               </div>
             ))}
           </div>
+          </>
+          )}
         </div>
 
+        {!showCreateOverlay ? (
+        <>
         {/* ── Search + filter chips + primary CTA ── */}
         <div className="dash-main-gutter-x flex shrink-0 flex-col gap-3 border-b border-gray-100 py-4 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative w-full min-w-0 sm:max-w-xs sm:flex-1 sm:flex-none md:max-w-sm">
@@ -290,7 +725,7 @@ export function BusinessCampaigns() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
-            {(['All', 'Active', 'Completed'] as const).map((tab) => {
+            {(['All', 'Drafts', 'Reviewing', 'Active', 'Completed'] as const).map((tab) => {
               const on = activeFilter === tab;
               return (
                 <button
@@ -313,7 +748,15 @@ export function BusinessCampaigns() {
 
           <button
             type="button"
-            onClick={() => setShowCreateOverlay(true)}
+            onClick={() => {
+              wizardRestoreGenerationRef.current += 1;
+              setDraftResumeSession(null);
+              setWizardInitialStep(1);
+              setWizardPersistedStep(1);
+              setWizardPersistedDraftId(null);
+              setWizardInstanceKey((k) => k + 1);
+              setShowCreateOverlay(true);
+            }}
             className="focus-nilink inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-nilink-accent px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-nilink-accent-hover sm:ml-auto sm:w-auto"
           >
             <Plus className="h-4 w-4 shrink-0" strokeWidth={2.25} />
@@ -338,7 +781,13 @@ export function BusinessCampaigns() {
               {filteredCampaigns.map((campaign) => (
                 <tr
                   key={campaign.id}
-                  onClick={() => void openCampaignDetail(campaign)}
+                  onClick={() => {
+                    if (campaign.status === 'Draft') {
+                      void openDraftInWizard(campaign);
+                      return;
+                    }
+                    void openCampaignDetail(campaign);
+                  }}
                   className="group hover:bg-gray-50 border-b border-gray-50 last:border-0 cursor-pointer transition-colors"
                 >
                   <td className="px-5 py-4">
@@ -363,7 +812,29 @@ export function BusinessCampaigns() {
                     <StatusBadge status={campaign.status} />
                   </td>
                   <td className="px-5 py-4">
-                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    <div className="flex items-center justify-end gap-2">
+                      {campaign.status === 'Draft' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => void openEditDraft(e, campaign)}
+                            className="shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-gray-600 transition-colors hover:border-nilink-accent-border hover:bg-nilink-accent-soft hover:text-nilink-accent"
+                          >
+                            Edit Draft
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => void handleDiscardDraft(e, campaign)}
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                            title="Discard draft"
+                            aria-label="Discard draft"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                      <ChevronRight className="w-4 h-4 shrink-0 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -384,6 +855,21 @@ export function BusinessCampaigns() {
             </div>
           )}
         </div>
+        </>
+        ) : (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-6 dash-main-gutter-x">
+          <CreateCampaignOverlay
+            key={`${wizardInstanceKey}-${draftResumeSession ? `edit-draft-${draftResumeSession.campaignId}` : 'create-campaign'}`}
+            draftResume={draftResumeSession}
+            initialStep={wizardInitialStep}
+            onWizardStepChange={handleWizardStepPersist}
+            onPersistedCampaignIdChange={handleWizardPersistedIdChange}
+            onClose={closeCreateWizard}
+            onSubmitCampaign={handleSubmitCampaign}
+            onDiscardPersistedDraft={discardPersistedDraftById}
+          />
+        </div>
+        )}
       </div>
       )}
 
@@ -396,15 +882,11 @@ export function BusinessCampaigns() {
             onBack={() => setSelectedCampaign(null)}
             brandReviewMode
             onPatchApplication={handlePatchApplication}
+            onPatchCampaignStatus={handlePatchCampaignStatus}
+            onSendSelectedToDeals={(applicationIds) =>
+              handleSendSelectedToDeals(selectedCampaign.id, applicationIds)
+            }
             onApplicationsUpdated={refreshSelectedCampaign}
-          />
-        )}
-
-        {showCreateOverlay && (
-          <CreateCampaignOverlay
-            key="create-campaign"
-            onClose={() => setShowCreateOverlay(false)}
-            onLaunch={handleLaunchCampaign}
           />
         )}
       </AnimatePresence>

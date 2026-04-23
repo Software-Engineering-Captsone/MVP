@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Megaphone, ChevronRight, X } from 'lucide-react';
+import Link from 'next/link';
+import { Megaphone, ChevronRight, MessageSquare, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
@@ -15,6 +16,7 @@ export function AthleteCampaigns() {
   const [detail, setDetail] = useState<{
     campaign: Campaign;
     myApplication: ApiApplicationRow | null;
+    applicationMessaging?: { canViewThread: boolean; canSend: boolean } | null;
   } | null>(null);
   const [applyPitch, setApplyPitch] = useState('');
   const [applySubmitting, setApplySubmitting] = useState(false);
@@ -50,6 +52,7 @@ export function AthleteCampaigns() {
       const data = (await res.json()) as {
         campaign?: ApiCampaignRow;
         myApplication?: ApiApplicationRow | null;
+        applicationMessaging?: { canViewThread: boolean; canSend: boolean } | null;
         error?: string;
       };
       if (!res.ok || !data.campaign) {
@@ -59,6 +62,7 @@ export function AthleteCampaigns() {
       setDetail({
         campaign: apiCampaignToUi(data.campaign, []),
         myApplication: data.myApplication ?? null,
+        applicationMessaging: data.applicationMessaging ?? null,
       });
       setApplyPitch('');
     } catch {
@@ -93,10 +97,24 @@ export function AthleteCampaigns() {
           athleteSnapshot,
         }),
       });
-      const data = (await res.json()) as { error?: string; application?: ApiApplicationRow };
+      const data = (await res.json()) as {
+        error?: string;
+        details?: { application?: ApiApplicationRow };
+        application?: ApiApplicationRow;
+      };
       if (!res.ok) {
-        if (res.status === 409 && data.application) {
-          setDetail({ ...detail, myApplication: data.application });
+        const existingApp = data.details?.application ?? data.application;
+        if (res.status === 409 && existingApp) {
+          const again = await authFetch(`/api/campaigns/${detail.campaign.id}`);
+          const againJson = (await again.json()) as {
+            campaign?: ApiCampaignRow;
+            applicationMessaging?: { canViewThread: boolean; canSend: boolean } | null;
+          };
+          setDetail({
+            ...detail,
+            myApplication: existingApp,
+            applicationMessaging: againJson.applicationMessaging ?? null,
+          });
           await loadList();
           return;
         }
@@ -104,7 +122,18 @@ export function AthleteCampaigns() {
         return;
       }
       if (data.application) {
-        setDetail({ ...detail, myApplication: data.application });
+        const again = await authFetch(`/api/campaigns/${detail.campaign.id}`);
+        const againJson = (await again.json()) as {
+          applicationMessaging?: { canViewThread: boolean; canSend: boolean } | null;
+        };
+        setDetail({
+          ...detail,
+          myApplication: data.application,
+          applicationMessaging: againJson.applicationMessaging ?? {
+            canViewThread: false,
+            canSend: false,
+          },
+        });
       }
       await loadList();
     } catch {
@@ -253,6 +282,21 @@ export function AthleteCampaigns() {
                     {detail.myApplication.pitch ? (
                       <p className="mt-2 text-gray-600">&ldquo;{detail.myApplication.pitch}&rdquo;</p>
                     ) : null}
+                    {detail.applicationMessaging?.canViewThread ? (
+                      <Link
+                        href={`/dashboard/messages?application=${encodeURIComponent(detail.myApplication.id)}`}
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-nilink-accent-border bg-white py-2.5 text-sm font-bold text-nilink-ink transition-colors hover:bg-gray-50"
+                        onClick={() => setDetail(null)}
+                      >
+                        <MessageSquare className="h-4 w-4" aria-hidden />
+                        Open message thread
+                      </Link>
+                    ) : (
+                      <p className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-600">
+                        Messaging opens when the brand approves your application, sends you an offer for this
+                        campaign, or messages you here first.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-6">

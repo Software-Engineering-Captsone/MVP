@@ -1,7 +1,6 @@
 export type CampaignStatus =
   | 'Draft'
   | 'Ready to Launch'
-  | 'Open for Applications'
   | 'Reviewing Candidates'
   | 'Deal Creation in Progress'
   | 'Active'
@@ -11,7 +10,12 @@ export type CandidateStatus =
   | 'Recommended'
   | 'Invited'
   | 'Applied'
+  | 'Under Review'
   | 'Shortlisted'
+  | 'Offer Sent'
+  | 'Offer Declined'
+  | 'Withdrawn'
+  | 'Rejected'
   | 'Selected'
   | 'Sent to Deals'
   | 'Contracted'
@@ -27,6 +31,8 @@ export interface Deliverable {
   status: 'Pending' | 'In Progress' | 'Submitted' | 'Approved';
 }
 
+export type ApplicationQueueSource = 'referral' | 'regular';
+
 export interface Candidate {
   id: string;
   name: string;
@@ -37,6 +43,8 @@ export interface Candidate {
   engagement: string;
   status: CandidateStatus;
   appliedDate: string;
+  /** How this row entered the campaign application queue (API `application.source`). */
+  applicationSource: ApplicationQueueSource;
 }
 
 export interface ContractedAthlete {

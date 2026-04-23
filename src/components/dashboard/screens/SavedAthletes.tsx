@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Search, Filter, Instagram, Facebook, X, Twitter } from 'lucide-react';
+import { Search, Filter, Instagram, X, Twitter } from 'lucide-react';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { useDashboard } from '../DashboardShell';
 import { Athlete, Brand } from '@/lib/mockData';
@@ -187,9 +187,15 @@ export function SavedAthletes() {
                     {brand.industry} | {brand.location}
                   </p>
                   <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                    <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {brand.stats.instagram}</span>
-                    <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {brand.stats.tiktok}</span>
-                    <span className="flex items-center gap-1"><Twitter className="w-3.5 h-3.5" /> {brand.stats.twitter}</span>
+                    <span className="flex items-center gap-1">
+                      <Instagram className="h-3.5 w-3.5 text-pink-600" /> {brand.stats.instagram}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {brand.stats.tiktok}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Twitter className="h-3.5 w-3.5 text-sky-500" /> {brand.stats.twitter}
+                    </span>
                   </div>
                 </div>
               ))
@@ -211,9 +217,12 @@ export function SavedAthletes() {
                     {athlete.sport} | {athlete.school}
                   </p>
                   <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                    <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {athlete.stats.instagram}</span>
-                    <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {athlete.stats.tiktok}</span>
-                    <span className="flex items-center gap-1"><Facebook className="w-3.5 h-3.5" /> {athlete.stats.facebook}</span>
+                    <span className="flex items-center gap-1">
+                      <Instagram className="h-3.5 w-3.5 text-pink-600" /> {athlete.stats.instagram}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {athlete.stats.tiktok}
+                    </span>
                   </div>
                 </div>
               ))
@@ -256,9 +265,15 @@ export function SavedAthletes() {
                         {selectedBrand.industry} | {selectedBrand.location}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {selectedBrand.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {selectedBrand.stats.tiktok}</span>
-                        <span className="flex items-center gap-1"><Twitter className="w-3.5 h-3.5" /> {selectedBrand.stats.twitter}</span>
+                        <span className="flex items-center gap-1">
+                          <Instagram className="h-3.5 w-3.5 text-pink-600" /> {selectedBrand.stats.instagram}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {selectedBrand.stats.tiktok}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Twitter className="h-3.5 w-3.5 text-sky-500" /> {selectedBrand.stats.twitter}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -307,9 +322,12 @@ export function SavedAthletes() {
                         {selectedAthlete.sport} | {selectedAthlete.school}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {selectedAthlete.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {selectedAthlete.stats.tiktok}</span>
-                        <span className="flex items-center gap-1"><Facebook className="w-3.5 h-3.5" /> {selectedAthlete.stats.facebook}</span>
+                        <span className="flex items-center gap-1">
+                          <Instagram className="h-3.5 w-3.5 text-pink-600" /> {selectedAthlete.stats.instagram}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {selectedAthlete.stats.tiktok}
+                        </span>
                       </div>
                     </div>
                   </div>

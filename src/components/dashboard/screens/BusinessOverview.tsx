@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   TrendingUp, Target,
   Activity, ChevronRight,
-  DollarSign, BarChart3, ArrowUpRight, Instagram, Facebook, Heart, Megaphone,
+  DollarSign, BarChart3, ArrowUpRight, Instagram, Heart, Megaphone,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
@@ -137,22 +137,13 @@ export function BusinessOverview() {
         <div>
           <motion.div
             layout
-            className="w-full bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-gray-300 transition-all duration-200 group"
-            onClick={() => router.push('/dashboard/deals')}
-            whileHover={{ scale: 1.002 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 35 }}
+            className="w-full bg-white rounded-xl border border-gray-200 p-6 outline-none"
           >
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3
-                  className="text-2xl font-black text-nilink-ink leading-none mb-1"
-                  style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-                >
-                  Deal Pipeline
-                </h3>
+                <h2 className="text-xl font-bold text-nilink-ink">Deal Pipeline</h2>
                 <p className="text-xs text-gray-500 font-medium">Track every deal from outreach to completion</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-1 transition-all" />
             </div>
 
             <div className="flex items-stretch gap-2 mb-4">
@@ -203,7 +194,7 @@ export function BusinessOverview() {
               Manage all
             </Link>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="rounded-xl border border-gray-200 bg-white px-5">
             {campaignsLoading && (
               <p className="py-6 text-center text-sm text-gray-400">Loading your campaigns…</p>
             )}
@@ -320,9 +311,12 @@ export function BusinessOverview() {
                   {athlete.sport} | {athlete.school}
                 </p>
                 <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                  <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {athlete.stats.instagram}</span>
-                  <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {athlete.stats.tiktok}</span>
-                  <span className="flex items-center gap-1"><Facebook className="w-3.5 h-3.5" /> {athlete.stats.facebook}</span>
+                  <span className="flex items-center gap-1">
+                    <Instagram className="h-3.5 w-3.5 text-pink-600" /> {athlete.stats.instagram}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {athlete.stats.tiktok}
+                  </span>
                 </div>
               </motion.div>
             ))}
