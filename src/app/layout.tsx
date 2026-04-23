@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${sora.variable} ${instrumentSerif.variable}`}>
+      <body className={`${sora.variable} ${instrumentSerif.variable}`} suppressHydrationWarning>
         {children}
       </body>
     </html>
