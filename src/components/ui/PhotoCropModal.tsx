@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import { Loader2, X } from 'lucide-react';
 
@@ -16,18 +16,14 @@ interface Props {
  * so we don't push giant photos into Storage.
  */
 export function PhotoCropModal({ file, onCancel, onConfirm }: Props) {
-  const [imageSrc, setImageSrc] = useState<string>('');
+  const imageSrc = useMemo(() => URL.createObjectURL(file), [file]);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState<Area | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const url = URL.createObjectURL(file);
-    setImageSrc(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+  useEffect(() => () => URL.revokeObjectURL(imageSrc), [imageSrc]);
 
   const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
     setArea(areaPixels);

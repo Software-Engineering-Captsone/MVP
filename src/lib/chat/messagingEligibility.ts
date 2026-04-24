@@ -1,6 +1,6 @@
-// @ts-nocheck
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { StoredApplication, StoredOffer } from '@/lib/campaigns/localCampaignStore';
+import type { StoredOffer } from '@/lib/campaigns/localCampaignStore';
+import type { StoredApplication } from '@/lib/campaigns/repository';
 import { readLocalCampaignStore } from '@/lib/campaigns/localCampaignStore';
 import { getApplicationById, getCampaignById } from '@/lib/campaigns/repository';
 import { threadHasUserMessageFromParticipant } from '@/lib/chat/service';

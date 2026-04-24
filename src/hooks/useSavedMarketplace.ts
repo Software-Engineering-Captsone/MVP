@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSavedProfilesClient } from '@/lib/savedFetch';
 import type { SavedSnapshot } from '@/lib/saved/types';
 
 export function useSavedMarketplace() {
-  const client = useRef(createSavedProfilesClient()).current;
+  const client = useMemo(() => createSavedProfilesClient(), []);
   const [athleteIds, setAthleteIds] = useState<string[]>([]);
   const [brandIds, setBrandIds] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -16,7 +16,6 @@ export function useSavedMarketplace() {
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
     client
       .load()
       .then((snap: SavedSnapshot) => {

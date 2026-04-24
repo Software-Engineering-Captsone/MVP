@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -743,6 +742,10 @@ export function CreateCampaignOverlay({
       secondaryKpi,
       secondaryKpiTarget,
       marketRegion,
+      audiencePersona: opportunityContext || campaignName,
+      audienceGeoRequirement: 'open',
+      languagePreferencesText: '',
+      creatorExclusionsText: '',
       platforms: v2Platforms,
       deliverableBundle,
       ctaType,

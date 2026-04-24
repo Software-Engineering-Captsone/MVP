@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { readLocalCampaignStore } from '@/lib/campaigns/localCampaignStore';
 import { getApplicationById, getCampaignById } from '@/lib/campaigns/repository';

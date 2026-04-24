@@ -43,7 +43,7 @@ export function applicationToJSON(a: StoredApplication) {
     status: a.status,
     pitch: a.pitch ?? '',
     athleteSnapshot: a.athleteSnapshot ?? {},
-    messages: (Array.isArray(a.messages) ? a.messages : []).map((m: Record<string, unknown>) => ({
+    messages: (Array.isArray(a.messages) ? a.messages : []).map((m) => ({
       id: m._id != null ? String(m._id) : '',
       fromUserId: m.fromUserId,
       body: m.body,

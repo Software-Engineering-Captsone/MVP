@@ -1,4 +1,4 @@
-import type { StoredApplication, StoredCampaign } from '@/lib/campaigns/localCampaignStore';
+import type { StoredApplication, StoredCampaign } from '@/lib/campaigns/repository';
 import type { ChatSessionUser } from './types';
 
 export function canAccessApplicationChat(

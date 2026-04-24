@@ -112,6 +112,8 @@ export function DashboardInbox({
   const [offerActionLoadingById, setOfferActionLoadingById] = useState<Record<string, 'accept' | 'decline' | 'send' | null>>({});
   const orphanAttemptedRef = useRef<string | null>(null);
   const initialThreadAppliedRef = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
@@ -268,6 +270,15 @@ export function DashboardInbox({
   );
 
   useEffect(() => {
+    if (messages.length === 0) return;
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [messages, selectedThreadId, messagesLoading]);
+
+  useEffect(() => {
     if (!selectedThreadId) {
       setMessages([]);
       setComposerMenuOpen(false);
@@ -303,52 +314,67 @@ export function DashboardInbox({
   useEffect(() => {
     if (!currentUserId) return;
     const supabase = createSupabaseBrowserClient();
-    const channel = supabase
-      .channel(`chat-inbox-${currentUserId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-        (payload) => {
-          const row = payload.new as {
-            id: string;
-            thread_id: string;
-            from_user_id: string;
-            body: string;
-            created_at: string;
-            message_kind?: string;
-            offer_id?: string | null;
-          };
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
-          // Append to the open thread if the message arrived from someone else.
-          // Our own sends are already optimistic — dedupe by id just in case.
-          if (
-            row.thread_id === selectedThreadIdRef.current &&
-            row.from_user_id !== currentUserId
-          ) {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === row.id)) return prev;
-              return [
-                ...prev,
-                {
-                  id: row.id,
-                  fromUserId: row.from_user_id,
-                  body: row.body,
-                  createdAt: row.created_at,
-                  messageKind: (row.message_kind as ChatMessageKind) ?? 'user',
-                  offerId: row.offer_id ?? null,
-                },
-              ];
-            });
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) {
+        await supabase.realtime.setAuth(token);
+      }
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(`chat-inbox-${currentUserId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+          (payload) => {
+            // eslint-disable-next-line no-console
+            console.log('[chat-realtime] insert', payload.new);
+            const row = payload.new as {
+              id: string;
+              thread_id: string;
+              from_user_id: string;
+              body: string;
+              created_at: string;
+              message_kind?: string;
+              offer_id?: string | null;
+            };
+
+            if (
+              row.thread_id === selectedThreadIdRef.current &&
+              row.from_user_id !== currentUserId
+            ) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === row.id)) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: row.id,
+                    fromUserId: row.from_user_id,
+                    body: row.body,
+                    createdAt: row.created_at,
+                    messageKind: (row.message_kind as ChatMessageKind) ?? 'user',
+                    offerId: row.offer_id ?? null,
+                  },
+                ];
+              });
+            }
+
+            void fetchInbox(debouncedSearchRef.current);
           }
-
-          // Refresh inbox previews / unread counts on any incoming event.
-          void fetchInbox(debouncedSearchRef.current);
-        }
-      )
-      .subscribe();
+        )
+        .subscribe((status, err) => {
+          // eslint-disable-next-line no-console
+          console.log('[chat-realtime] status', status, err ?? '');
+        });
+    })();
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [currentUserId, fetchInbox]);
 
@@ -694,7 +720,7 @@ export function DashboardInbox({
                   <p className="text-sm">Loading messages…</p>
                 </div>
               ) : selectedThreadId && messages.length > 0 ? (
-                <div className="scrollbar-hide flex-1 space-y-4 overflow-y-auto p-6 pb-28">
+                <div ref={messagesScrollRef} className="scrollbar-hide flex-1 space-y-4 overflow-y-auto p-6 pb-28">
                   <div className="text-center">
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Today</span>
                   </div>
@@ -711,6 +737,7 @@ export function DashboardInbox({
                       onDeclineOffer={handleDeclineOffer}
                     />
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
               ) : selectedThreadId ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 pb-28 text-gray-500">

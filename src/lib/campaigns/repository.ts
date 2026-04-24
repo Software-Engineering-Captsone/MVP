@@ -206,6 +206,20 @@ const CAMPAIGN_SELECT = '*, brand:brand_profiles(company_name)';
  * Exported repository API — identical to the pre-Supabase version.
  * ───────────────────────────────────────────────────────────────── */
 
+/**
+ * Compatibility shim for legacy local-store seed bootstrap paths.
+ * Supabase-backed environments do not require synthetic seed insertion.
+ */
+export async function ensureSeedCampaignsPresent(): Promise<void> {}
+
+/**
+ * Compatibility shim for legacy seed-ownership claim flow.
+ * Campaign ownership is already sourced from persisted Supabase rows.
+ */
+export async function claimSeedBusinessOwnershipForBrandUser(_brandUserId: string): Promise<void> {
+  void _brandUserId;
+}
+
 export async function listCampaignsForBrand(brandUserId: string): Promise<StoredCampaign[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
