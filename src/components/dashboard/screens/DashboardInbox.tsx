@@ -17,7 +17,8 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { authFetch } from '@/lib/authFetch';
-import type { ChatInboxItem, ChatMessageRow } from '@/lib/chat/types';
+import type { ChatInboxItem, ChatMessageKind, ChatMessageRow } from '@/lib/chat/types';
+import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const PLACEHOLDER_AVATAR =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -286,6 +287,70 @@ export function DashboardInbox({
       cancelled = true;
     };
   }, [selectedThreadId, loadThreadMessages, loadAthleteOfferStatuses, variant]);
+
+  // Realtime: subscribe to chat_messages inserts scoped to this user.
+  // RLS on chat_messages is the real gate — the subscription only
+  // delivers rows the user is allowed to read.
+  const selectedThreadIdRef = useRef<string | null>(null);
+  const debouncedSearchRef = useRef('');
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
+  useEffect(() => {
+    debouncedSearchRef.current = debouncedSearch;
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const supabase = createSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`chat-inbox-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            thread_id: string;
+            from_user_id: string;
+            body: string;
+            created_at: string;
+            message_kind?: string;
+            offer_id?: string | null;
+          };
+
+          // Append to the open thread if the message arrived from someone else.
+          // Our own sends are already optimistic — dedupe by id just in case.
+          if (
+            row.thread_id === selectedThreadIdRef.current &&
+            row.from_user_id !== currentUserId
+          ) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === row.id)) return prev;
+              return [
+                ...prev,
+                {
+                  id: row.id,
+                  fromUserId: row.from_user_id,
+                  body: row.body,
+                  createdAt: row.created_at,
+                  messageKind: (row.message_kind as ChatMessageKind) ?? 'user',
+                  offerId: row.offer_id ?? null,
+                },
+              ];
+            });
+          }
+
+          // Refresh inbox previews / unread counts on any incoming event.
+          void fetchInbox(debouncedSearchRef.current);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId, fetchInbox]);
 
   const subtitle =
     variant === 'business'
