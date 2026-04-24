@@ -1,49 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
+import { getApplicationById, getCampaignById } from '@/lib/campaigns/repository';
+import { createClient } from '@/lib/supabase/server';
 import {
-  appendApplicationMessage,
-  getApplicationById,
-  getCampaignById,
-} from '@/lib/campaigns/repository';
-import { applicationToJSON } from '@/lib/campaigns/serialization';
+  ensureApplicationCampaignThread,
+  insertMessage,
+  listMessagesForThread,
+} from '@/lib/chat/service';
+import type { StoredApplication, StoredCampaign } from '@/lib/campaigns/localCampaignStore';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(request: NextRequest, context: RouteContext) {
-  const user = await getAuthUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+/**
+ * Legacy endpoint — now a thin wrapper over the chat service. Application
+ * messages and inbox share one source of truth (chat_threads/chat_messages).
+ * The thread is created on demand (first message) rather than waiting for
+ * approval, so brand and athlete can chat the moment the application exists.
+ */
 
-  const { id } = await context.params;
-  const app = await getApplicationById(id);
-  if (!app) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
+async function authorizeAndLoad(applicationId: string) {
+  const user = await getAuthUser();
+  if (!user) return { error: 'Unauthorized' as const, status: 401 };
+
+  const app = await getApplicationById(applicationId);
+  if (!app) return { error: 'Not found' as const, status: 404 };
 
   const campaign = await getCampaignById(String(app.campaignId));
-  if (!campaign) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
+  if (!campaign) return { error: 'Not found' as const, status: 404 };
 
   const isBrand = user.role === 'brand' && campaign.brandUserId === user.userId;
   const isAthlete = user.role === 'athlete' && app.athleteUserId === user.userId;
-  if (!isBrand && !isAthlete) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  if (!isBrand && !isAthlete) return { error: 'Forbidden' as const, status: 403 };
 
-  return NextResponse.json({
-    messages: applicationToJSON(app).messages,
-  });
+  return { user, app, campaign };
+}
+
+export async function GET(_request: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
+  const auth = await authorizeAndLoad(id);
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  try {
+    const supabase = await createClient();
+    const thread = await ensureApplicationCampaignThread(
+      supabase,
+      id,
+      auth.app as unknown as StoredApplication,
+      auth.campaign as unknown as StoredCampaign
+    );
+    const rows = await listMessagesForThread(supabase, thread.id);
+    return NextResponse.json({
+      threadId: thread.id,
+      messages: rows.map((r) => ({
+        id: r.id,
+        fromUserId: r.fromUserId,
+        body: r.body,
+        createdAt: r.createdAt,
+      })),
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : String(e) },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
-  const user = await getAuthUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { id } = await context.params;
+  const auth = await authorizeAndLoad(id);
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
@@ -52,21 +79,31 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   const text = typeof body.body === 'string' ? body.body.trim() : '';
-  if (!text) {
-    return NextResponse.json({ error: 'Message body required' }, { status: 400 });
-  }
+  if (!text) return NextResponse.json({ error: 'Message body required' }, { status: 400 });
+  if (text.length > 5000) return NextResponse.json({ error: 'Message too long' }, { status: 400 });
 
   try {
-    const { application, error } = await appendApplicationMessage(id, user.userId, text);
-    if (error === 'not_found') {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    if (error === 'forbidden') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-    return NextResponse.json({ application: application ? applicationToJSON(application) : null });
+    const supabase = await createClient();
+    const thread = await ensureApplicationCampaignThread(
+      supabase,
+      id,
+      auth.app as unknown as StoredApplication,
+      auth.campaign as unknown as StoredCampaign
+    );
+    const message = await insertMessage(supabase, thread.id, auth.user.userId, text);
+    return NextResponse.json({
+      threadId: thread.id,
+      message: {
+        id: message.id,
+        fromUserId: message.fromUserId,
+        body: message.body,
+        createdAt: message.createdAt,
+      },
+    });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Failed to send';
-    return NextResponse.json({ error: msg }, { status: 400 });
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : String(e) },
+      { status: 500 }
+    );
   }
 }
