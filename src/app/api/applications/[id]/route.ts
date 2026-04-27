@@ -3,8 +3,11 @@ import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import {
   getApplicationById,
   getCampaignById,
+  updateApplicationPitchByAthlete,
   updateApplicationStatus,
+  withdrawApplicationByAthlete,
 } from '@/lib/campaigns/repository';
+import { jsonError } from '@/lib/api/jsonError';
 import { applicationToJSON } from '@/lib/campaigns/serialization';
 import { createClient } from '@/lib/supabase/server';
 import {
@@ -21,21 +24,40 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (user.role !== 'brand') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const { id } = await context.params;
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return jsonError(400, 'Invalid JSON');
+  }
+
+  // Athlete-side intents: edit pitch, withdraw application.
+  // Kept separate from the brand status flow so each side validates against
+  // its own RLS-permitted operations (status set ⊆ {pending, withdrawn}).
+  if (user.role === 'athlete') {
+    const intent = typeof body.intent === 'string' ? body.intent : '';
+    if (intent === 'edit') {
+      const pitch = typeof body.pitch === 'string' ? body.pitch : '';
+      const result = await updateApplicationPitchByAthlete(id, user.userId, pitch);
+      if (!result.ok) return jsonError(result.status, result.error);
+      return NextResponse.json({ application: applicationToJSON(result.application) });
+    }
+    if (intent === 'withdraw') {
+      const result = await withdrawApplicationByAthlete(id, user.userId);
+      if (!result.ok) return jsonError(result.status, result.error);
+      return NextResponse.json({ application: applicationToJSON(result.application) });
+    }
+    return jsonError(400, 'Invalid intent');
+  }
+
+  if (user.role !== 'brand') {
+    return jsonError(403, 'Forbidden');
   }
 
   const status = body.status;
   if (typeof status !== 'string' || !ALLOWED.has(status)) {
-    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    return jsonError(400, 'Invalid status');
   }
 
   try {
