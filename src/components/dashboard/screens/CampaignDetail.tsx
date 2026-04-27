@@ -26,12 +26,13 @@ const applicationSourceStyles: Record<ApplicationQueueSource, string> = {
 
 /* ── Status Badge (shared) ──────────────────────────────────── */
 const campaignStatusStyles: Record<CampaignStatus, string> = {
-  Draft: 'bg-gray-100 text-gray-500 border-gray-200',
+  'Draft': 'bg-gray-100 text-gray-500 border-gray-200',
   'Ready to Launch': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
-  'Reviewing Candidates': 'bg-red-50 text-red-700 border-red-200',
-  'Deal Creation in Progress': 'bg-red-50 text-red-800 border-red-200',
-  Active: 'bg-amber-50 text-amber-700 border-amber-200',
-  Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Open for Applications': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Reviewing Candidates': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Deal Creation in Progress': 'bg-gray-100 text-nilink-ink border-gray-300',
+  'Active': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Completed': 'bg-gray-100 text-gray-600 border-gray-300',
 };
 
 const candidateStatusStyles: Record<CandidateStatus, string> = {

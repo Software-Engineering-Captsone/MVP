@@ -19,7 +19,6 @@ import {
 import {
   apiCampaignRowToDraftOverlayPrefill,
   apiCampaignToUi,
-  normalizeUiCampaignStatus,
   type ApiApplicationRow,
   type ApiCampaignRow,
 } from '@/lib/campaigns/clientMap';
@@ -66,14 +65,15 @@ export type {
   Deliverable,
 } from '@/components/dashboard/screens/campaignDashboardTypes';
 
-/* ── Status Badge (aligned with dashboard stat card palette) ── */
+/* ── Status Badge ───────────────────────────────────────────── */
 const statusStyles: Record<CampaignStatus, string> = {
-  Draft: 'bg-gray-100 text-gray-500 border-gray-200',
+  'Draft': 'bg-gray-100 text-gray-500 border-gray-200',
   'Ready to Launch': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
-  'Reviewing Candidates': 'bg-red-50 text-red-700 border-red-200',
-  'Deal Creation in Progress': 'bg-red-50 text-red-800 border-red-200',
-  Active: 'bg-amber-50 text-amber-700 border-amber-200',
-  Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Open for Applications': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
+  'Reviewing Candidates': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Deal Creation in Progress': 'bg-gray-100 text-nilink-ink border-gray-300',
+  'Active': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Completed': 'bg-gray-100 text-gray-600 border-gray-300',
 };
 
 function StatusBadge({ status }: { status: CampaignStatus }) {
@@ -127,23 +127,8 @@ export function BusinessCampaigns() {
   const [listError, setListError] = useState<string | null>(null);
   const [listLoading, setListLoading] = useState(true);
   const [brandDisplayName, setBrandDisplayName] = useState('');
-  type CampaignListFilter = 'All' | 'Drafts' | 'Reviewing' | 'Active' | 'Completed';
-  const [activeFilter, setActiveFilter] = useState<CampaignListFilter>('All');
+  const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-
-  /**
-   * If the user navigates away from Campaigns mid-wizard, we don't want to force-open
-   * the create overlay when they come back. Drafts are still accessible from the table.
-   */
-  useEffect(() => {
-    return () => {
-      try {
-        sessionStorage.removeItem(WIZARD_SESSION_KEY);
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
 
   const loadCampaignList = useCallback(async () => {
     setListLoading(true);
@@ -211,7 +196,7 @@ export function BusinessCampaigns() {
               return;
             }
             const apiRow = data.campaign;
-            const remoteStatus = normalizeUiCampaignStatus(apiRow.status);
+            const remoteStatus = (apiRow.status || 'Draft') as CampaignStatus;
             if (remoteStatus !== 'Draft') {
               finishOpen(
                 null,
@@ -315,7 +300,7 @@ export function BusinessCampaigns() {
         return;
       }
       const apiRow = data.campaign;
-      const remoteStatus = normalizeUiCampaignStatus(apiRow.status);
+      const remoteStatus = (apiRow.status || 'Draft') as CampaignStatus;
       if (remoteStatus !== 'Draft') {
         setListError(
           'This campaign is no longer a draft. Use the row to open details, or refresh the list.'
@@ -590,23 +575,15 @@ export function BusinessCampaigns() {
   };
 
   // Stats
-  const draftCampaigns = campaigns.filter((c) => c.status === 'Draft');
+  const activeCampaigns = campaigns.filter((c) => c.status === 'Active');
+  const openCampaigns = campaigns.filter((c) => c.status === 'Open for Applications');
   const reviewingCampaigns = campaigns.filter(
     (c) => c.status === 'Reviewing Candidates' || c.status === 'Deal Creation in Progress'
   );
-  const activeCampaigns = campaigns.filter((c) => c.status === 'Active');
   const completedCampaigns = campaigns.filter((c) => c.status === 'Completed');
 
-  // Filters (order matches stat cards; "All" stays first in the chip row)
+  // Filters
   const filteredCampaigns = campaigns.filter((c) => {
-    if (activeFilter === 'Drafts' && c.status !== 'Draft') return false;
-    if (
-      activeFilter === 'Reviewing' &&
-      c.status !== 'Reviewing Candidates' &&
-      c.status !== 'Deal Creation in Progress'
-    ) {
-      return false;
-    }
     if (activeFilter === 'Active' && c.status !== 'Active') return false;
     if (activeFilter === 'Completed' && c.status !== 'Completed') return false;
     if (searchQuery && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -631,7 +608,7 @@ export function BusinessCampaigns() {
           {!showCreateOverlay && (
             <DashboardPageHeader
               title="Campaigns"
-              subtitle="Create, manage, and track NIL campaigns"
+              subtitle="Create, manage, and track NIL campaigns (saved to server file data/local-campaign-store.json)"
               className="mb-6"
             />
           )}
@@ -664,22 +641,22 @@ export function BusinessCampaigns() {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
               {
-                label: 'Drafts',
-                value: draftCampaigns.length,
-                valueClass: 'text-gray-600',
-                cardClass: 'border-gray-200 bg-gray-100/80',
-                labelClass: 'text-gray-500',
+                label: 'Active',
+                value: activeCampaigns.length,
+                valueClass: 'text-emerald-700',
+                cardClass: 'border-emerald-200/80 bg-emerald-50/90',
+                labelClass: 'text-emerald-700/70',
+              },
+              {
+                label: 'Open for Apps',
+                value: openCampaigns.length,
+                valueClass: 'text-nilink-accent',
+                cardClass: 'border-nilink-accent-border bg-nilink-accent-soft',
+                labelClass: 'text-nilink-accent/80',
               },
               {
                 label: 'Reviewing',
                 value: reviewingCampaigns.length,
-                valueClass: 'text-red-700',
-                cardClass: 'border-red-200/80 bg-red-50/90',
-                labelClass: 'text-red-800/70',
-              },
-              {
-                label: 'Active',
-                value: activeCampaigns.length,
                 valueClass: 'text-amber-700',
                 cardClass: 'border-amber-200/80 bg-amber-50/90',
                 labelClass: 'text-amber-800/70',
@@ -687,9 +664,9 @@ export function BusinessCampaigns() {
               {
                 label: 'Completed',
                 value: completedCampaigns.length,
-                valueClass: 'text-emerald-700',
-                cardClass: 'border-emerald-200/80 bg-emerald-50/90',
-                labelClass: 'text-emerald-700/70',
+                valueClass: 'text-gray-600',
+                cardClass: 'border-gray-200 bg-gray-100/80',
+                labelClass: 'text-gray-500',
               },
             ].map((stat) => (
               <div
@@ -725,7 +702,7 @@ export function BusinessCampaigns() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
-            {(['All', 'Drafts', 'Reviewing', 'Active', 'Completed'] as const).map((tab) => {
+            {(['All', 'Active', 'Completed'] as const).map((tab) => {
               const on = activeFilter === tab;
               return (
                 <button

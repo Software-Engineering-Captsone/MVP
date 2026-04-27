@@ -17,8 +17,7 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { authFetch } from '@/lib/authFetch';
-import type { ChatInboxItem, ChatMessageKind, ChatMessageRow } from '@/lib/chat/types';
-import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
+import type { ChatInboxItem, ChatMessageRow } from '@/lib/chat/types';
 
 const PLACEHOLDER_AVATAR =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -112,8 +111,6 @@ export function DashboardInbox({
   const [offerActionLoadingById, setOfferActionLoadingById] = useState<Record<string, 'accept' | 'decline' | 'send' | null>>({});
   const orphanAttemptedRef = useRef<string | null>(null);
   const initialThreadAppliedRef = useRef(false);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
@@ -270,15 +267,6 @@ export function DashboardInbox({
   );
 
   useEffect(() => {
-    if (messages.length === 0) return;
-    const el = messagesScrollRef.current;
-    if (!el) return;
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
-  }, [messages, selectedThreadId, messagesLoading]);
-
-  useEffect(() => {
     if (!selectedThreadId) {
       setMessages([]);
       setComposerMenuOpen(false);
@@ -298,85 +286,6 @@ export function DashboardInbox({
       cancelled = true;
     };
   }, [selectedThreadId, loadThreadMessages, loadAthleteOfferStatuses, variant]);
-
-  // Realtime: subscribe to chat_messages inserts scoped to this user.
-  // RLS on chat_messages is the real gate — the subscription only
-  // delivers rows the user is allowed to read.
-  const selectedThreadIdRef = useRef<string | null>(null);
-  const debouncedSearchRef = useRef('');
-  useEffect(() => {
-    selectedThreadIdRef.current = selectedThreadId;
-  }, [selectedThreadId]);
-  useEffect(() => {
-    debouncedSearchRef.current = debouncedSearch;
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    if (!currentUserId) return;
-    const supabase = createSupabaseBrowserClient();
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let cancelled = false;
-
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (token) {
-        await supabase.realtime.setAuth(token);
-      }
-      if (cancelled) return;
-
-      channel = supabase
-        .channel(`chat-inbox-${currentUserId}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-          (payload) => {
-            // eslint-disable-next-line no-console
-            console.log('[chat-realtime] insert', payload.new);
-            const row = payload.new as {
-              id: string;
-              thread_id: string;
-              from_user_id: string;
-              body: string;
-              created_at: string;
-              message_kind?: string;
-              offer_id?: string | null;
-            };
-
-            if (
-              row.thread_id === selectedThreadIdRef.current &&
-              row.from_user_id !== currentUserId
-            ) {
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === row.id)) return prev;
-                return [
-                  ...prev,
-                  {
-                    id: row.id,
-                    fromUserId: row.from_user_id,
-                    body: row.body,
-                    createdAt: row.created_at,
-                    messageKind: (row.message_kind as ChatMessageKind) ?? 'user',
-                    offerId: row.offer_id ?? null,
-                  },
-                ];
-              });
-            }
-
-            void fetchInbox(debouncedSearchRef.current);
-          }
-        )
-        .subscribe((status, err) => {
-          // eslint-disable-next-line no-console
-          console.log('[chat-realtime] status', status, err ?? '');
-        });
-    })();
-
-    return () => {
-      cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [currentUserId, fetchInbox]);
 
   const subtitle =
     variant === 'business'
@@ -720,7 +629,7 @@ export function DashboardInbox({
                   <p className="text-sm">Loading messages…</p>
                 </div>
               ) : selectedThreadId && messages.length > 0 ? (
-                <div ref={messagesScrollRef} className="scrollbar-hide flex-1 space-y-4 overflow-y-auto p-6 pb-28">
+                <div className="scrollbar-hide flex-1 space-y-4 overflow-y-auto p-6 pb-28">
                   <div className="text-center">
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Today</span>
                   </div>
@@ -737,7 +646,6 @@ export function DashboardInbox({
                       onDeclineOffer={handleDeclineOffer}
                     />
                   ))}
-                  <div ref={messagesEndRef} />
                 </div>
               ) : selectedThreadId ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 pb-28 text-gray-500">
