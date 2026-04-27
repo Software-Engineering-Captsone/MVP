@@ -243,9 +243,9 @@ export function AthleteProfile() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                 {showSaveForBrand ? <SaveAthleteControl athleteId={athlete.id} /> : null}
-                <CreateOfferButton />
+                {showSaveForBrand ? <CreateOfferButton /> : null}
               </div>
             </div>
           </div>
@@ -275,9 +275,9 @@ export function AthleteProfile() {
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {showSaveForBrand ? <SaveAthleteControl athleteId={athlete.id} compact /> : null}
-              <CreateOfferButton compact />
+              {showSaveForBrand ? <CreateOfferButton compact /> : null}
             </div>
           </div>
         </div>
