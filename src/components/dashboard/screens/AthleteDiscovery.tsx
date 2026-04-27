@@ -287,7 +287,7 @@ export function AthleteDiscovery() {
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="mt-8 pb-8 text-center">
                   <button
                     type="button"
