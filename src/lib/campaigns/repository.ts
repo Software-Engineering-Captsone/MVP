@@ -566,6 +566,99 @@ export async function updateApplicationStatus(
   return data ? dbApplicationToStored(data as unknown as DbApplicationRow) : null;
 }
 
+/**
+ * True when the campaign has a deadline and it is now in the past.
+ * Used by the athlete applications view to gate the "Re-apply" affordance.
+ */
+export function isPastCampaignApplicationDeadline(campaign: StoredCampaign): boolean {
+  const endDate = typeof campaign.endDate === 'string' ? campaign.endDate.trim() : '';
+  if (!endDate) return false;
+  const ms = new Date(endDate).getTime();
+  if (Number.isNaN(ms)) return false;
+  return Date.now() > ms;
+}
+
+export async function listApplicationsForAthlete(athleteUserId: string): Promise<StoredApplication[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('athlete_id', athleteUserId)
+    .order('updated_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbApplicationToStored(r as unknown as DbApplicationRow));
+}
+
+export async function updateApplicationPitchByAthlete(
+  applicationId: string,
+  athleteUserId: string,
+  pitch: string,
+): Promise<
+  | { ok: true; application: StoredApplication }
+  | { ok: false; status: number; error: string }
+> {
+  const trimmed = typeof pitch === 'string' ? pitch.trim() : '';
+  if (!trimmed) return { ok: false, status: 400, error: 'Pitch cannot be empty' };
+  if (trimmed.length > 1000) return { ok: false, status: 400, error: 'Pitch too long (max 1000)' };
+
+  const supabase = await createClient();
+  const { data: existing, error: readErr } = await supabase
+    .from('applications')
+    .select('id, athlete_id, status')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  if (!existing) return { ok: false, status: 404, error: 'Not found' };
+  if (existing.athlete_id !== athleteUserId) return { ok: false, status: 403, error: 'Forbidden' };
+  if (existing.status !== 'pending') {
+    return { ok: false, status: 409, error: 'Cannot edit pitch after the application has moved past pending' };
+  }
+
+  const { data, error } = await supabase
+    .from('applications')
+    .update({ pitch: trimmed })
+    .eq('id', applicationId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return { ok: false, status: 404, error: 'Not found' };
+  return { ok: true, application: dbApplicationToStored(data as unknown as DbApplicationRow) };
+}
+
+export async function withdrawApplicationByAthlete(
+  applicationId: string,
+  athleteUserId: string,
+): Promise<
+  | { ok: true; application: StoredApplication }
+  | { ok: false; status: number; error: string }
+> {
+  const supabase = await createClient();
+  const { data: existing, error: readErr } = await supabase
+    .from('applications')
+    .select('id, athlete_id, status')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  if (!existing) return { ok: false, status: 404, error: 'Not found' };
+  if (existing.athlete_id !== athleteUserId) return { ok: false, status: 403, error: 'Forbidden' };
+  if (existing.status === 'withdrawn') {
+    return { ok: false, status: 409, error: 'Application is already withdrawn' };
+  }
+  if (existing.status === 'approved' || existing.status === 'declined') {
+    return { ok: false, status: 409, error: 'Cannot withdraw a decided application' };
+  }
+
+  const { data, error } = await supabase
+    .from('applications')
+    .update({ status: 'withdrawn' })
+    .eq('id', applicationId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return { ok: false, status: 404, error: 'Not found' };
+  return { ok: true, application: dbApplicationToStored(data as unknown as DbApplicationRow) };
+}
+
 export async function appendApplicationMessage(
   applicationId: string,
   userId: string,
