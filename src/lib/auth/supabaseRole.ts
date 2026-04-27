@@ -1,29 +1,24 @@
-export type UserRole = "athlete" | "brand" | "admin" | "unknown";
+type MaybeRecord = Record<string, unknown> | null | undefined;
 
-export async function getUserRole(): Promise<UserRole> {
-  return "unknown";
+function normalizeRoleValue(value: unknown): 'brand' | 'athlete' | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim().toLowerCase();
+  if (v === 'brand' || v === 'business') return 'brand';
+  if (v === 'athlete') return 'athlete';
+  return null;
 }
-
-export async function requireRole(_role: UserRole): Promise<void> {}
-
-type RoleInput = {
-  userMetadata?: Record<string, unknown> | null;
-  appMetadata?: Record<string, unknown> | null;
-};
 
 /**
- * Fast client-side role read. Source of truth is `profiles.role` in the DB
- * (mirrored into `user_metadata.role` by the signup trigger). `app_metadata.role`
- * wins when both are present — it's server-controlled and cannot be forged by the client.
+ * Resolve app role from Supabase metadata with sensible fallbacks.
+ * Accepts both `brand` and legacy `business`.
  */
-export function resolveSupabaseRole(input?: RoleInput): "athlete" | "brand" {
-  const app = input?.appMetadata?.role;
-  if (app === "brand" || app === "athlete") return app;
-  const user = input?.userMetadata?.role;
-  if (user === "brand" || user === "athlete") return user;
-  return "athlete";
-}
-
-export function isRole(value: unknown): value is UserRole {
-  return value === "athlete" || value === "brand" || value === "admin" || value === "unknown";
+export function resolveSupabaseRole(args: {
+  userMetadata?: MaybeRecord;
+  appMetadata?: MaybeRecord;
+}): 'brand' | 'athlete' {
+  const userRole = normalizeRoleValue(args.userMetadata?.role);
+  if (userRole) return userRole;
+  const appRole = normalizeRoleValue(args.appMetadata?.role);
+  if (appRole) return appRole;
+  return 'athlete';
 }

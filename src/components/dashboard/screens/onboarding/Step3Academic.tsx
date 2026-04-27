@@ -19,12 +19,7 @@ const labelClass =
   'mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400';
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Graduate / 5th Year'] as const;
-const ELIGIBILITY: { value: string; label: string }[] = [
-  { value: '1', label: '1 year' },
-  { value: '2', label: '2 years' },
-  { value: '3', label: '3 years' },
-  { value: '4', label: '4 years' },
-];
+const ELIGIBILITY = ['1 year', '2 years', '3 years', '4 years'] as const;
 
 interface Step3Props {
   data: OnboardingAcademic;
@@ -106,23 +101,12 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
       transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
       className="space-y-6"
     >
-      {/* Header */}
-      <div className="mb-2">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
-          <GraduationCap className="h-6 w-6" strokeWidth={2} />
-        </div>
-        <h2
-          className="text-2xl tracking-wide text-nilink-ink"
-          style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-        >
-          UNIVERSITY & ACADEMICS
-        </h2>
-        <p className="mt-1 text-sm font-medium text-gray-500">
-          {isEduAccount
-            ? 'We detected your school from your .edu email. Confirm your details below.'
-            : 'Search for your university and verify with your school email.'}
-        </p>
-      </div>
+      {/* Helper text */}
+      <p className="text-sm leading-relaxed text-gray-500">
+        {isEduAccount
+          ? 'We detected your school from your .edu email. Confirm your details below.'
+          : 'Search for your university and verify with your school email.'}
+      </p>
 
       {/* ── University selection ── */}
       <div>
@@ -281,19 +265,19 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
         <label className={labelClass}>Remaining Eligibility</label>
         <div className="flex flex-wrap gap-2">
           {ELIGIBILITY.map((opt) => {
-            const active = data.eligibilityYears === opt.value;
+            const active = data.eligibilityYears === opt;
             return (
               <button
-                key={opt.value}
+                key={opt}
                 type="button"
-                onClick={() => onChange({ eligibilityYears: opt.value })}
+                onClick={() => onChange({ eligibilityYears: opt })}
                 className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
                   active
                     ? 'border-nilink-accent bg-nilink-accent text-white shadow-sm'
                     : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                {opt.label}
+                {opt}
               </button>
             );
           })}
@@ -305,7 +289,7 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
+          className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-6 py-3.5 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -314,7 +298,7 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
           type="button"
           disabled={!filled}
           onClick={onNext}
-          className="inline-flex items-center gap-2 rounded-xl bg-nilink-accent px-8 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-2xl bg-nilink-accent px-8 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           whileHover={filled ? { scale: 1.02 } : {}}
           whileTap={filled ? { scale: 0.98 } : {}}
         >

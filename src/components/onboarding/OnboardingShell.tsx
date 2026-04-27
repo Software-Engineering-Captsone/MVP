@@ -60,26 +60,21 @@ export default function OnboardingShell({ children }: { children: React.ReactNod
     });
   }, [supabase, router]);
 
-  // If already onboarded, send them to dashboard.
-  // Source of truth: profiles.onboarding_completed_at — same column DashboardShell gates on.
+  // If already onboarded, send them to dashboard
   useEffect(() => {
     if (booting || !user) return;
-    let cancelled = false;
-    void (async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('onboarding_completed_at')
-        .eq('id', user.id)
-        .single();
-      if (cancelled) return;
-      if (!error && data?.onboarding_completed_at) {
-        router.replace('/dashboard');
+    try {
+      const raw = localStorage.getItem('athlete_onboarding_draft');
+      if (raw) {
+        const draft = JSON.parse(raw) as { completedAt?: string };
+        if (draft.completedAt) {
+          router.replace('/dashboard');
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [booting, user, router, supabase]);
+    } catch {
+      /* ignore */
+    }
+  }, [booting, user, router]);
 
   /* ── Boot screen ── */
   if (booting) {

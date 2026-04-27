@@ -1,6 +1,5 @@
 'use client';
 
-import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Sparkles,
@@ -9,13 +8,8 @@ import {
   Twitter,
   ImagePlus,
   Check,
-  Loader2,
-  Upload,
 } from 'lucide-react';
 import type { OnboardingProfile } from '@/hooks/useOnboardingStorage';
-import { uploadAvatar } from '@/lib/avatarUpload';
-import { PhotoCropModal } from '@/components/ui/PhotoCropModal';
-import { useDashboard } from '@/components/dashboard/DashboardShell';
 
 const inputClass =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-nilink-ink outline-none transition placeholder:text-gray-400 focus:border-nilink-accent-border focus:ring-2 focus:ring-nilink-accent/20';
@@ -42,49 +36,10 @@ interface Step4Props {
 }
 
 export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props) {
-  const { refreshUser } = useDashboard();
-  const filled = data.bio.trim().length > 0 && data.availabilityStatus !== '';
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const filled = true; // Temporary: Dev mode allows skipping this section
 
   const updateSocial = (key: keyof OnboardingProfile['socials'], value: string) => {
     onChange({ socials: { ...data.socials, [key]: value } });
-  };
-
-  const handlePickPhoto = () => fileInputRef.current?.click();
-
-  const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setUploadError(null);
-    setPendingFile(file);
-  };
-
-  const handleCropConfirm = async (cropped: File) => {
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const url = await uploadAvatar(cropped);
-      onChange({ profilePictureUrl: url });
-      // Persist imageUrl to Supabase user_metadata so legacy surfaces
-      // reading /api/auth/me still see the photo. profiles.avatar_url is
-      // already written by uploadAvatar.
-      await fetch('/api/auth/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ athleteProfile: { imageUrl: url } }),
-      });
-      await refreshUser();
-      setPendingFile(null);
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
   };
 
   return (
@@ -95,69 +50,30 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
       transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
       className="space-y-6"
     >
-      {/* Header */}
-      <div className="mb-2">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
-          <Sparkles className="h-6 w-6" strokeWidth={2} />
-        </div>
-        <h2
-          className="text-2xl tracking-wide text-nilink-ink"
-          style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-        >
-          MAKE IT SHINE
-        </h2>
-        <p className="mt-1 text-sm font-medium text-gray-500">
-          Polish your public profile. This is what brands see when they find you.
-        </p>
-      </div>
+      {/* Helper text */}
+      <p className="text-sm leading-relaxed text-gray-500">
+        Polish your public profile. This is what brands see when they find you.
+      </p>
 
       {/* Profile Picture + Banner */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {/* Picture */}
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/60 p-5 text-center transition hover:border-nilink-accent-border hover:bg-nilink-accent-soft/30">
-          <div className="mx-auto mb-3 h-20 w-20 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-gray-100">
-            {data.profilePictureUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={data.profilePictureUrl}
-                alt="Profile preview"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <ImagePlus className="h-6 w-6 text-gray-400" />
-              </div>
-            )}
+          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+            <ImagePlus className="h-6 w-6 text-gray-400" />
           </div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Profile Picture</p>
+          <label className={`${labelClass} mt-3`} htmlFor="ob-pic-url">
+            Image URL <span className="text-gray-300 normal-case">(optional)</span>
+          </label>
           <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={handleFilePicked}
-            className="hidden"
+            id="ob-pic-url"
+            type="url"
+            value={data.profilePictureUrl}
+            onChange={(e) => onChange({ profilePictureUrl: e.target.value })}
+            className={inputClass}
+            placeholder="https://…"
           />
-          <button
-            type="button"
-            onClick={handlePickPhoto}
-            disabled={uploading}
-            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-nilink-ink shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                Uploading…
-              </>
-            ) : (
-              <>
-                <Upload className="h-3.5 w-3.5" aria-hidden />
-                {data.profilePictureUrl ? 'Change Photo' : 'Upload Photo'}
-              </>
-            )}
-          </button>
-          {uploadError && (
-            <p className="mt-2 text-[11px] font-medium text-amber-700">{uploadError}</p>
-          )}
         </div>
 
         {/* Banner */}
@@ -167,7 +83,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
           </div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Profile Banner</p>
           <label className={`${labelClass} mt-3`} htmlFor="ob-banner-url">
-            Image URL
+            Image URL <span className="text-gray-300 normal-case">(optional)</span>
           </label>
           <input
             id="ob-banner-url"
@@ -183,7 +99,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
       {/* Bio */}
       <div>
         <label className={labelClass} htmlFor="ob-bio">
-          Bio
+          Bio <span className="text-gray-300 normal-case">(optional)</span>
         </label>
         <textarea
           id="ob-bio"
@@ -299,7 +215,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
+          className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-6 py-3.5 text-sm font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -308,7 +224,7 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
           type="button"
           disabled={!filled}
           onClick={onComplete}
-          className="inline-flex items-center gap-2 rounded-xl bg-nilink-accent px-8 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-2xl bg-nilink-accent px-8 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-nilink-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           whileHover={filled ? { scale: 1.02 } : {}}
           whileTap={filled ? { scale: 0.98 } : {}}
         >
@@ -316,14 +232,6 @@ export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props)
           Complete Profile
         </motion.button>
       </div>
-
-      {pendingFile && (
-        <PhotoCropModal
-          file={pendingFile}
-          onCancel={() => setPendingFile(null)}
-          onConfirm={handleCropConfirm}
-        />
-      )}
     </motion.div>
   );
 }

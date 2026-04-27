@@ -1,6 +1,7 @@
 export type CampaignStatus =
   | 'Draft'
   | 'Ready to Launch'
+  | 'Open for Applications'
   | 'Reviewing Candidates'
   | 'Deal Creation in Progress'
   | 'Active'

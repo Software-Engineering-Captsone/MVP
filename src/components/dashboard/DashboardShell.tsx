@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, createContext, useContext, useEffect, useCallback, useRef } from 'react';
+import { useState, createContext, useContext, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Search, FileText, MessageSquare, Heart,
-  CreditCard, Megaphone, BarChart3, MoreVertical,
+  CreditCard, Megaphone, BarChart3, MoreVertical, Handshake,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react';
 import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
@@ -46,9 +47,9 @@ type NavItem = { href: string; icon: LucideIcon; label: string; badge?: string }
 const athleteNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/dashboard/search', icon: Search, label: 'Explore' },
-  { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
+  { href: '/dashboard/applications', icon: ClipboardList, label: 'Applications' },
+  { href: '/dashboard/offers', icon: Handshake, label: 'Offers' },
   { href: '/dashboard/deals', icon: FileText, label: 'Deals' },
-  { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
 ];
 
 const businessNavigation: NavItem[] = [
@@ -72,9 +73,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const router = useRouter();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [booting, setBooting] = useState(true);
-  const signOutRequestedRef = useRef(false);
+  const [pendingOfferCount, setPendingOfferCount] = useState(0);
 
   const supabase = createClient();
 
@@ -101,31 +101,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     };
   }, []);
 
-  const fetchAvatar = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('avatar_url')
-      .eq('id', userId)
-      .single();
-    setAvatarUrl(data?.avatar_url ?? '');
-  }, [supabase]);
-
   const refreshUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setSessionUser(mapSupabaseUser(user));
-      await fetchAvatar(user.id);
-    }
-  }, [supabase, mapSupabaseUser, fetchAvatar]);
+    if (user) setSessionUser(mapSupabaseUser(user));
+  }, [supabase, mapSupabaseUser]);
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setSessionUser(mapSupabaseUser(user));
-        void fetchAvatar(user.id);
       } else {
-        router.replace(signOutRequestedRef.current ? '/' : '/auth');
+        router.replace('/auth');
       }
       setBooting(false);
     });
@@ -135,11 +122,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       (_event, session) => {
         if (session?.user) {
           setSessionUser(mapSupabaseUser(session.user));
-          void fetchAvatar(session.user.id);
         } else {
           setSessionUser(null);
-          setAvatarUrl('');
-          router.replace(signOutRequestedRef.current ? '/' : '/auth');
+          router.replace('/auth');
         }
       }
     );
@@ -147,62 +132,64 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, mapSupabaseUser, fetchAvatar]);
+  }, [supabase, router, mapSupabaseUser]);
 
-  /* ── Onboarding gate for athletes ──
-   * Source of truth: profiles.onboarding_completed_at. We query it once
-   * per signed-in user, then cache the verdict in onboardingCheckedFor
-   * so the dashboard doesn't pay the round-trip on every navigation.
-   */
-  const [onboardingCheckedFor, setOnboardingCheckedFor] = useState<string | null>(null);
-
+  /* ── Onboarding gate for athletes ── */
   useEffect(() => {
     if (booting || !sessionUser) return;
-    // Gate applies to both roles now — brands have their own wizard at
-    // /dashboard/onboarding and share the onboarding_completed_at column.
-    // Already decided for this user — nothing to do.
-    if (onboardingCheckedFor === sessionUser.id) return;
-    // Don't gate the wizard itself.
-    if (pathname.startsWith('/dashboard/onboarding')) {
-      setOnboardingCheckedFor(sessionUser.id);
+    if (sessionUser.role !== 'athlete') return;
+
+    try {
+      const raw = localStorage.getItem('athlete_onboarding_draft');
+      if (raw) {
+        const draft = JSON.parse(raw) as { completedAt?: string };
+        if (draft.completedAt) return; // already onboarded
+      }
+      // No draft or no completedAt → redirect to dedicated onboarding
+      router.replace('/onboarding');
+    } catch {
+      // Malformed JSON — treat as not onboarded
+      router.replace('/onboarding');
+    }
+  }, [booting, sessionUser, pathname, router]);
+
+  const refreshPendingOfferCount = useCallback(async () => {
+    if (!sessionUser || sessionUser.role !== 'athlete') {
+      queueMicrotask(() => {
+        setPendingOfferCount(0);
+      });
       return;
     }
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('onboarding_completed_at')
-          .eq('id', sessionUser.id)
-          .single();
-        if (cancelled) return;
-        if (!error && !data?.onboarding_completed_at) {
-          router.replace('/dashboard/onboarding');
-        }
-      } catch {
-        /* network error — don't trap the user; treat as decided */
-      } finally {
-        if (!cancelled) setOnboardingCheckedFor(sessionUser.id);
+    try {
+      const res = await fetch('/api/offers', { credentials: 'include' });
+      if (!res.ok) {
+        setPendingOfferCount(0);
+        return;
       }
-    })();
+      const data = (await res.json()) as {
+        offers?: { athleteOfferStatus?: string }[];
+      };
+      const offers = Array.isArray(data.offers) ? data.offers : [];
+      const count = offers.filter((o) => o.athleteOfferStatus === 'pending').length;
+      setPendingOfferCount(count);
+    } catch {
+      setPendingOfferCount(0);
+    }
+  }, [sessionUser]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [booting, sessionUser, pathname, router, supabase, onboardingCheckedFor]);
+  useEffect(() => {
+    // Async fetch + non-sync microtask reset; rule misfires on `void` + client fetch.
+    void refreshPendingOfferCount(); // eslint-disable-line react-hooks/set-state-in-effect -- server-driven badge
+    if (!sessionUser || sessionUser.role !== 'athlete') {
+      return;
+    }
+    const t = window.setInterval(() => {
+      void refreshPendingOfferCount();
+    }, 45000);
+    return () => window.clearInterval(t);
+  }, [sessionUser, refreshPendingOfferCount, pathname]);
 
-  // Hold the dashboard chrome until: (a) we know who's signed in, and
-  // (b) we've checked their onboarding state. Without (b), a non-onboarded
-  // user (athlete or brand) would see the dashboard for one frame before
-  // the redirect kicks in.
-  const onAuthenticatedShellRoute = pathname.startsWith('/dashboard/onboarding');
-  const gateUndecided =
-    !!sessionUser &&
-    onboardingCheckedFor !== sessionUser.id &&
-    !onAuthenticatedShellRoute;
-
-  if (booting || gateUndecided) {
+  if (booting) {
     return (
       <div className="flex h-screen items-center justify-center bg-nilink-page text-nilink-ink">
         <p className="text-sm text-gray-500">Loading your workspace…</p>
@@ -218,7 +205,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const navigation = accountType === 'business' ? businessNavigation : athleteNavigation;
 
   const userDisplay = {
-    avatar: avatarUrl || userAvatarDataUrl(sessionUser.name),
+    avatar: userAvatarDataUrl(sessionUser.name),
     name: sessionUser.name,
     email: sessionUser.email,
   };
@@ -227,19 +214,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const inboxActive = pathname.startsWith(inboxNavItem.href);
 
   const handleSignOut = async () => {
-    signOutRequestedRef.current = true;
     await supabase.auth.signOut();
-    // Drop per-browser onboarding state so the next sign-in (potentially a
-    // different account) hydrates cleanly from the DB instead of inheriting
-    // this user's localStorage draft.
-    try {
-      localStorage.removeItem('athlete_onboarding_draft');
-      localStorage.removeItem('nilink_last_user_id');
-    } catch {
-      /* localStorage unavailable — nothing to clean */
-    }
     setIsProfileMenuOpen(false);
-    router.push('/');
+    router.push('/auth');
     router.refresh();
   };
 
@@ -275,6 +252,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   item.href === '/dashboard'
                     ? pathname === '/dashboard'
                     : pathname.startsWith(item.href);
+                const badge =
+                  accountType === 'athlete' && item.href === '/dashboard/offers'
+                    ? pendingOfferCount > 0
+                      ? pendingOfferCount > 99
+                        ? '99+'
+                        : String(pendingOfferCount)
+                      : undefined
+                    : item.badge;
 
                 return (
                   <li key={item.href + item.label}>
@@ -307,9 +292,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                           >
                             {item.label}
                           </span>
-                          {item.badge && (
+                          {badge && (
                             <span className="shrink-0 rounded-full bg-nilink-accent px-2 py-0.5 text-[10px] font-bold text-white">
-                              {item.badge}
+                              {badge}
                             </span>
                           )}
                         </div>

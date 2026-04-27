@@ -38,7 +38,7 @@ const PRESETS: { id: OfferWizardPresetId; label: string; hint: string }[] = [
   { id: 'appearance_media_day', label: 'Media day', hint: 'Hybrid-friendly' },
 ];
 
-const UGC_PLATFORMS = ['Instagram', 'TikTok'] as const;
+const UGC_PLATFORMS = ['Instagram', 'TikTok', 'YouTube', 'X / Twitter'] as const;
 
 type ApiOfferRow = {
   id: string;
