@@ -768,7 +768,7 @@ export function AthleteProfile() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                 {showSaveForBrand ? <SaveAthleteControl athleteId={athlete.id} /> : null}
                 {showSaveForBrand ? (
                   <MessageAthleteButton athleteUserId={athlete.id} athleteName={athlete.name} />
