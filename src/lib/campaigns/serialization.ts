@@ -1,4 +1,4 @@
-import type { StoredApplication, StoredCampaign } from './repository';
+import type { StoredApplication, StoredCampaign, StoredOffer } from './repository';
 
 function idOf(row: { _id?: unknown }): string {
   return row._id != null ? String(row._id) : '';
@@ -59,4 +59,30 @@ export function athletePublicCampaignJSON(c: StoredCampaign) {
   const { brandUserId: _brandUserId, ...rest } = full;
   void _brandUserId;
   return rest;
+}
+
+/** API shape for an offer. Optional timeline stamps are omitted when null
+ *  so the response stays compact for offers that haven't reached that
+ *  state yet. */
+export function offerToJSON(o: StoredOffer) {
+  return {
+    id: idOf(o),
+    brandUserId: o.brandUserId,
+    athleteUserId: o.athleteUserId,
+    campaignId: o.campaignId,
+    applicationId: o.applicationId,
+    ...(o.dealId ? { dealId: o.dealId } : {}),
+    offerOrigin: o.offerOrigin,
+    status: o.status,
+    structuredDraft: o.structuredDraft,
+    notes: o.notes ?? '',
+    ...(o.declineReason ? { declineReason: o.declineReason } : {}),
+    ...(o.declineNote ? { declineNote: o.declineNote } : {}),
+    ...(o.sentAt ? { sentAt: o.sentAt } : {}),
+    ...(o.acceptedAt ? { acceptedAt: o.acceptedAt } : {}),
+    ...(o.declinedAt ? { declinedAt: o.declinedAt } : {}),
+    ...(o.withdrawnAt ? { withdrawnAt: o.withdrawnAt } : {}),
+    createdAt: o.createdAt,
+    updatedAt: o.updatedAt,
+  };
 }
