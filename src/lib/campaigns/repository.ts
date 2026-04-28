@@ -461,6 +461,77 @@ export async function createApplication(
   return { application: dbApplicationToStored(data as unknown as DbApplicationRow) };
 }
 
+/**
+ * Brand-initiated referral invite — creates a `pending` application on
+ * the brand's own campaign for the given athlete. Idempotent: if an
+ * application already exists for that (campaign, athlete), returns it
+ * with `created: false` instead of inserting again.
+ *
+ * Requires the "Brands invite athletes to own campaigns" INSERT policy
+ * (see supabase-referrals-setup.sql). The campaign must be accepting
+ * applications — the BEFORE-INSERT trigger enforces that.
+ */
+export async function createReferralApplication(input: {
+  campaignId: string;
+  brandUserId: string;
+  athleteUserId: string;
+}): Promise<
+  | { ok: true; application: StoredApplication; created: boolean }
+  | { ok: false; status: number; error: string }
+> {
+  const athleteUserId = String(input.athleteUserId ?? '').trim();
+  if (!athleteUserId) {
+    return { ok: false, status: 400, error: 'athleteUserId is required' };
+  }
+
+  const campaign = await getCampaignById(input.campaignId);
+  if (!campaign) {
+    return { ok: false, status: 404, error: 'Campaign not found' };
+  }
+  if (campaign.brandUserId !== input.brandUserId) {
+    return { ok: false, status: 403, error: 'Forbidden' };
+  }
+
+  const supabase = await createClient();
+
+  const { data: existing, error: existingErr } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('campaign_id', input.campaignId)
+    .eq('athlete_id', athleteUserId)
+    .maybeSingle();
+  if (existingErr) {
+    return { ok: false, status: 400, error: existingErr.message };
+  }
+  if (existing) {
+    return {
+      ok: true,
+      application: dbApplicationToStored(existing as unknown as DbApplicationRow),
+      created: false,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('applications')
+    .insert({
+      campaign_id: input.campaignId,
+      athlete_id: athleteUserId,
+      status: 'pending',
+      pitch: '',
+      athlete_snapshot: {},
+    })
+    .select('*')
+    .single();
+  if (error) {
+    return { ok: false, status: 400, error: error.message };
+  }
+  return {
+    ok: true,
+    application: dbApplicationToStored(data as unknown as DbApplicationRow),
+    created: true,
+  };
+}
+
 export async function updateApplicationStatus(
   applicationId: string,
   brandUserId: string,
