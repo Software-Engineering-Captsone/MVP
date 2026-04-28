@@ -54,6 +54,30 @@ export interface StoredApplication {
   updatedAt: string;
 }
 
+export type OfferOrigin = 'direct_profile' | 'campaign_handoff' | 'chat_negotiated';
+export type OfferStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'withdrawn';
+
+export interface StoredOffer {
+  _id: string;
+  brandUserId: string;
+  athleteUserId: string;
+  campaignId: string | null;
+  applicationId: string | null;
+  dealId: string | null;
+  offerOrigin: OfferOrigin;
+  status: OfferStatus;
+  structuredDraft: Record<string, unknown>;
+  notes: string;
+  declineReason: string;
+  declineNote: string;
+  sentAt: string | null;
+  acceptedAt: string | null;
+  declinedAt: string | null;
+  withdrawnAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /* ─────────────────────────────────────────────────────────────────
  * DB row shapes (raw Supabase response)
  * ───────────────────────────────────────────────────────────────── */
@@ -94,6 +118,27 @@ interface DbApplicationRow {
   pitch: string;
   athlete_snapshot: unknown;
   messages: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DbOfferRow {
+  id: string;
+  brand_id: string;
+  athlete_id: string;
+  campaign_id: string | null;
+  application_id: string | null;
+  deal_id: string | null;
+  offer_origin: OfferOrigin;
+  status: OfferStatus;
+  structured_draft: unknown;
+  notes: string | null;
+  decline_reason: string | null;
+  decline_note: string | null;
+  sent_at: string | null;
+  accepted_at: string | null;
+  declined_at: string | null;
+  withdrawn_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -174,6 +219,33 @@ function normalizeMessages(raw: unknown): StoredApplicationMessage[] {
       body: String(m.body ?? ''),
       createdAt: String(m.createdAt ?? ''),
     }));
+}
+
+function dbOfferToStored(row: DbOfferRow): StoredOffer {
+  const draft =
+    row.structured_draft && typeof row.structured_draft === 'object' && !Array.isArray(row.structured_draft)
+      ? (row.structured_draft as Record<string, unknown>)
+      : {};
+  return {
+    _id: row.id,
+    brandUserId: row.brand_id,
+    athleteUserId: row.athlete_id,
+    campaignId: row.campaign_id,
+    applicationId: row.application_id,
+    dealId: row.deal_id,
+    offerOrigin: row.offer_origin,
+    status: row.status,
+    structuredDraft: draft,
+    notes: row.notes ?? '',
+    declineReason: row.decline_reason ?? '',
+    declineNote: row.decline_note ?? '',
+    sentAt: row.sent_at,
+    acceptedAt: row.accepted_at,
+    declinedAt: row.declined_at,
+    withdrawnAt: row.withdrawn_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function dbApplicationToStored(row: DbApplicationRow): StoredApplication {
@@ -389,6 +461,77 @@ export async function createApplication(
   return { application: dbApplicationToStored(data as unknown as DbApplicationRow) };
 }
 
+/**
+ * Brand-initiated referral invite — creates a `pending` application on
+ * the brand's own campaign for the given athlete. Idempotent: if an
+ * application already exists for that (campaign, athlete), returns it
+ * with `created: false` instead of inserting again.
+ *
+ * Requires the "Brands invite athletes to own campaigns" INSERT policy
+ * (see supabase-referrals-setup.sql). The campaign must be accepting
+ * applications — the BEFORE-INSERT trigger enforces that.
+ */
+export async function createReferralApplication(input: {
+  campaignId: string;
+  brandUserId: string;
+  athleteUserId: string;
+}): Promise<
+  | { ok: true; application: StoredApplication; created: boolean }
+  | { ok: false; status: number; error: string }
+> {
+  const athleteUserId = String(input.athleteUserId ?? '').trim();
+  if (!athleteUserId) {
+    return { ok: false, status: 400, error: 'athleteUserId is required' };
+  }
+
+  const campaign = await getCampaignById(input.campaignId);
+  if (!campaign) {
+    return { ok: false, status: 404, error: 'Campaign not found' };
+  }
+  if (campaign.brandUserId !== input.brandUserId) {
+    return { ok: false, status: 403, error: 'Forbidden' };
+  }
+
+  const supabase = await createClient();
+
+  const { data: existing, error: existingErr } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('campaign_id', input.campaignId)
+    .eq('athlete_id', athleteUserId)
+    .maybeSingle();
+  if (existingErr) {
+    return { ok: false, status: 400, error: existingErr.message };
+  }
+  if (existing) {
+    return {
+      ok: true,
+      application: dbApplicationToStored(existing as unknown as DbApplicationRow),
+      created: false,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('applications')
+    .insert({
+      campaign_id: input.campaignId,
+      athlete_id: athleteUserId,
+      status: 'pending',
+      pitch: '',
+      athlete_snapshot: {},
+    })
+    .select('*')
+    .single();
+  if (error) {
+    return { ok: false, status: 400, error: error.message };
+  }
+  return {
+    ok: true,
+    application: dbApplicationToStored(data as unknown as DbApplicationRow),
+    created: true,
+  };
+}
+
 export async function updateApplicationStatus(
   applicationId: string,
   brandUserId: string,
@@ -469,4 +612,244 @@ export async function appendApplicationMessage(
   if (upErr) throw new Error(upErr.message);
   if (!updated) return { application: null, error: 'forbidden' };
   return { application: dbApplicationToStored(updated as unknown as DbApplicationRow) };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * OFFERS
+ *
+ * Backed by the public.offers table. RLS policies in
+ * supabase-offers-setup.sql gate access — these helpers add a
+ * defensive ownership check before mutations so the caller gets a
+ * clear null/error rather than a cryptic RLS denial.
+ * ───────────────────────────────────────────────────────────────── */
+
+const OFFER_SELECT = '*';
+
+export async function listOffersForCampaign(
+  campaignId: string,
+  brandUserId: string,
+): Promise<StoredOffer[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('offers')
+    .select(OFFER_SELECT)
+    .eq('campaign_id', campaignId)
+    .eq('brand_id', brandUserId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
+}
+
+export async function listOffersForAthlete(athleteUserId: string): Promise<StoredOffer[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('offers')
+    .select(OFFER_SELECT)
+    .eq('athlete_id', athleteUserId)
+    .neq('status', 'draft')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
+}
+
+export async function listOffersForBrand(brandUserId: string): Promise<StoredOffer[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('offers')
+    .select(OFFER_SELECT)
+    .eq('brand_id', brandUserId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
+}
+
+export async function getOfferByIdForBrand(
+  offerId: string,
+  brandUserId: string,
+): Promise<StoredOffer | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('offers')
+    .select(OFFER_SELECT)
+    .eq('id', offerId)
+    .eq('brand_id', brandUserId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? dbOfferToStored(data as unknown as DbOfferRow) : null;
+}
+
+export async function getOfferByIdForAthlete(
+  offerId: string,
+  athleteUserId: string,
+): Promise<StoredOffer | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('offers')
+    .select(OFFER_SELECT)
+    .eq('id', offerId)
+    .eq('athlete_id', athleteUserId)
+    .neq('status', 'draft')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? dbOfferToStored(data as unknown as DbOfferRow) : null;
+}
+
+/**
+ * Direct-from-profile draft. The brand opens the athlete's profile and
+ * starts a fresh draft with no campaign or application linkage. The
+ * OfferWizard is then opened against the returned offer id.
+ */
+export async function createDirectProfileOfferDraft(input: {
+  brandUserId: string;
+  athleteUserId: string;
+  notes?: string;
+  structuredDraft?: Record<string, unknown>;
+}): Promise<StoredOffer> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('offers')
+    .insert({
+      brand_id: input.brandUserId,
+      athlete_id: input.athleteUserId,
+      offer_origin: 'direct_profile',
+      status: 'draft',
+      notes: (input.notes ?? '').trim(),
+      structured_draft: input.structuredDraft ?? {},
+    })
+    .select(OFFER_SELECT)
+    .single();
+  if (error) throw new Error(error.message);
+  return dbOfferToStored(data as unknown as DbOfferRow);
+}
+
+/**
+ * Chat-negotiated draft. Optionally carries a campaign_id when the
+ * conversation referenced one; never carries an application_id.
+ */
+export async function createChatNegotiatedOfferDraft(input: {
+  brandUserId: string;
+  athleteUserId: string;
+  campaignId?: string | null;
+  notes?: string;
+  structuredDraft?: Record<string, unknown>;
+}): Promise<StoredOffer> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('offers')
+    .insert({
+      brand_id: input.brandUserId,
+      athlete_id: input.athleteUserId,
+      campaign_id: input.campaignId ?? null,
+      offer_origin: 'chat_negotiated',
+      status: 'draft',
+      notes: (input.notes ?? '').trim(),
+      structured_draft: input.structuredDraft ?? {},
+    })
+    .select(OFFER_SELECT)
+    .single();
+  if (error) throw new Error(error.message);
+  return dbOfferToStored(data as unknown as DbOfferRow);
+}
+
+/**
+ * Bulk draft creation from approved applications. Used when a brand
+ * picks N applicants from a campaign review screen and wants offer
+ * drafts queued up. Skips application ids that already have an offer.
+ */
+export async function createOfferDraftsFromApplications(input: {
+  brandUserId: string;
+  campaignId: string;
+  applicationIds: string[];
+}): Promise<StoredOffer[]> {
+  if (input.applicationIds.length === 0) return [];
+  const supabase = await createClient();
+
+  const { data: camp } = await supabase
+    .from('campaigns')
+    .select('brand_id')
+    .eq('id', input.campaignId)
+    .maybeSingle();
+  if (!camp || camp.brand_id !== input.brandUserId) {
+    throw new Error('Campaign not found or not owned by brand');
+  }
+
+  const { data: apps, error: appsErr } = await supabase
+    .from('applications')
+    .select('id, athlete_id, status, campaign_id')
+    .in('id', input.applicationIds)
+    .eq('campaign_id', input.campaignId);
+  if (appsErr) throw new Error(appsErr.message);
+
+  const { data: existingOffers, error: exErr } = await supabase
+    .from('offers')
+    .select('application_id')
+    .in('application_id', input.applicationIds);
+  if (exErr) throw new Error(exErr.message);
+  const taken = new Set(
+    (existingOffers ?? [])
+      .map((r) => r.application_id)
+      .filter((id): id is string => typeof id === 'string'),
+  );
+
+  const toInsert = (apps ?? [])
+    .filter((a) => !taken.has(a.id))
+    .map((a) => ({
+      brand_id: input.brandUserId,
+      athlete_id: a.athlete_id,
+      campaign_id: input.campaignId,
+      application_id: a.id,
+      offer_origin: 'campaign_handoff' as const,
+      status: 'draft' as const,
+      structured_draft: {},
+    }));
+
+  if (toInsert.length === 0) return [];
+
+  const { data: inserted, error: insErr } = await supabase
+    .from('offers')
+    .insert(toInsert)
+    .select(OFFER_SELECT);
+  if (insErr) throw new Error(insErr.message);
+  return (inserted ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
+}
+
+/**
+ * Patch a draft offer's editable fields. Status transitions go through
+ * a separate helper (Step 7) — this only touches terms/notes while the
+ * offer is still a draft.
+ */
+export async function updateOfferDraftFields(
+  offerId: string,
+  brandUserId: string,
+  patch: {
+    structuredDraft?: Record<string, unknown>;
+    notes?: string;
+  },
+): Promise<StoredOffer | null> {
+  const supabase = await createClient();
+  const update: Record<string, unknown> = {};
+  if (patch.structuredDraft !== undefined) update.structured_draft = patch.structuredDraft;
+  if (patch.notes !== undefined) update.notes = patch.notes;
+  if (Object.keys(update).length === 0) {
+    return getOfferByIdForBrand(offerId, brandUserId);
+  }
+
+  // Verify ownership and draft status before mutating. RLS would
+  // reject a cross-brand write, but we want a clean null instead of an
+  // exception for the "not found / not editable" case.
+  const current = await getOfferByIdForBrand(offerId, brandUserId);
+  if (!current) return null;
+  if (current.status !== 'draft') {
+    throw new Error('Only draft offers can be edited');
+  }
+
+  const { data, error } = await supabase
+    .from('offers')
+    .update(update)
+    .eq('id', offerId)
+    .eq('brand_id', brandUserId)
+    .select(OFFER_SELECT)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? dbOfferToStored(data as unknown as DbOfferRow) : null;
 }
