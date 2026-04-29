@@ -214,10 +214,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const inboxActive = pathname.startsWith(inboxNavItem.href);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
     setIsProfileMenuOpen(false);
-    router.push('/auth');
-    router.refresh();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Proceed to /auth even if signOut errors — user intent is to leave.
+    }
+    // Hard navigation so middleware re-runs with cleared auth cookies
+    // and any in-memory client state is wiped.
+    window.location.replace('/auth');
   };
 
   return (
