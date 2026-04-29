@@ -5,6 +5,7 @@
     "engineering-advanced-skills@claude-code-skills": true,
     "supabase@claude-plugins-official": true,
     "postgres-best-practices@supabase-agent-skills": true,
-    "everything-claude-code@everything-claude-code": true
+    "everything-claude-code@everything-claude-code": true,
+    "claude-mem@thedotmack": true
   }
 }
