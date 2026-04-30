@@ -68,10 +68,26 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const router = useRouter();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
   const [pendingOfferCount, setPendingOfferCount] = useState(0);
 
   const supabase = createClient();
+
+  const fetchAvatarUrl = useCallback(async (userId: string): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) return null;
+      const url = String(data?.avatar_url ?? '').trim();
+      return url.length > 0 ? url : null;
+    } catch {
+      return null;
+    }
+  }, [supabase]);
 
   const mapSupabaseUser = useCallback((supaUser: {
     id: string;
@@ -98,14 +114,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const refreshUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) setSessionUser(mapSupabaseUser(user));
-  }, [supabase, mapSupabaseUser]);
+    if (user) {
+      setSessionUser(mapSupabaseUser(user));
+      setAvatarUrl(await fetchAvatarUrl(user.id));
+    }
+  }, [supabase, mapSupabaseUser, fetchAvatarUrl]);
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    void supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setSessionUser(mapSupabaseUser(user));
+        setAvatarUrl(await fetchAvatarUrl(user.id));
       } else {
         router.replace('/auth');
       }
@@ -117,8 +137,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       (_event, session) => {
         if (session?.user) {
           setSessionUser(mapSupabaseUser(session.user));
+          void fetchAvatarUrl(session.user.id).then(setAvatarUrl);
         } else {
           setSessionUser(null);
+          setAvatarUrl(null);
           router.replace('/auth');
         }
       }
@@ -127,7 +149,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, mapSupabaseUser]);
+  }, [supabase, router, mapSupabaseUser, fetchAvatarUrl]);
 
   /* ── Onboarding gate for athletes ── */
   useEffect(() => {
@@ -200,7 +222,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const navigation = accountType === 'business' ? businessNavigation : athleteNavigation;
 
   const userDisplay = {
-    avatar: userAvatarDataUrl(sessionUser.name),
+    avatar: avatarUrl ?? userAvatarDataUrl(sessionUser.name),
     name: sessionUser.name,
     email: sessionUser.email,
   };

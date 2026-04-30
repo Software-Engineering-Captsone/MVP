@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import { Loader2, X } from 'lucide-react';
 
@@ -16,21 +16,27 @@ interface Props {
  * so we don't push giant photos into Storage.
  */
 export function PhotoCropModal({ file, onCancel, onConfirm }: Props) {
-  const imageSrc = useMemo(() => URL.createObjectURL(file), [file]);
+  // Pair URL creation with its own cleanup inside an effect so React's
+  // StrictMode double-invoke can't revoke a URL that's still in use.
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState<Area | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => () => URL.revokeObjectURL(imageSrc), [imageSrc]);
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setImageSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
     setArea(areaPixels);
   }, []);
 
   const handleConfirm = async () => {
-    if (!area || processing) return;
+    if (!area || processing || !imageSrc) return;
     setProcessing(true);
     setError(null);
     try {
