@@ -1,8 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { StoredOffer } from '@/lib/campaigns/localCampaignStore';
-import type { StoredApplication } from '@/lib/campaigns/repository';
-import { readLocalCampaignStore } from '@/lib/campaigns/localCampaignStore';
-import { getApplicationById, getCampaignById } from '@/lib/campaigns/repository';
+import type { StoredApplication, StoredOffer } from '@/lib/campaigns/repository';
+import { getApplicationById, getCampaignById, listOffersForAthlete } from '@/lib/campaigns/repository';
 import { threadHasUserMessageFromParticipant } from '@/lib/chat/service';
 import type { ChatInboxItem, ChatSessionUser } from '@/lib/chat/types';
 
@@ -91,8 +89,7 @@ export async function filterAthleteInboxItems(
   items: ChatInboxItem[]
 ): Promise<ChatInboxItem[]> {
   if (session.role !== 'athlete') return items;
-  const snap = await readLocalCampaignStore();
-  const offers = snap.offers ?? [];
+  const offers = await listOffersForAthlete(session.id);
   const out: ChatInboxItem[] = [];
 
   for (const item of items) {

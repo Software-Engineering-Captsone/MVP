@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { readLocalCampaignStore } from '@/lib/campaigns/localCampaignStore';
-import { getApplicationById, getCampaignById } from '@/lib/campaigns/repository';
+import { getApplicationById, getCampaignById, listOffersForAthlete } from '@/lib/campaigns/repository';
 import { canAccessApplicationChat } from '@/lib/chat/access';
 import {
   athleteHasChatLaneOfferForOutreachThread,
@@ -35,8 +34,7 @@ export async function assertThreadMessagingAccess(
     if (session.id === thread.brand_user_id) {
       return { error: null };
     }
-    const snap = await readLocalCampaignStore();
-    const offers = snap.offers ?? [];
+    const offers = await listOffersForAthlete(thread.athlete_user_id);
     const fromBrand = await threadHasUserMessageFromParticipant(
       supabase,
       threadId,
@@ -85,8 +83,7 @@ export async function assertThreadMessagingAccess(
     return { error: 'forbidden' };
   }
 
-  const snap = await readLocalCampaignStore();
-  const offers = snap.offers ?? [];
+  const offers = await listOffersForAthlete(session.id);
   const brandId = String(campaign.brandUserId ?? '');
 
   if (intent === 'write') {

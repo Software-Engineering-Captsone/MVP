@@ -946,3 +946,94 @@ export async function updateOfferDraftFields(
   if (error) throw new Error(error.message);
   return data ? dbOfferToStored(data as unknown as DbOfferRow) : null;
 }
+
+
+/* ─────────────────────────────────────────────────────────────────
+ * Campaign templates (per-brand saved presets)
+ * Backed by `public.campaign_templates`. System templates aren't
+ * stored — the GET route merges the seed list from
+ * buildSeedSystemCampaignTemplates() with rows returned here.
+ * ───────────────────────────────────────────────────────────────── */
+
+export interface StoredBrandCampaignTemplate {
+  id: string;
+  brandUserId: string;
+  name: string;
+  description: string;
+  version: number;
+  status: 'active' | 'archived';
+  defaults: Record<string, unknown>;
+  lockedPaths: string[] | null;
+  sourceCampaignId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface DbCampaignTemplateRow {
+  id: string;
+  brand_id: string;
+  name: string;
+  description: string | null;
+  version: number;
+  status: string;
+  defaults: Record<string, unknown> | null;
+  locked_paths: string[] | null;
+  source_campaign_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function dbTemplateToStored(row: DbCampaignTemplateRow): StoredBrandCampaignTemplate {
+  return {
+    id: row.id,
+    brandUserId: row.brand_id,
+    name: row.name,
+    description: row.description ?? '',
+    version: row.version,
+    status: row.status === 'archived' ? 'archived' : 'active',
+    defaults: row.defaults ?? {},
+    lockedPaths: row.locked_paths,
+    sourceCampaignId: row.source_campaign_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function listCampaignTemplatesForBrand(
+  brandUserId: string,
+): Promise<StoredBrandCampaignTemplate[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('campaign_templates')
+    .select('*')
+    .eq('brand_id', brandUserId)
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbTemplateToStored(r as DbCampaignTemplateRow));
+}
+
+export async function createBrandCampaignTemplate(input: {
+  brandUserId: string;
+  name: string;
+  description?: string;
+  defaults: Record<string, unknown>;
+  lockedPaths?: string[] | null;
+  sourceCampaignId?: string | null;
+}): Promise<StoredBrandCampaignTemplate> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('campaign_templates')
+    .insert({
+      brand_id: input.brandUserId,
+      name: input.name,
+      description: input.description ?? '',
+      defaults: input.defaults,
+      locked_paths: input.lockedPaths ?? null,
+      source_campaign_id: input.sourceCampaignId ?? null,
+    })
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return dbTemplateToStored(data as DbCampaignTemplateRow);
+}
