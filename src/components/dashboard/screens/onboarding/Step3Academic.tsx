@@ -19,7 +19,21 @@ const labelClass =
   'mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400';
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Graduate / 5th Year'] as const;
-const ELIGIBILITY = ['1 year', '2 years', '3 years', '4 years'] as const;
+
+const ELIGIBILITY_OPTIONS = [
+  { label: '1 year',  value: '1' },
+  { label: '2 years', value: '2' },
+  { label: '3 years', value: '3' },
+  { label: '4 years', value: '4' },
+] as const;
+
+const YEAR_TO_ELIGIBILITY: Record<string, string> = {
+  'Freshman':            '4',
+  'Sophomore':           '3',
+  'Junior':              '2',
+  'Senior':              '1',
+  'Graduate / 5th Year': '1',
+};
 
 interface Step3Props {
   data: OnboardingAcademic;
@@ -31,6 +45,9 @@ interface Step3Props {
 
 export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: Step3Props) {
   const { universities, loading: loadingUnis, error: uniError } = useUniversities();
+
+  // Track whether the user has manually overridden the auto-inferred eligibility
+  const userOverrodeEligibility = useRef(false);
 
   // Detect if account email is .edu
   const isEduAccount = sessionEmail.toLowerCase().endsWith('.edu');
@@ -229,7 +246,15 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
           <select
             id="ob-year"
             value={data.currentYear}
-            onChange={(e) => onChange({ currentYear: e.target.value })}
+            onChange={(e) => {
+              const year = e.target.value;
+              const inferred = YEAR_TO_ELIGIBILITY[year];
+              const patch: Parameters<typeof onChange>[0] = { currentYear: year };
+              if (inferred && !userOverrodeEligibility.current) {
+                patch.eligibilityYears = inferred;
+              }
+              onChange(patch);
+            }}
             className={`${inputClass} appearance-none`}
           >
             <option value="">Select year</option>
@@ -264,20 +289,23 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
       <div>
         <label className={labelClass}>Remaining Eligibility</label>
         <div className="flex flex-wrap gap-2">
-          {ELIGIBILITY.map((opt) => {
-            const active = data.eligibilityYears === opt;
+          {ELIGIBILITY_OPTIONS.map((opt) => {
+            const active = data.eligibilityYears === opt.value;
             return (
               <button
-                key={opt}
+                key={opt.value}
                 type="button"
-                onClick={() => onChange({ eligibilityYears: opt })}
+                onClick={() => {
+                  userOverrodeEligibility.current = true;
+                  onChange({ eligibilityYears: opt.value });
+                }}
                 className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
                   active
                     ? 'border-nilink-accent bg-nilink-accent text-white shadow-sm'
                     : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                {opt}
+                {opt.label}
               </button>
             );
           })}

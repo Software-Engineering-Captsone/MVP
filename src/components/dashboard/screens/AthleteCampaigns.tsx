@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { Megaphone, ChevronRight, MessageSquare, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { authFetch } from '@/lib/authFetch';
 import { apiCampaignToUi, type ApiApplicationRow, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
 import type { Campaign } from '@/components/dashboard/screens/campaignDashboardTypes';
 
 export function AthleteCampaigns() {
+  const { user } = useDashboard();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,11 +85,7 @@ export function AthleteCampaigns() {
         followers: '—',
         engagement: '—',
       };
-      const meRes = await authFetch('/api/auth/me');
-      if (meRes.ok) {
-        const meJson = (await meRes.json()) as { user?: { name?: string } };
-        if (meJson.user?.name) athleteSnapshot.name = meJson.user.name;
-      }
+      athleteSnapshot.name = user?.name ?? '';
 
       const res = await authFetch(`/api/campaigns/${detail.campaign.id}/applications`, {
         method: 'POST',

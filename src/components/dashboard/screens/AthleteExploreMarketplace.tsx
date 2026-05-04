@@ -72,19 +72,70 @@ function formatDate(value?: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function formatOpenUntil(value?: string): string {
-  if (!value) return 'N/A';
+/**
+ * Formats a campaign close date for the deadline pill on the opportunity card.
+ * Returns `null` when the date is missing or invalid so the caller can render a
+ * neutral "ongoing" hint instead of a broken "Closes N/A" string.
+ */
+function formatOpenUntil(value?: string): string | null {
+  if (!value) return null;
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return 'N/A';
+  if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function condensedDeliverableChips(campaign: ApiCampaignRow): string[] {
+/**
+ * Compact relative recency for the deadline slot on cards with no close date.
+ * Higher signal than "Always open" — tells the athlete whether the opportunity is fresh.
+ *   <24h  → "Posted today"
+ *   <14d  → "Posted Nd ago"
+ *   <8w   → "Posted Nw ago"
+ *   else  → "Posted Mon D"
+ */
+function formatPostedRecency(value?: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const ms = Date.now() - d.getTime();
+  if (ms < 0) return 'Posted today';
+  const days = Math.floor(ms / 86_400_000);
+  if (days < 1) return 'Posted today';
+  if (days < 14) return `Posted ${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 8) return `Posted ${weeks}w ago`;
+  return `Posted ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+}
+
+type DeliverableChipsResult = {
+  labels: string[];
+  /** True when no real deliverable data exists; caller should render the chip(s) muted. */
+  isHint: boolean;
+};
+
+/**
+ * Derive 1–2 char initials from a brand or campaign name for the monogram fallback.
+ * "Sam's Bar" → "SB", "Nike" → "NI", "" → "·".
+ */
+function brandMonogramInitials(name: string): string {
+  const cleaned = name.trim();
+  if (!cleaned) return '·';
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    const single = parts[0]!;
+    return (single.length >= 2 ? single.slice(0, 2) : single).toUpperCase();
+  }
+  return ((parts[0]![0] ?? '') + (parts[parts.length - 1]![0] ?? '')).toUpperCase();
+}
+
+function condensedDeliverableChips(campaign: ApiCampaignRow): DeliverableChipsResult {
   if (Array.isArray(campaign.packageDetails) && campaign.packageDetails.length > 0) {
-    return campaign.packageDetails
-      .map((item) => String(item).trim())
-      .filter(Boolean)
-      .slice(0, 3);
+    return {
+      labels: campaign.packageDetails
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .slice(0, 3),
+      isHint: false,
+    };
   }
   const chips: string[] = [];
   if (Array.isArray(campaign.platforms) && campaign.platforms.length > 0) {
@@ -92,8 +143,8 @@ function condensedDeliverableChips(campaign: ApiCampaignRow): string[] {
   }
   const campaignType = typeof campaign.campaignType === 'string' ? campaign.campaignType.trim() : '';
   if (campaignType) chips.push(campaignType);
-  if (chips.length > 0) return chips.slice(0, 3);
-  return ['Deliverables shared'];
+  if (chips.length > 0) return { labels: chips.slice(0, 3), isHint: false };
+  return { labels: ['Details on deal'], isHint: true };
 }
 
 function detailSectionTitle(text: string) {
@@ -437,13 +488,18 @@ export function AthleteExploreMarketplace() {
     [brands]
   );
 
+  /**
+   * Returns a real image URL or `''` when the campaign and its brand both lack one.
+   * The opportunity card uses the empty string as a signal to render the deterministic
+   * monogram fallback instead of the generic orange placeholder SVG.
+   */
   const campaignImageForCard = useCallback(
     (campaign: ApiCampaignRow): string => {
       const campaignImage = typeof campaign.image === 'string' ? campaign.image.trim() : '';
       if (campaignImage) return campaignImage;
       const brand = findBrandForCampaign(campaign);
       if (brand?.image) return brand.image;
-      return PLACEHOLDER_IMAGE;
+      return '';
     },
     [findBrandForCampaign]
   );
@@ -759,23 +815,37 @@ export function AthleteExploreMarketplace() {
                             const isSaved = savedCampaignIds.includes(String(campaign.id));
                             const deliverables = condensedDeliverableChips(campaign);
                             const openUntil = formatOpenUntil(campaign.endDate);
-                            const openUntilLabel = `Closes ${openUntil}`;
+                            const postedRecency = formatPostedRecency(campaign.createdAt);
+                            const deadline = openUntil
+                              ? { label: `Closes ${openUntil}` }
+                              : {
+                                  label: postedRecency ?? 'Always open',
+                                  urgency: 'none' as const,
+                                };
+                            const rawCompensation =
+                              campaign.budgetHint || campaign.budget || '';
+                            const compensation = rawCompensation
+                              ? { display: String(rawCompensation), variant: 'price' as const }
+                              : { display: '' };
+                            const chipObjects = deliverables.isHint
+                              ? []
+                              : toOpportunityChips(deliverables.labels);
+                            const brandName = String(
+                              campaign.brandDisplayName ?? brand?.name ?? 'Brand'
+                            );
                             return (
                               <OpportunityExploreCard
                                 key={String(campaign.id)}
                                 content={{
                                   id: String(campaign.id),
                                   title: String(campaign.name ?? 'Campaign'),
-                                  brandName: String(campaign.brandDisplayName ?? brand?.name ?? 'Brand'),
+                                  brandName,
                                   imageSrc: image,
                                   imageAlt: String(campaign.name ?? 'Campaign'),
-                                  chips: toOpportunityChips(deliverables),
-                                  deadline: { label: openUntilLabel },
-                                  compensation: {
-                                    display: String(
-                                      campaign.budgetHint || campaign.budget || 'Compensation shared on detail'
-                                    ),
-                                  },
+                                  mediaMonogram: { initials: brandMonogramInitials(brandName) },
+                                  chips: chipObjects,
+                                  deadline,
+                                  compensation,
                                   ctaLabel: 'View Deal',
                                 }}
                                 state={{ isSaved, isWithdrawn }}
@@ -854,23 +924,36 @@ export function AthleteExploreMarketplace() {
                   const image = campaignImageForCard(campaign);
                   const deliverables = condensedDeliverableChips(campaign);
                   const openUntil = formatOpenUntil(campaign.endDate);
-                  const openUntilLabel = `Closes ${openUntil}`;
+                  const postedRecency = formatPostedRecency(campaign.createdAt);
+                  const deadline = openUntil
+                    ? { label: `Closes ${openUntil}` }
+                    : {
+                        label: postedRecency ?? 'Always open',
+                        urgency: 'none' as const,
+                      };
+                  const rawCompensation = campaign.budgetHint || campaign.budget || '';
+                  const compensation = rawCompensation
+                    ? { display: String(rawCompensation), variant: 'price' as const }
+                    : { display: '' };
+                  const chipObjects = deliverables.isHint
+                    ? []
+                    : toOpportunityChips(deliverables.labels);
+                  const brandName = String(
+                    campaign.brandDisplayName ?? brand?.name ?? 'Brand'
+                  );
                   return (
                     <OpportunityExploreCard
                       key={String(campaign.id)}
                       content={{
                         id: String(campaign.id),
                         title: String(campaign.name ?? 'Campaign'),
-                        brandName: String(campaign.brandDisplayName ?? brand?.name ?? 'Brand'),
+                        brandName,
                         imageSrc: image,
                         imageAlt: String(campaign.name ?? 'Campaign'),
-                        chips: toOpportunityChips(deliverables),
-                        deadline: { label: openUntilLabel },
-                        compensation: {
-                          display: String(
-                            campaign.budgetHint || campaign.budget || 'Compensation shared on detail'
-                          ),
-                        },
+                        mediaMonogram: { initials: brandMonogramInitials(brandName) },
+                        chips: chipObjects,
+                        deadline,
+                        compensation,
                         ctaLabel: 'View Deal',
                       }}
                       state={{ isSaved: true }}
@@ -980,7 +1063,7 @@ export function AthleteExploreMarketplace() {
                 )}
                 <div className="mt-4 h-48 overflow-hidden rounded-xl border border-gray-100 bg-gray-100 sm:h-52">
                   <ImageWithFallback
-                    src={campaignImageForCard(selectedCampaign)}
+                    src={campaignImageForCard(selectedCampaign) || PLACEHOLDER_IMAGE}
                     alt={String(selectedCampaign.name ?? 'Campaign')}
                     className="h-full w-full object-cover"
                   />

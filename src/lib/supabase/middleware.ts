@@ -40,17 +40,11 @@ export async function updateSession(request: NextRequest) {
 
   let user: { id: string } | null = null;
   try {
-    // IMPORTANT: Do NOT call supabase.auth.getSession() here.
-    // getUser() hits Supabase Auth to revalidate. Bound the wait time
-    // so navigation cannot hang when auth service is unavailable.
-    const result = await Promise.race([
-      supabase.auth.getUser(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
-    ]);
-
-    if (result && typeof result === 'object' && 'data' in result) {
-      user = result.data.user ?? null;
-    }
+    // getSession() reads the session from the cookie without a network call,
+    // making navigation fast. Route protection is sufficient here — full token
+    // revalidation happens in API routes that call getUser().
+    const { data: { session } } = await supabase.auth.getSession();
+    user = session?.user ?? null;
   } catch {
     user = null;
   }

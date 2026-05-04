@@ -9,8 +9,14 @@ import {
   XCircle, UserPlus, Zap, MessageSquare, Loader2,
 } from 'lucide-react';
 import { authFetch } from '@/lib/authFetch';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { motion } from 'framer-motion';
-import { OfferWizard } from '@/components/offers/OfferWizard';
+import dynamic from 'next/dynamic';
+
+const OfferWizard = dynamic(
+  () => import('@/components/offers/OfferWizard').then((m) => m.OfferWizard),
+  { ssr: false, loading: () => null }
+);
 import { COPY_INVITE_TO_CAMPAIGN, COPY_REFERRAL, COPY_SEND_OFFER } from '@/lib/productCopy';
 import type {
   ApplicationQueueSource,
@@ -113,7 +119,8 @@ export function CampaignDetail({
   const [openMenuForId, setOpenMenuForId] = useState<string | null>(null);
   const [messageAppId, setMessageAppId] = useState<string | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { user: dashboardUser } = useDashboard();
+  const currentUserId = dashboardUser?.id ?? null;
   const [threadMessages, setThreadMessages] = useState<
     { id: string; fromUserId: string; body: string; createdAt: string }[]
   >([]);
@@ -127,14 +134,6 @@ export function CampaignDetail({
   const [offersMapError, setOffersMapError] = useState<string | null>(null);
   const [wizardOfferId, setWizardOfferId] = useState<string | null>(null);
 
-  useEffect(() => {
-    void (async () => {
-      const res = await authFetch('/api/auth/me');
-      if (!res.ok) return;
-      const data = (await res.json()) as { user?: { id?: string } };
-      if (data.user?.id) setCurrentUserId(data.user.id);
-    })();
-  }, []);
 
   const filteredCandidates = useMemo(() => {
     let list =

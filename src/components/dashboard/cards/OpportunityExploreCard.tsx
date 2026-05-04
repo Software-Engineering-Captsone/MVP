@@ -6,6 +6,7 @@ import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import {
   opportunityCardFocusRing,
   opportunityCardTokens,
+  opportunityMonogramTones,
 } from '@/components/dashboard/cards/opportunityCardTokens';
 
 export type OpportunityCardChipLane = 'deliverable' | 'qualifier';
@@ -18,13 +19,26 @@ export type OpportunityCardChip = {
 };
 
 export type OpportunityCardCompensation = {
+  /**
+   * The string to render. **Pass an empty string to hide the slot entirely** —
+   * preferred over filler copy like "Comp on offer" so the bottom row collapses
+   * to just the CTA and the card stops carrying anti-information.
+   */
   display: string;
   ariaLabel?: string;
+  /**
+   * Visual treatment for the compensation slot (only relevant when `display` is non-empty).
+   * - 'price' — large bold typography for actual amounts ("$1,200", "$1k–$2k").
+   * - 'note'  — small muted typography for short descriptive labels ("Pay on application").
+   * When omitted, the variant is auto-detected: any digit or currency symbol => 'price', otherwise 'note'.
+   */
+  variant?: 'price' | 'note';
 };
 
 export type OpportunityCardDeadline = {
   label: string;
-  urgency?: 'normal' | 'soon' | 'today';
+  /** 'none' renders a neutral gray dot (use when there is no real close date — e.g. ongoing campaigns). */
+  urgency?: 'normal' | 'soon' | 'today' | 'none';
 };
 
 export type OpportunityCardVisualState = {
@@ -34,12 +48,22 @@ export type OpportunityCardVisualState = {
   isLoading?: boolean;
 };
 
+export type OpportunityCardMonogram = {
+  /** 1–2 char initials. The card does not derive these — callers compute from brand name. */
+  initials: string;
+  /** Optional palette index into `opportunityMonogramTones`; if omitted, hashed from `initials`. */
+  tone?: number;
+};
+
 export type OpportunityCardContent = {
   id: string;
   title: string;
   brandName: string;
+  /** Empty/falsy => render the monogram fallback. */
   imageSrc: string;
   imageAlt: string;
+  /** Optional monogram fallback used when `imageSrc` is missing or empty. */
+  mediaMonogram?: OpportunityCardMonogram;
   chips: OpportunityCardChip[];
   deadline: OpportunityCardDeadline;
   compensation: OpportunityCardCompensation;
@@ -72,7 +96,26 @@ export function toOpportunityChips(labels: readonly string[]): OpportunityCardCh
 function deadlineDotClass(urgency?: OpportunityCardDeadline['urgency']): string {
   if (urgency === 'today') return opportunityCardTokens.deadlineDotToday;
   if (urgency === 'soon') return opportunityCardTokens.deadlineDotSoon;
+  if (urgency === 'none') return opportunityCardTokens.deadlineDotNone;
   return opportunityCardTokens.deadlineDotNormal;
+}
+
+const PRICE_LIKE = /[\d$€£¥₹]/;
+function resolveCompensationVariant(c: OpportunityCardCompensation): 'price' | 'note' {
+  if (c.variant) return c.variant;
+  return PRICE_LIKE.test(c.display) ? 'price' : 'note';
+}
+
+/** Deterministic palette index — same input always picks the same gradient. */
+function monogramToneClass(monogram: OpportunityCardMonogram): string {
+  if (typeof monogram.tone === 'number') {
+    return opportunityMonogramTones[monogram.tone % opportunityMonogramTones.length]!;
+  }
+  let hash = 0;
+  for (let i = 0; i < monogram.initials.length; i += 1) {
+    hash = (hash * 31 + monogram.initials.charCodeAt(i)) >>> 0;
+  }
+  return opportunityMonogramTones[hash % opportunityMonogramTones.length]!;
 }
 
 function visibleChips(chips: OpportunityCardChip[]): OpportunityCardChip[] {
@@ -138,11 +181,27 @@ export function OpportunityExploreCard({
       {/* min-h on root + flex-1 column; bottomShell mt-auto + pt-3 locks compensation + CTA to card bottom. */}
       <div className={`${opportunityCardTokens.layoutRow} min-h-0 flex-1 motion-reduce:transition-none`}>
         <div className={opportunityCardTokens.mediaWrap}>
-          <ImageWithFallback
-            src={content.imageSrc}
-            alt={content.imageAlt}
-            className={opportunityCardTokens.mediaImage}
-          />
+          {content.imageSrc ? (
+            <ImageWithFallback
+              src={content.imageSrc}
+              alt={content.imageAlt}
+              className={opportunityCardTokens.mediaImage}
+            />
+          ) : content.mediaMonogram ? (
+            <div
+              className={`${opportunityCardTokens.mediaMonogram} ${monogramToneClass(content.mediaMonogram)}`}
+              role="img"
+              aria-label={content.imageAlt}
+            >
+              {content.mediaMonogram.initials}
+            </div>
+          ) : (
+            <ImageWithFallback
+              src={content.imageSrc}
+              alt={content.imageAlt}
+              className={opportunityCardTokens.mediaImage}
+            />
+          )}
         </div>
         <div className={`${opportunityCardTokens.headerWrap} flex min-h-0 flex-1 flex-col`}>
           <div className={opportunityCardTokens.headerRow}>
@@ -169,19 +228,27 @@ export function OpportunityExploreCard({
             </button>
           </div>
 
-          <div className={opportunityCardTokens.chipsRow}>
-            {chips.map((chip) => {
-              const isMuted = chip.label.startsWith('+') || chip.lane === 'qualifier';
-              const chipClass = isMuted ? opportunityCardTokens.chipMuted : opportunityCardTokens.chip;
-              return (
-                <span key={chip.id} className={chipClass} title={chip.title ?? chip.label}>
-                  {chip.label}
-                </span>
-              );
-            })}
-          </div>
+          {chips.length > 0 ? (
+            <div className={opportunityCardTokens.chipsRow}>
+              {chips.map((chip) => {
+                const isMuted = chip.label.startsWith('+') || chip.lane === 'qualifier';
+                const chipClass = isMuted ? opportunityCardTokens.chipMuted : opportunityCardTokens.chip;
+                return (
+                  <span key={chip.id} className={chipClass} title={chip.title ?? chip.label}>
+                    {chip.label}
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
 
-          <div className={opportunityCardTokens.deadlineRow}>
+          <div
+            className={
+              content.deadline.urgency === 'none'
+                ? opportunityCardTokens.deadlineRowMuted
+                : opportunityCardTokens.deadlineRow
+            }
+          >
             <span className={opportunityCardTokens.deadlineLabel}>
               <span className={deadlineDotClass(content.deadline.urgency)} aria-hidden />
               <span className="truncate">{content.deadline.label}</span>
@@ -192,13 +259,25 @@ export function OpportunityExploreCard({
           </div>
 
           <div className={opportunityCardTokens.bottomShell}>
-            <div className={opportunityCardTokens.bottomRow}>
-              <p
-                className={opportunityCardTokens.compensation}
-                {...(content.compensation.ariaLabel ? { 'aria-label': content.compensation.ariaLabel } : {})}
-              >
-                {content.compensation.display}
-              </p>
+            <div
+              className={
+                content.compensation.display
+                  ? opportunityCardTokens.bottomRow
+                  : opportunityCardTokens.bottomRowCtaOnly
+              }
+            >
+              {content.compensation.display ? (
+                <p
+                  className={
+                    resolveCompensationVariant(content.compensation) === 'note'
+                      ? opportunityCardTokens.compensationNote
+                      : opportunityCardTokens.compensation
+                  }
+                  {...(content.compensation.ariaLabel ? { 'aria-label': content.compensation.ariaLabel } : {})}
+                >
+                  {content.compensation.display}
+                </p>
+              ) : null}
               <button
                 type="button"
                 aria-label={`View deal for ${content.title}`}

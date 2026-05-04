@@ -28,7 +28,9 @@
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "19.2.3",
     "react-easy-crop": "^5.5.7",
-    "recharts": "^3.8.0"
+    "recharts": "^3.8.0",
+    "resend": "^6.12.2",
+    "swr": "^2.4.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -7,7 +7,12 @@ import {
 } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
-import { PhotoCropModal } from '@/components/ui/PhotoCropModal';
+import dynamic from 'next/dynamic';
+
+const PhotoCropModal = dynamic(
+  () => import('@/components/ui/PhotoCropModal').then((m) => m.PhotoCropModal),
+  { ssr: false, loading: () => null }
+);
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { authFetch } from '@/lib/authFetch';
 import { uploadAvatar } from '@/lib/avatarUpload';

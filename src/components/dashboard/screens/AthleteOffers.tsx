@@ -1,38 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Calendar, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
-
-type AthleteOfferStatus = 'pending' | 'accepted' | 'declined' | 'expired';
-
-type ApiOfferRow = {
-  id: string;
-  offerOrigin: 'campaign_handoff' | 'direct_profile' | 'chat_negotiated';
-  campaignId: string | null;
-  applicationId: string | null;
-  athleteUserId: string;
-  brandUserId: string;
-  status: string;
-  dealId?: string;
-  notes?: string;
-  structuredDraft?: Record<string, unknown>;
-  createdAt?: string;
-  updatedAt?: string;
-  sentAt?: string;
-  acceptedAt?: string;
-  declinedAt?: string;
-  declineReason?: string;
-  declineNote?: string;
-  athleteOfferStatus: AthleteOfferStatus;
-  brandName: string;
-  campaignName: string | null;
-  shortDescription: string;
-  compensationSummary: string;
-  deadline: string | null;
-};
+import { useOffersList, type ApiOfferRow, type AthleteOfferStatus } from '@/hooks/api/useOffersList';
 
 type OfferDetailPayload = {
   offer: ApiOfferRow;
@@ -86,8 +59,7 @@ function fmtDate(iso: string | null | undefined): string {
 
 export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: string | null }) {
   const router = useRouter();
-  const [offers, setOffers] = useState<ApiOfferRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { offers, isLoading: loading, error: offersError, mutate: mutateOffers } = useOffersList();
   const [error, setError] = useState<string | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(initialOfferId);
   const [detail, setDetail] = useState<OfferDetailPayload | null>(null);
@@ -98,34 +70,13 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
   const [declineReason, setDeclineReason] = useState<(typeof declineReasonOptions)[number]['id']>('not_interested');
   const [declineNote, setDeclineNote] = useState('');
 
-  const loadOffers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await authFetch('/api/offers');
-      const data = (await res.json()) as { offers?: ApiOfferRow[]; error?: string };
-      if (!res.ok) {
-        setError(data.error || 'Could not load offers');
-        setOffers([]);
-        return;
-      }
-      const rows = Array.isArray(data.offers) ? data.offers : [];
-      setOffers(rows);
-      if (!selectedOfferId && rows.length > 0) {
-        const preferred = initialOfferId ? rows.find((r) => r.id === initialOfferId) : null;
-        setSelectedOfferId((preferred ?? rows[0]).id);
-      }
-    } catch {
-      setError('Network error while loading offers');
-      setOffers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [initialOfferId, selectedOfferId]);
-
+  // Auto-select the first offer (or initialOfferId) once the list loads
   useEffect(() => {
-    void loadOffers();
-  }, [loadOffers]);
+    if (!selectedOfferId && offers.length > 0) {
+      const preferred = initialOfferId ? offers.find((r) => r.id === initialOfferId) : null;
+      setSelectedOfferId((preferred ?? offers[0]).id);
+    }
+  }, [offers, initialOfferId, selectedOfferId]);
 
   useEffect(() => {
     if (!selectedOfferId) {
@@ -182,7 +133,7 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
         setNotice(data.error || 'Could not accept offer');
         return;
       }
-      await loadOffers();
+      await mutateOffers();
       if (data.deal?.id) {
         router.push(`/dashboard/deals?deal=${encodeURIComponent(data.deal.id)}`);
       } else {
@@ -216,7 +167,7 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
       }
       setShowDeclineModal(false);
       setDeclineNote('');
-      await loadOffers();
+      await mutateOffers();
       setNotice('Offer declined. The brand has been notified.');
     } catch {
       setNotice('Network error while declining offer');
@@ -236,12 +187,14 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
         {notice ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{notice}</p>
         ) : null}
-        {error ? (
+        {(offersError ?? error) ? (
           <p className="mt-2 text-sm text-red-700">
-            {error}{' '}
-            <button type="button" className="font-semibold underline" onClick={() => void loadOffers()}>
-              Retry
-            </button>
+            {offersError?.message ?? error}{' '}
+            {offersError ? (
+              <button type="button" className="font-semibold underline" onClick={() => void mutateOffers()}>
+                Retry
+              </button>
+            ) : null}
           </p>
         ) : null}
       </div>

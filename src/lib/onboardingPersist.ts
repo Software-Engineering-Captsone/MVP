@@ -85,7 +85,7 @@ export async function persistProfileSection(p: OnboardingProfile): Promise<void>
         instagram: p.socials.instagram,
         tiktok: p.socials.tiktok,
         twitter: p.socials.twitter,
-        other_platform: p.socials.other,
+        youtube: p.socials.youtube,
       },
     },
   });

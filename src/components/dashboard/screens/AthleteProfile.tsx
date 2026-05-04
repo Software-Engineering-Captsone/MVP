@@ -28,7 +28,12 @@ import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
 import { authFetch } from '@/lib/authFetch';
 import type { ApiCampaignRow } from '@/lib/campaigns/clientMap';
-import { OfferWizard } from '@/components/offers/OfferWizard';
+import dynamic from 'next/dynamic';
+
+const OfferWizard = dynamic(
+  () => import('@/components/offers/OfferWizard').then((m) => m.OfferWizard),
+  { ssr: false, loading: () => null }
+);
 import { trackAnalyticsEvent } from '@/lib/analytics';
 import {
   COPY_INVITE_TO_CAMPAIGN,

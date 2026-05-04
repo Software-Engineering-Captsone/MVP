@@ -3,8 +3,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Loader2, PartyPopper, ArrowRight } from 'lucide-react';
+import { Loader2, PartyPopper, ArrowRight } from 'lucide-react';
 import { useOnboardingStorage } from '@/hooks/useOnboardingStorage';
+import { markOnboardingComplete } from '@/lib/onboardingPersist';
 import { useOnboardingUser } from '@/components/onboarding/OnboardingShell';
 import { Step1Basics } from './Step1Basics';
 import { Step2Athletic } from './Step2Athletic';
@@ -37,15 +38,20 @@ export function AthleteOnboarding() {
   const {
     draft,
     hydrated,
+    syncError,
     updateDraft,
     updateBasics,
     updateAthletic,
     updateAcademic,
     updateCompliance,
     updateProfile,
+    commitStep,
   } = useOnboardingStorage();
 
   const [completed, setCompleted] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [stepError, setStepError] = useState<string | null>(null);
+  const [stepSaving, setStepSaving] = useState(false);
   const step = draft.currentStep;
 
   const goTo = useCallback(
@@ -53,10 +59,38 @@ export function AthleteOnboarding() {
     [updateDraft],
   );
 
-  const handleComplete = useCallback(() => {
-    updateDraft({ completedAt: new Date().toISOString() });
-    setCompleted(true);
-  }, [updateDraft]);
+  const handleComplete = useCallback(async () => {
+    setCompleteError(null);
+    try {
+      await commitStep(1);
+      await commitStep(2);
+      await commitStep(3);
+      await commitStep(4);
+      await commitStep(5);
+      await markOnboardingComplete();
+      updateDraft({ completedAt: new Date().toISOString() });
+      setCompleted(true);
+    } catch {
+      setCompleteError(syncError ?? 'Failed to save. Please try again.');
+    }
+  }, [commitStep, updateDraft, syncError]);
+
+  const advanceStep = useCallback(
+    async (fromStep: number, toStep: number) => {
+      if (stepSaving) return;
+      setStepError(null);
+      setStepSaving(true);
+      try {
+        await commitStep(fromStep);
+        goTo(toStep);
+      } catch (err) {
+        setStepError(err instanceof Error ? err.message : syncError ?? 'Failed to save this step.');
+      } finally {
+        setStepSaving(false);
+      }
+    },
+    [commitStep, goTo, syncError, stepSaving]
+  );
 
   const pct = useMemo(() => Math.round(((step - 1) / TOTAL_STEPS) * 100), [step]);
 
@@ -184,7 +218,9 @@ export function AthleteOnboarding() {
                 sessionName={user?.name ?? ''}
                 sessionEmail={user?.email ?? ''}
                 onChange={updateBasics}
-                onNext={() => goTo(2)}
+                onNext={() => {
+                  void advanceStep(1, 2);
+                }}
               />
             )}
             {step === 2 && (
@@ -192,7 +228,9 @@ export function AthleteOnboarding() {
                 key="step2"
                 data={draft.athletic}
                 onChange={updateAthletic}
-                onNext={() => goTo(3)}
+                onNext={() => {
+                  void advanceStep(2, 3);
+                }}
                 onBack={() => goTo(1)}
               />
             )}
@@ -202,7 +240,9 @@ export function AthleteOnboarding() {
                 data={draft.academic}
                 sessionEmail={user?.email ?? ''}
                 onChange={updateAcademic}
-                onNext={() => goTo(4)}
+                onNext={() => {
+                  void advanceStep(3, 4);
+                }}
                 onBack={() => goTo(2)}
               />
             )}
@@ -210,21 +250,35 @@ export function AthleteOnboarding() {
               <Step3Compliance
                 key="step4"
                 data={draft.compliance}
+                schoolEmail={draft.academic.schoolEmail}
+                sessionEmail={user?.email ?? ''}
                 onChange={updateCompliance}
-                onNext={() => goTo(5)}
+                onNext={() => {
+                  void advanceStep(4, 5);
+                }}
                 onBack={() => goTo(3)}
               />
             )}
             {step === 5 && (
-              <Step4Profile
-                key="step5"
-                data={draft.profile}
-                onChange={updateProfile}
-                onBack={() => goTo(4)}
-                onComplete={handleComplete}
-              />
+              <>
+                <Step4Profile
+                  key="step5"
+                  data={draft.profile}
+                  userId={user?.id ?? ''}
+                  onChange={updateProfile}
+                  onBack={() => goTo(4)}
+                  onComplete={handleComplete}
+                />
+                {completeError && (
+                  <p className="mt-2 text-center text-xs text-red-500">{completeError}</p>
+                )}
+              </>
             )}
           </AnimatePresence>
+          {stepSaving ? (
+            <p className="mt-3 text-center text-xs text-gray-500">Saving step…</p>
+          ) : null}
+          {stepError ? <p className="mt-3 text-center text-xs text-red-500">{stepError}</p> : null}
         </div>
       </div>
     </motion.div>

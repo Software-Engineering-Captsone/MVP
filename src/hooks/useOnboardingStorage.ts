@@ -53,7 +53,7 @@ export interface OnboardingSocials {
   instagram: string;
   tiktok: string;
   twitter: string;
-  other: string;
+  youtube: string;
 }
 
 export interface OnboardingProfile {
@@ -61,7 +61,6 @@ export interface OnboardingProfile {
   profileBannerUrl: string;
   bio: string;
   socials: OnboardingSocials;
-  socialMediaFollowing: string;
   availabilityStatus: 'available' | 'busy' | 'not_looking' | '';
 }
 
@@ -110,8 +109,7 @@ export const defaultDraft: OnboardingDraft = {
     profilePictureUrl: '',
     profileBannerUrl: '',
     bio: '',
-    socials: { instagram: '', tiktok: '', twitter: '', other: '' },
-    socialMediaFollowing: '',
+    socials: { instagram: '', tiktok: '', twitter: '', youtube: '' },
     availabilityStatus: '',
   },
 };
@@ -161,7 +159,10 @@ function loadDraft(): OnboardingDraft {
         ...parsed.profile,
         socials: {
           ...defaultDraft.profile.socials,
-          ...(parsed.profile?.socials ?? {}),
+          instagram: parsed.profile?.socials?.instagram ?? '',
+          tiktok: parsed.profile?.socials?.tiktok ?? '',
+          twitter: parsed.profile?.socials?.twitter ?? '',
+          youtube: parsed.profile?.socials?.youtube ?? '',
         },
       },
     };

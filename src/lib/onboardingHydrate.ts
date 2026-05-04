@@ -62,7 +62,7 @@ interface DbSocials {
   instagram?: Maybe<string>;
   tiktok?: Maybe<string>;
   twitter?: Maybe<string>;
-  other_platform?: Maybe<string>;
+  youtube?: Maybe<string>;
 }
 
 export interface OnboardingDbState {
@@ -188,9 +188,8 @@ export function hydrateOnboardingDraft(state: OnboardingDbState | null): Onboard
         instagram: str(s.instagram),
         tiktok: str(s.tiktok),
         twitter: str(s.twitter),
-        other: str(s.other_platform),
+        youtube: str(s.youtube),
       },
-      socialMediaFollowing: '',
       availabilityStatus: availability(p.availability_status),
     },
     completedAt: typeof p.onboarding_completed_at === 'string'

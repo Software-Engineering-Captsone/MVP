@@ -44,3 +44,42 @@ drop policy if exists "Public can read avatars" on storage.objects;
 create policy "Public can read avatars"
   on storage.objects for select
   using (bucket_id = 'avatars');
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- Profile Banner bucket
+-- File path convention: <user_id>/banner-<ts>.<ext>
+-- ─────────────────────────────────────────────────────────────────
+
+insert into storage.buckets (id, name, public)
+values ('banners', 'banners', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Users can upload own banner" on storage.objects;
+create policy "Users can upload own banner"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'banners'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "Users can update own banner" on storage.objects;
+create policy "Users can update own banner"
+  on storage.objects for update
+  using (
+    bucket_id = 'banners'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "Users can delete own banner" on storage.objects;
+create policy "Users can delete own banner"
+  on storage.objects for delete
+  using (
+    bucket_id = 'banners'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "Public can read banners" on storage.objects;
+create policy "Public can read banners"
+  on storage.objects for select
+  using (bucket_id = 'banners');

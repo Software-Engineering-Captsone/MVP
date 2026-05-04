@@ -1,7 +1,7 @@
 'use client';
 
-import { AthleteProfile } from '@/components/dashboard/screens/AthleteProfile';
+import { ProfileView } from '@/components/dashboard/screens/ProfileView';
 
 export default function ProfileViewPage() {
-  return <AthleteProfile />;
+  return <ProfileView />;
 }

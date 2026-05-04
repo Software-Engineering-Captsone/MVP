@@ -574,23 +574,16 @@
 /* ===== RESPONSIVE ===== */
 @media (max-width: 960px) {
     .auth-page {
-        flex-direction: column;
+        display: block;
     }
 
     .auth-left {
-        min-height: auto;
-        padding: 36px 32px;
-    }
-
-    .auth-left-content h1 {
-        font-size: 32px;
-    }
-
-    .auth-left-testimonial {
         display: none;
     }
 
     .auth-right {
+        width: 100%;
+        min-height: 100vh;
         padding: 36px 24px;
     }
 }

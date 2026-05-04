@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, createContext, useContext, useEffect, useCallback } from 'react';
+import { useState, createContext, useContext, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import useSWR from 'swr';
+import type { OffersListResponse } from '@/hooks/api/useOffersList';
+import { apiFetcher } from '@/hooks/api/fetcher';
 import {
   Home, Search, FileText, MessageSquare, Heart,
   CreditCard, Megaphone, BarChart3, MoreVertical, Handshake,
@@ -11,7 +14,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
-import { pageTransition } from '@/components/dashboard/dashboardMotion';
 import { createClient } from '@/lib/supabase/client';
 import { userAvatarDataUrl } from '@/lib/userAvatar';
 import { resolveSupabaseRole } from '@/lib/auth/supabaseRole';
@@ -23,6 +25,7 @@ export type DashboardUser = {
   email: string;
   name: string;
   role: 'athlete' | 'brand';
+  avatarUrl?: string;
 };
 
 interface DashboardContextValue {
@@ -68,26 +71,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const router = useRouter();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
-  const [pendingOfferCount, setPendingOfferCount] = useState(0);
 
-  const supabase = createClient();
-
-  const fetchAvatarUrl = useCallback(async (userId: string): Promise<string | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('avatar_url')
-        .eq('id', userId)
-        .maybeSingle();
-      if (error) return null;
-      const url = String(data?.avatar_url ?? '').trim();
-      return url.length > 0 ? url : null;
-    } catch {
-      return null;
-    }
-  }, [supabase]);
+  const supabase = useMemo(() => createClient(), []);
 
   const mapSupabaseUser = useCallback((supaUser: {
     id: string;
@@ -109,23 +95,45 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       email: supaUser.email ?? '',
       name,
       role,
+      avatarUrl:
+        typeof meta.avatar_url === 'string' && meta.avatar_url.trim().length > 0
+          ? meta.avatar_url.trim()
+          : undefined,
     };
   }, []);
+
+  const hydrateAvatarFromProfile = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', userId)
+      .maybeSingle<{ avatar_url: string | null }>();
+    if (error) return;
+    const avatarUrl =
+      typeof data?.avatar_url === 'string' && data.avatar_url.trim().length > 0
+        ? data.avatar_url.trim()
+        : undefined;
+    setSessionUser((prev) => {
+      if (!prev || prev.id !== userId) return prev;
+      if (prev.avatarUrl === avatarUrl) return prev;
+      return { ...prev, avatarUrl };
+    });
+  }, [supabase]);
 
   const refreshUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       setSessionUser(mapSupabaseUser(user));
-      setAvatarUrl(await fetchAvatarUrl(user.id));
+      void hydrateAvatarFromProfile(user.id);
     }
-  }, [supabase, mapSupabaseUser, fetchAvatarUrl]);
+  }, [supabase, mapSupabaseUser, hydrateAvatarFromProfile]);
 
   useEffect(() => {
     // Get initial session
     void supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setSessionUser(mapSupabaseUser(user));
-        setAvatarUrl(await fetchAvatarUrl(user.id));
+        void hydrateAvatarFromProfile(user.id);
       } else {
         router.replace('/auth');
       }
@@ -137,10 +145,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       (_event, session) => {
         if (session?.user) {
           setSessionUser(mapSupabaseUser(session.user));
-          void fetchAvatarUrl(session.user.id).then(setAvatarUrl);
+          void hydrateAvatarFromProfile(session.user.id);
         } else {
           setSessionUser(null);
-          setAvatarUrl(null);
           router.replace('/auth');
         }
       }
@@ -149,7 +156,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, mapSupabaseUser, fetchAvatarUrl]);
+  }, [supabase, router, mapSupabaseUser, hydrateAvatarFromProfile]);
 
   /* ── Onboarding gate for athletes ── */
   useEffect(() => {
@@ -170,41 +177,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [booting, sessionUser, pathname, router]);
 
-  const refreshPendingOfferCount = useCallback(async () => {
-    if (!sessionUser || sessionUser.role !== 'athlete') {
-      queueMicrotask(() => {
-        setPendingOfferCount(0);
-      });
-      return;
-    }
-    try {
-      const res = await fetch('/api/offers', { credentials: 'include' });
-      if (!res.ok) {
-        setPendingOfferCount(0);
-        return;
-      }
-      const data = (await res.json()) as {
-        offers?: { athleteOfferStatus?: string }[];
-      };
-      const offers = Array.isArray(data.offers) ? data.offers : [];
-      const count = offers.filter((o) => o.athleteOfferStatus === 'pending').length;
-      setPendingOfferCount(count);
-    } catch {
-      setPendingOfferCount(0);
-    }
-  }, [sessionUser]);
-
-  useEffect(() => {
-    // Async fetch + non-sync microtask reset; rule misfires on `void` + client fetch.
-    void refreshPendingOfferCount(); // eslint-disable-line react-hooks/set-state-in-effect -- server-driven badge
-    if (!sessionUser || sessionUser.role !== 'athlete') {
-      return;
-    }
-    const t = window.setInterval(() => {
-      void refreshPendingOfferCount();
-    }, 45000);
-    return () => window.clearInterval(t);
-  }, [sessionUser, refreshPendingOfferCount, pathname]);
+  const offersKey = sessionUser?.role === 'athlete' ? '/api/offers' : null;
+  const { data: offersData } = useSWR<OffersListResponse>(offersKey, apiFetcher, {
+    revalidateOnFocus: false,
+    refreshInterval: 45000,
+  });
+  const pendingOfferCount = offersData?.offers.filter(
+    (o) => o.athleteOfferStatus === 'pending'
+  ).length ?? 0;
 
   if (booting) {
     return (
@@ -222,7 +202,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const navigation = accountType === 'business' ? businessNavigation : athleteNavigation;
 
   const userDisplay = {
-    avatar: avatarUrl ?? userAvatarDataUrl(sessionUser.name),
+    avatar: sessionUser.avatarUrl || userAvatarDataUrl(sessionUser.name),
     name: sessionUser.name,
     email: sessionUser.email,
   };
@@ -397,15 +377,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         </aside>
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-nilink-surface">
-          <motion.div
-            key={pathname}
-            className="flex min-h-full min-w-0 w-full flex-1 flex-col"
-            initial={pageTransition.initial}
-            animate={pageTransition.animate}
-            transition={pageTransition.transition}
-          >
+          <div className="flex min-h-full min-w-0 w-full flex-1 flex-col">
             {children}
-          </motion.div>
+          </div>
         </main>
       </div>
     </DashboardContext.Provider>

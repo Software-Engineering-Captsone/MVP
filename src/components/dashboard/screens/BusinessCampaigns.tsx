@@ -1,16 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Plus, Search, Eye, ChevronRight, Megaphone, Trash2 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
-import {
-  CreateCampaignOverlay,
-  type DraftResumeSession,
-  type SubmitCampaignArgs,
-} from './CreateCampaignOverlay';
-import { CampaignDetail } from './CampaignDetail';
+import dynamic from 'next/dynamic';
+import type { DraftResumeSession, SubmitCampaignArgs } from './CreateCampaignOverlay';
+
+const CreateCampaignOverlay = dynamic(
+  () => import('./CreateCampaignOverlay').then((m) => m.CreateCampaignOverlay),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-nilink-accent" />
+      </div>
+    ),
+  }
+);
+
+const CampaignDetail = dynamic(
+  () => import('./CampaignDetail').then((m) => m.CampaignDetail),
+  { ssr: false, loading: () => null }
+);
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { authFetch } from '@/lib/authFetch';
+import { useCampaignsList } from '@/hooks/api/useCampaignsList';
 import {
   CampaignPublishRejectedError,
   type CampaignPublishValidationIssue,
@@ -123,37 +138,13 @@ export function BusinessCampaigns() {
   const [wizardPersistedDraftId, setWizardPersistedDraftId] = useState<string | null>(null);
   /** Bumps when the user starts a wizard intentionally, so stale session-restore async cannot overwrite it. */
   const wizardRestoreGenerationRef = useRef(0);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const { user } = useDashboard();
+  const { campaigns: apiCampaigns, isLoading: listLoading, mutate: mutateCampaigns } = useCampaignsList();
+  const campaigns = useMemo(() => apiCampaigns.map((c) => apiCampaignToUi(c, [])), [apiCampaigns]);
   const [listError, setListError] = useState<string | null>(null);
-  const [listLoading, setListLoading] = useState(true);
-  const [brandDisplayName, setBrandDisplayName] = useState('');
+  const brandDisplayName = user?.name ?? '';
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-
-  const loadCampaignList = useCallback(async () => {
-    setListLoading(true);
-    setListError(null);
-    try {
-      const res = await authFetch('/api/campaigns');
-      const data = (await res.json()) as { campaigns?: ApiCampaignRow[]; error?: string };
-      if (!res.ok) {
-        setListError(data.error || 'Could not load campaigns');
-        setCampaigns([]);
-        return;
-      }
-      const rows = data.campaigns ?? [];
-      setCampaigns(rows.map((c) => apiCampaignToUi(c, [])));
-    } catch {
-      setListError('Network error');
-      setCampaigns([]);
-    } finally {
-      setListLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadCampaignList();
-  }, [loadCampaignList]);
 
   /** Restore create wizard from sessionStorage when returning to this page with an open session. */
   useEffect(() => {
@@ -202,7 +193,7 @@ export function BusinessCampaigns() {
                 null,
                 'Saved session pointed to a campaign that is no longer a draft. Open it from the list if you need to continue.'
               );
-              await loadCampaignList();
+              await mutateCampaigns();
               return;
             }
             finishOpen({
@@ -231,7 +222,7 @@ export function BusinessCampaigns() {
     return () => {
       cancelled = true;
     };
-  }, [loadCampaignList]);
+  }, [mutateCampaigns]);
 
   useEffect(() => {
     if (!showCreateOverlay) return;
@@ -248,18 +239,6 @@ export function BusinessCampaigns() {
     }
   }, [showCreateOverlay, wizardPersistedStep, wizardPersistedDraftId, draftResumeSession?.campaignId]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await authFetch('/api/auth/me');
-        if (!res.ok) return;
-        const data = (await res.json()) as { user?: { name?: string } };
-        if (data.user?.name) setBrandDisplayName(data.user.name);
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, []);
 
   const closeCreateWizard = useCallback(() => {
     setShowCreateOverlay(false);
@@ -305,7 +284,7 @@ export function BusinessCampaigns() {
         setListError(
           'This campaign is no longer a draft. Use the row to open details, or refresh the list.'
         );
-        await loadCampaignList();
+        await mutateCampaigns();
         return;
       }
       setDraftResumeSession({
@@ -320,7 +299,7 @@ export function BusinessCampaigns() {
     } catch {
       setListError('Network error');
     }
-  }, [loadCampaignList]);
+  }, [mutateCampaigns]);
 
   const openEditDraft = useCallback(
     async (e: MouseEvent, row: Campaign) => {
@@ -348,9 +327,9 @@ export function BusinessCampaigns() {
         setListError(msg);
         throw new Error(msg);
       }
-      await loadCampaignList();
+      await mutateCampaigns();
     },
-    [loadCampaignList]
+    [mutateCampaigns]
   );
 
   const handleDiscardDraft = useCallback(
@@ -451,7 +430,7 @@ export function BusinessCampaigns() {
         if (!id) {
           throw new Error('Missing campaign id');
         }
-        await loadCampaignList();
+        await mutateCampaigns();
         return { campaignId: id };
       }
 
@@ -492,7 +471,7 @@ export function BusinessCampaigns() {
       if (!id) {
         throw new Error('Missing campaign id');
       }
-      await loadCampaignList();
+      await mutateCampaigns();
       return { campaignId: id };
     } catch (e) {
       if (!quiet) {
@@ -521,7 +500,7 @@ export function BusinessCampaigns() {
       return undefined;
     }
     await refreshSelectedCampaign();
-    await loadCampaignList();
+    await mutateCampaigns();
     return { warnings: data.warnings };
   };
 
@@ -537,7 +516,7 @@ export function BusinessCampaigns() {
       return;
     }
     await refreshSelectedCampaign();
-    await loadCampaignList();
+    await mutateCampaigns();
   };
 
   /** Offer handoff (POST /api/campaigns/[id]/offers) then advance campaign to deal creation. */
@@ -571,7 +550,7 @@ export function BusinessCampaigns() {
       throw new Error(patchData.error || 'Could not update campaign status');
     }
     await refreshSelectedCampaign();
-    await loadCampaignList();
+    await mutateCampaigns();
   };
 
   // Stats
@@ -627,7 +606,7 @@ export function BusinessCampaigns() {
                 className="ml-3 font-semibold underline"
                 onClick={() => {
                   setListError(null);
-                  void loadCampaignList();
+                  void mutateCampaigns();
                 }}
               >
                 Retry

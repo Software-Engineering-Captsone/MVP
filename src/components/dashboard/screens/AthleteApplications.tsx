@@ -6,6 +6,7 @@ import { Calendar, Check, FileEdit, History, Loader2, XCircle } from 'lucide-rea
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
+import { useApplicationsList, type ApplicationWithCampaign } from '@/hooks/api/useApplicationsList';
 
 type ApplicationStatus =
   | 'applied'
@@ -27,31 +28,6 @@ type RowActionError = {
   message: string;
   retryPitch?: string;
   retryCampaignId?: string;
-};
-
-type ApplicationWithCampaign = {
-  application: {
-    id: string;
-    campaignId: string;
-    status: string;
-    pitch?: string;
-    withdrawnByAthlete?: boolean;
-    createdAt?: string;
-    updatedAt?: string;
-    statusHistory?: { status: string; at: string }[];
-    hasPreviousPitch?: boolean;
-  };
-  campaign: {
-    id: string;
-    name: string;
-    image?: string;
-    brandDisplayName?: string;
-    applicationDeadlinePassed?: boolean;
-  } | null;
-  applicationMessaging?: {
-    canViewThread: boolean;
-    canSend: boolean;
-  } | null;
 };
 
 const PLACEHOLDER_IMAGE = '/brands_images/brand-01.svg';
@@ -196,8 +172,7 @@ function activityTimeMs(row: ApplicationWithCampaign): number {
 }
 
 export function AthleteApplications() {
-  const [applications, setApplications] = useState<ApplicationWithCampaign[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { applications, isLoading: loading, error: appError, mutate: mutateApplications } = useApplicationsList();
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [editAppId, setEditAppId] = useState<string | null>(null);
@@ -212,34 +187,6 @@ export function AthleteApplications() {
     [applications, editAppId]
   );
   const initialEditPitch = editingApplication?.application.pitch ?? '';
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await authFetch('/api/applications');
-      const data = (await res.json()) as {
-        applications?: ApplicationWithCampaign[];
-        error?: string;
-      };
-      if (!res.ok) {
-        setApplications([]);
-        setError(data.error || LOAD_ERROR_MESSAGE);
-      } else {
-        setApplications(Array.isArray(data.applications) ? data.applications : []);
-        setRowActionError(null);
-      }
-    } catch {
-      setApplications([]);
-      setError(NETWORK_ERROR_MESSAGE);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
 
   const sorted = useMemo(() => {
     return [...applications].sort((a, b) => {
@@ -365,8 +312,8 @@ export function AthleteApplications() {
     setEditAppId(null);
     setEditPitch('');
     setSuccessMessage('Application updated successfully.');
-    await loadData();
-  }, [editAppId, editPitch, loadData, rowActionError]);
+    await mutateApplications();
+  }, [editAppId, editPitch, mutateApplications, rowActionError]);
 
   const requestCloseEditModal = useCallback(() => {
     if (!editAppId) return;
@@ -413,11 +360,11 @@ export function AthleteApplications() {
       }
       setEditPitch(data.application?.pitch ?? '');
       setSuccessMessage('Previous version restored.');
-      await loadData();
+      await mutateApplications();
     } finally {
       setRestoringPitch(false);
     }
-  }, [editAppId, editPitch, initialEditPitch, loadData]);
+  }, [editAppId, editPitch, initialEditPitch, mutateApplications]);
 
   const withdraw = useCallback(async (applicationId: string) => {
     setSuccessMessage(null);
@@ -441,8 +388,8 @@ export function AthleteApplications() {
     if (rowActionError?.applicationId === applicationId) {
       setRowActionError(null);
     }
-    await loadData();
-  }, [loadData, rowActionError]);
+    await mutateApplications();
+  }, [mutateApplications, rowActionError]);
 
   const retryRowAction = useCallback(async () => {
     if (!rowActionError) return;
@@ -469,7 +416,7 @@ export function AthleteApplications() {
         return;
       }
       setRowActionError(null);
-      await loadData();
+      await mutateApplications();
       return;
     }
     if (rowActionError.action === 'withdraw') {
@@ -493,8 +440,8 @@ export function AthleteApplications() {
     setRowActionError(null);
     setEditAppId(null);
     setEditPitch('');
-    await loadData();
-  }, [loadData, rowActionError, withdraw]);
+    await mutateApplications();
+  }, [mutateApplications, rowActionError, withdraw]);
 
   useEffect(() => {
     if (!successMessage) return;
@@ -585,9 +532,9 @@ export function AthleteApplications() {
           </div>
         ) : null}
 
-        {error ? (
+        {(appError ?? error) ? (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            {error}
+            {appError?.message ?? error}
           </div>
         ) : null}
         {successMessage ? (
@@ -810,7 +757,7 @@ export function AthleteApplications() {
                                   if (rowActionError?.applicationId === row.application.id) {
                                     setRowActionError(null);
                                   }
-                                  await loadData();
+                                  await mutateApplications();
                                 }}
                               >
                                 Re-apply

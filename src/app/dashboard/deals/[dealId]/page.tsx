@@ -3,7 +3,20 @@
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-import { BusinessDealWorkspace } from '@/components/dashboard/screens/BusinessDealWorkspace';
+import dynamic from 'next/dynamic';
+
+function PageSpinner() {
+  return (
+    <div className="flex h-full items-center justify-center bg-nilink-surface">
+      <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-nilink-accent" />
+    </div>
+  );
+}
+
+const BusinessDealWorkspace = dynamic(
+  () => import('@/components/dashboard/screens/BusinessDealWorkspace').then((m) => m.BusinessDealWorkspace),
+  { ssr: false, loading: () => <PageSpinner /> }
+);
 
 export default function BusinessDealPage() {
   const params = useParams();

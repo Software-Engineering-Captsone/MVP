@@ -16,6 +16,7 @@ import {
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
+import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { authFetch } from '@/lib/authFetch';
 import type { ChatInboxItem, ChatMessageRow } from '@/lib/chat/types';
 
@@ -96,7 +97,8 @@ export function DashboardInbox({
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [showUnread, setShowUnread] = useState(false);
   const [draft, setDraft] = useState('');
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { user: dashboardUser } = useDashboard();
+  const currentUserId = dashboardUser?.id ?? null;
   const [items, setItems] = useState<ChatInboxItem[]>([]);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState<string | null>(null);
@@ -161,14 +163,6 @@ export function DashboardInbox({
     }
   }, []);
 
-  useEffect(() => {
-    void (async () => {
-      const res = await authFetch('/api/auth/me');
-      if (!res.ok) return;
-      const data = (await res.json()) as { user?: { id?: string } };
-      if (data.user?.id) setCurrentUserId(data.user.id);
-    })();
-  }, []);
 
   useEffect(() => {
     if (!currentUserId) return;
