@@ -46,3 +46,6 @@ next-env.d.ts
 # Local campaign + application store (Mongoose-validated JSON; no cloud DB)
 /data/local-campaign-store.json
 /data/local-users-store.json
+
+# supabase CLI scratch state (project ref, pooler URL, version pins) — local only
+supabase/.temp/
