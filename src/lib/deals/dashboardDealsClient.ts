@@ -268,7 +268,7 @@ const MOCK_SUBMISSIONS_BY_DELIVERABLE: Record<string, ApiSubmission[]> = {
       submissionType: 'content',
       artifacts: [{ kind: 'url', ref: 'https://instagram.com/p/mock-lookbook-1', label: 'Lookbook Post' }],
       notes: '[Final] Submitted for final review',
-      status: 'changes_requested',
+      status: 'revision_requested',
       reviewedBy: 'mock-brand',
       reviewedAt: daysAgo(2),
       feedback: 'Please add product close-up in first frame.',
@@ -293,6 +293,14 @@ const MOCK_SUBMISSIONS_BY_DELIVERABLE: Record<string, ApiSubmission[]> = {
 };
 
 export type BusinessDealSection = 'needs_action' | 'awaiting_athlete' | 'awaiting_review' | 'completed';
+
+/**
+ * When `NEXT_PUBLIC_DEALS_USE_MOCKS=1`, empty lists / failed loads can show bundled
+ * demo deals for screenshots. Production should omit this variable.
+ */
+export function dealsUseMocks(): boolean {
+  return process.env.NEXT_PUBLIC_DEALS_USE_MOCKS === '1';
+}
 
 export async function readApiError(res: Response): Promise<string> {
   try {

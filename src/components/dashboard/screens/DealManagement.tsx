@@ -1,12 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Calendar, ChevronRight, Loader2, Sparkles } from 'lucide-react';
+import { AlertCircle, Calendar, ChevronRight, Handshake, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
 import {
+  activitySummary,
   createDeliverableSubmission,
+  dealsUseMocks,
   fetchDealDetail,
   fetchDealsList,
   fetchSubmissionsForDeliverable,
@@ -76,6 +79,19 @@ function submissionTierLabel(notes: string): string {
   if (notes.startsWith('[Draft]')) return 'Draft';
   if (notes.startsWith('[Final]')) return 'Final';
   return 'Submission';
+}
+
+function athleteDealCardTitle(deal: ApiDeal): string {
+  const t = parseTermsSnapshot(deal.termsSnapshot);
+  const line = (t?.compensationLine ?? '').trim();
+  if (line) return line;
+  const notes = (t?.notes ?? '').trim();
+  if (notes) return notes.length > 56 ? `${notes.slice(0, 56)}…` : notes;
+  return 'NIL partnership';
+}
+
+function athleteDealCardSubtitle(deal: ApiDeal): string {
+  return `Brand · ${formatShortId(deal.brandUserId)}`;
 }
 
 function urgencyMetaForDeal(deal: ApiDeal): { level: UrgencyLevel; nearestDueAt: string | null } {
@@ -181,6 +197,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
   const [deals, setDeals] = useState<ApiDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [tab, setTab] = useState<ListTab>('open');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ApiDealDetail | null>(null);
@@ -203,10 +220,19 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
     setError(null);
     try {
       const rows = await fetchDealsList();
-      setDeals(rows.length ? rows : getMockAthleteDeals());
+      if (rows.length === 0 && dealsUseMocks()) {
+        setDeals(getMockAthleteDeals());
+      } else {
+        setDeals(rows);
+      }
     } catch (e) {
-      setDeals(getMockAthleteDeals());
-      setError(e instanceof Error ? `${e.message} — showing mock deals` : null);
+      if (dealsUseMocks()) {
+        setDeals(getMockAthleteDeals());
+        setError(e instanceof Error ? `${e.message} (demo deals)` : 'Using demo deals');
+      } else {
+        setDeals([]);
+        setError(e instanceof Error ? e.message : 'Failed to load deals');
+      }
     } finally {
       setLoading(false);
     }
@@ -271,25 +297,21 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
 
   const loadDetail = useCallback(async (dealId: string) => {
     setDetailLoading(true);
+    setDetailError(null);
     setActionError(null);
     setCampaignTitle(null);
     try {
-      const d = (await fetchDealDetail(dealId)) ?? getMockAthleteDealDetail(dealId);
+      const d = await fetchDealDetail(dealId);
       setDetail(d);
-      if (!d) {
-        setSubmissionsByDeliverable({});
-        return;
-      }
       const subMap: Record<string, ApiSubmission[]> = {};
       await Promise.all(
         d.deliverables.map(async (del) => {
           try {
-            const rows = await fetchSubmissionsForDeliverable(del.id);
-            subMap[del.id] = rows.length ? rows : getMockAthleteSubmissions(del.id);
+            subMap[del.id] = await fetchSubmissionsForDeliverable(del.id);
           } catch {
-            subMap[del.id] = getMockAthleteSubmissions(del.id);
+            subMap[del.id] = [];
           }
-        })
+        }),
       );
       setSubmissionsByDeliverable(subMap);
       const initForms: Record<string, { tier: 'draft' | 'final'; url: string; body: string; notes: string }> = {};
@@ -309,15 +331,23 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
           /* optional */
         }
       }
-    } catch {
-      const mockDetail = getMockAthleteDealDetail(dealId);
-      setDetail(mockDetail);
-      if (!mockDetail) {
-        setSubmissionsByDeliverable({});
+    } catch (e) {
+      if (dealsUseMocks()) {
+        const mockDetail = getMockAthleteDealDetail(dealId);
+        setDetail(mockDetail);
+        if (mockDetail) {
+          const mapped: Record<string, ApiSubmission[]> = {};
+          for (const del of mockDetail.deliverables) {
+            mapped[del.id] = getMockAthleteSubmissions(del.id);
+          }
+          setSubmissionsByDeliverable(mapped);
+        } else {
+          setSubmissionsByDeliverable({});
+        }
       } else {
-        const mapped: Record<string, ApiSubmission[]> = {};
-        for (const del of mockDetail.deliverables) mapped[del.id] = getMockAthleteSubmissions(del.id);
-        setSubmissionsByDeliverable(mapped);
+        setDetail(null);
+        setDetailError(e instanceof Error ? e.message : 'Could not load deal');
+        setSubmissionsByDeliverable({});
       }
       setSubmitErrors({});
     } finally {
@@ -337,6 +367,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
     if (selectedId) void loadDetail(selectedId);
     else {
       setDetail(null);
+      setDetailError(null);
       setSubmissionsByDeliverable({});
       setOpenIntent('default');
     }
@@ -457,31 +488,42 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
           <p className="text-sm font-semibold text-gray-700">
             Your deals{' '}
             <span className="font-normal text-gray-400">
-              ({filteredDeals.length} {filteredDeals.length === 1 ? 'deal' : 'deals'})
+              ({filteredDeals.length} {filteredDeals.length === 1 ? 'deal' : 'deals'} in this view)
             </span>
           </p>
-          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter deals">
-            {(['open', 'done'] as const).map((t) => {
-              const selected = tab === t;
-              const label = t === 'open' ? 'In progress' : 'Done';
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => setTab(t)}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition sm:text-[13px] ${
-                    selected
-                      ? 'border-gray-400 bg-gray-100 text-gray-900'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {label}{' '}
-                  <span className={selected ? 'text-gray-500' : 'text-gray-400'}>({tabCounts[t]})</span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter deals">
+              {(['open', 'done'] as const).map((t) => {
+                const selected = tab === t;
+                const label = t === 'open' ? 'In progress' : 'Done';
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setTab(t)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition sm:text-[13px] ${
+                      selected
+                        ? 'border-gray-400 bg-gray-100 text-gray-900'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {label}{' '}
+                    <span className={selected ? 'text-gray-500' : 'text-gray-400'}>({tabCounts[t]})</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadList()}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden />
+              Refresh
+            </button>
           </div>
         </div>
 
@@ -490,10 +532,38 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading…
           </div>
+        ) : deals.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
+              <Handshake className="h-7 w-7" aria-hidden />
+            </div>
+            <h2 className="mt-5 text-lg font-bold text-nilink-ink">No active partnerships yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
+              When you accept an offer, your deal appears here with contract steps, deliverables, and payout tracking.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/dashboard/offers"
+                className="inline-flex rounded-xl bg-nilink-accent px-5 py-2.5 text-sm font-bold text-white transition hover:bg-nilink-accent-hover"
+              >
+                View offers
+              </Link>
+              <Link
+                href="/dashboard/campaigns"
+                className="inline-flex rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                Browse campaigns
+              </Link>
+            </div>
+          </div>
         ) : tab === 'done' ? (
           <div className="space-y-4">
+            {filteredDeals.length === 0 ? (
+              <p className="rounded-xl border border-gray-100 bg-white py-10 text-center text-sm text-gray-500">
+                No completed deals in this tab. Switch to <span className="font-semibold">In progress</span> for active work.
+              </p>
+            ) : null}
             {filteredDeals.map((deal) => {
-              const terms = parseTermsSnapshot(deal.termsSnapshot);
               const stageMeta = cardStageMeta(deal);
               const progressIndex = cardProgressIndex(deal);
               return (
@@ -507,10 +577,11 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                 >
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Brand</p>
-                      <h3 className="text-2xl font-bold text-nilink-ink" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                        {formatShortId(deal.brandUserId).toUpperCase()}
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Deal</p>
+                      <h3 className="text-xl font-bold leading-tight text-nilink-ink sm:text-2xl" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                        {athleteDealCardTitle(deal)}
                       </h3>
+                      <p className="mt-1 text-xs font-medium text-gray-500">{athleteDealCardSubtitle(deal)}</p>
                       <p className="text-sm text-gray-600">
                         <span className="font-semibold text-gray-700">{stageMeta.label}:</span> {stageMeta.value}
                       </p>
@@ -556,7 +627,6 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                   </h3>
                   <div className="space-y-4">
                     {groupedOpenDeals[key].map((deal) => {
-                      const terms = parseTermsSnapshot(deal.termsSnapshot);
                       const urgency = urgencyMetaForDeal(deal);
                       const ctaLabel = cardPrimaryCta(deal, urgency.level);
                       const stageMeta = cardStageMeta(deal);
@@ -572,10 +642,11 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                         >
                           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Brand</p>
-                              <h3 className="text-2xl font-bold text-nilink-ink" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-                                {formatShortId(deal.brandUserId).toUpperCase()}
+                              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Deal</p>
+                              <h3 className="text-xl font-bold leading-tight text-nilink-ink sm:text-2xl" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+                                {athleteDealCardTitle(deal)}
                               </h3>
+                              <p className="mt-1 text-xs font-medium text-gray-500">{athleteDealCardSubtitle(deal)}</p>
                               <p className="text-sm text-gray-600">
                                 <span className="font-semibold text-gray-700">{stageMeta.label}:</span> {stageMeta.value}
                               </p>
@@ -648,7 +719,16 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
             {groupedOpenDeals.needs_action.length === 0 &&
             groupedOpenDeals.awaiting_review.length === 0 &&
             groupedOpenDeals.in_progress.length === 0 ? (
-              <p className="py-8 text-sm text-gray-500">No active deals in this view.</p>
+              <p className="rounded-xl border border-gray-100 bg-white py-10 text-center text-sm text-gray-600">
+                No in-progress deals.{' '}
+                <button
+                  type="button"
+                  className="font-semibold text-nilink-accent underline decoration-nilink-accent/40 hover:text-nilink-accent-hover"
+                  onClick={() => setTab('done')}
+                >
+                  View completed
+                </button>
+              </p>
             ) : null}
           </div>
         )}
@@ -665,10 +745,21 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
             className="max-h-[90vh] w-full max-w-2xl cursor-auto overflow-auto rounded-2xl border border-gray-100 bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {detailLoading || !detail ? (
+            {detailLoading ? (
               <div className="flex items-center gap-2 p-8 text-sm text-gray-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Loading deal…
+              </div>
+            ) : detailError || !detail ? (
+              <div className="space-y-4 p-8">
+                <p className="text-sm text-red-600">{detailError || 'Deal not found'}</p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-nilink-ink hover:bg-gray-50"
+                >
+                  Close
+                </button>
               </div>
             ) : (
               <>
@@ -1010,7 +1101,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                       <ul className="mt-3 space-y-2">
                         {timelineRows.map((a) => (
                           <li key={a.id} className="text-sm text-gray-700">
-                            <span className="font-semibold">{a.eventType.replace(/_/g, ' ')}</span>
+                            <span className="font-semibold">{activitySummary(a)}</span>
                             <span className="ml-2 text-xs text-gray-400">{formatIsoDate(a.createdAt)}</span>
                           </li>
                         ))}

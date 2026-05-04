@@ -1,10 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ChevronRight, Loader2, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, ChevronRight, Handshake, Loader2, RefreshCw, Search } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
 import {
+  activitySummary,
   fetchDealDetail,
   fetchDealsList,
   fetchSubmissionsForDeliverable,
@@ -246,10 +248,10 @@ export function BusinessDeals() {
   }, [detail?.activities]);
 
   return (
-    <div className="h-full flex flex-col bg-nilink-surface overflow-hidden text-nilink-ink">
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-4 pt-5">
-          <DashboardPageHeader title="Deals" subtitle="Live pipeline, deliverables, and reviews" />
+    <div className="flex h-full min-h-full flex-col overflow-hidden bg-nilink-page font-sans text-nilink-ink">
+        <div className="flex flex-1 flex-col overflow-hidden bg-nilink-page">
+        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 bg-white pb-4 pt-5">
+          <DashboardPageHeader title="Deals" subtitle="Live pipeline, deliverables, reviews, and payment" />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <div className="relative min-w-[200px] flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -304,10 +306,34 @@ export function BusinessDeals() {
               Loading deals…
             </div>
           ) : filteredDeals.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-200 bg-white/80 py-12 text-center text-sm text-gray-500">
-              {deals.length === 0
-                ? 'No deals yet.'
-                : 'No deals match the current status filter and search.'}
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
+                <Handshake className="h-7 w-7" aria-hidden />
+              </div>
+              <h2 className="mt-5 text-lg font-bold text-nilink-ink">
+                {deals.length === 0 ? 'No deals in your pipeline yet' : 'No matches for this filter'}
+              </h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
+                {deals.length === 0
+                  ? 'When athletes accept your offers, deals appear here so you can upload contracts, review submissions, and track payment.'
+                  : 'Try clearing the status filter or search to see all of your deals.'}
+              </p>
+              {deals.length === 0 ? (
+                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/dashboard/campaigns"
+                    className="inline-flex rounded-xl bg-nilink-accent px-5 py-2.5 text-sm font-bold text-white transition hover:bg-nilink-accent-hover"
+                  >
+                    Go to campaigns
+                  </Link>
+                  <Link
+                    href="/dashboard/messages"
+                    className="inline-flex rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                  >
+                    Open messages
+                  </Link>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -628,7 +654,7 @@ export function BusinessDeals() {
                         {sortedActivities.map((a) => (
                           <li key={a.id} className="relative text-sm text-gray-700">
                             <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-nilink-accent" />
-                            <span className="font-semibold text-nilink-ink">{a.eventType.replace(/_/g, ' ')}</span>
+                            <span className="font-semibold text-nilink-ink">{activitySummary(a)}</span>
                             <span className="ml-2 text-xs text-gray-400">{formatIsoDate(a.createdAt)}</span>
                           </li>
                         ))}
@@ -762,7 +788,16 @@ export function BusinessDeals() {
                       </div>
                     </details>
 
-                    <div className="flex gap-3 pb-2">
+                    <div className="flex flex-col gap-2 pb-2 sm:flex-row sm:gap-3">
+                      {selectedId ? (
+                        <Link
+                          href={`/dashboard/deals/${selectedId}`}
+                          className="flex-1 rounded-xl bg-nilink-ink py-3 text-center text-sm font-bold text-white transition hover:bg-gray-800"
+                          onClick={() => setSelectedId(null)}
+                        >
+                          Open full workspace
+                        </Link>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => setSelectedId(null)}

@@ -288,7 +288,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
   const paymentDirty = detail.payment && paymentStatusDraft !== detail.payment.status;
 
   return (
-    <div className="flex min-h-full flex-col bg-nilink-surface text-nilink-ink">
+    <div className="flex min-h-full flex-col bg-nilink-page font-sans text-nilink-ink">
       <header className="shrink-0 border-b border-gray-100 bg-white dash-main-gutter-x py-4">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white pb-3">
           <Link
