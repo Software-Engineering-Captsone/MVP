@@ -142,3 +142,24 @@ create policy "Athletes read own deals"
   on public.deals for select
   using ((select auth.uid()) = athlete_id);
 
+
+-- ─────────────────────────────────────────────────────────────────
+-- Phase 2 — Athlete-driven deal creation on offer accept.
+-- The accept route inserts the deal as the authenticated athlete; we
+-- gate it on the offer still being theirs and in 'sent' status, so a
+-- replayed/forged request cannot conjure a deal from an unrelated or
+-- already-accepted offer.
+-- ─────────────────────────────────────────────────────────────────
+drop policy if exists "Athletes create own deals on offer accept" on public.deals;
+create policy "Athletes create own deals on offer accept"
+  on public.deals for insert
+  with check (
+    (select auth.uid()) = athlete_id
+    and exists (
+      select 1 from public.offers o
+      where o.id = offer_id
+        and o.athlete_id = (select auth.uid())
+        and o.status = 'sent'
+    )
+  );
+
