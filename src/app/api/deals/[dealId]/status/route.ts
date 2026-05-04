@@ -36,6 +36,7 @@ export async function PATCH(
     return NextResponse.json({ deal });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    return NextResponse.json({ error: msg }, { status: 400 });
+    const status = msg === 'Deal not found' ? 404 : 400;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

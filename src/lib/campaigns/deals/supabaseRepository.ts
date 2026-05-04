@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { resolveContractFileUrlForDownload } from '@/lib/campaigns/deals/contractStorage';
 import { notifyDealPlaceholder } from '@/lib/campaigns/deals/notifications';
@@ -34,8 +35,9 @@ import type {
  *
  * Deal reads and mutations for the Supabase-backed API. Legacy in-memory deal
  * flows were removed; campaigns/applications may still use local JSON separately.
- * RLS scopes results to the calling user (brand or athlete on the deal), so the
- * caller does not need to pass a role.
+ * RLS scopes reads to the calling user (brand or athlete on the deal). Writes
+ * use broad participant policies in SQL, so mutations enforce brand vs athlete
+ * responsibilities here as well.
  *
  * Phase 1 returns deal rows only. Deliverables, contracts, payments, and
  * deliverables and activities are loaded from their tables for detail reads.
@@ -425,6 +427,33 @@ export async function recordDealActivity(input: {
 
 export type DealMutationActor = { userId: string; role: 'brand' | 'athlete' };
 
+async function assertActorIsDealBrand(
+  supabase: SupabaseClient,
+  dealId: string,
+  actor: DealMutationActor,
+): Promise<void> {
+  if (actor.role !== 'brand') {
+    throw new Error('Only the brand on this deal can perform this action');
+  }
+  const { data: deal, error } = await supabase.from('deals').select('brand_id').eq('id', dealId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!deal || (deal as { brand_id: string }).brand_id !== actor.userId) {
+    throw new Error('Forbidden');
+  }
+}
+
+async function assertProfileIsDealAthlete(
+  supabase: SupabaseClient,
+  dealId: string,
+  profileId: string,
+): Promise<void> {
+  const { data: deal, error } = await supabase.from('deals').select('athlete_id').eq('id', dealId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!deal || (deal as { athlete_id: string }).athlete_id !== profileId) {
+    throw new Error('Only the athlete on this deal can submit work for this deliverable');
+  }
+}
+
 const DEAL_SELECT =
   'id, offer_id, brand_id, athlete_id, campaign_id, application_id, ' +
   'chat_thread_id, terms_snapshot, status, contract_id, payment_id, ' +
@@ -575,6 +604,7 @@ export async function createDealContract(
   actor: DealMutationActor,
 ): Promise<ApiContractRow> {
   const supabase = await createClient();
+  await assertActorIsDealBrand(supabase, dealId, actor);
 
   const { data: existing, error: existingErr } = await supabase
     .from('deal_contracts')
@@ -653,6 +683,24 @@ export async function updateContractStatus(
   if (!current) throw new Error('Contract not found');
 
   const currentRow = current as unknown as DbContractRow;
+
+  const { data: dealRow, error: dealErr } = await supabase
+    .from('deals')
+    .select('brand_id, athlete_id')
+    .eq('id', currentRow.deal_id)
+    .maybeSingle();
+  if (dealErr) throw new Error(dealErr.message);
+  if (!dealRow) throw new Error('Deal not found');
+  const brandId = (dealRow as { brand_id: string }).brand_id;
+  const athleteId = (dealRow as { athlete_id: string }).athlete_id;
+  if (to === 'signed') {
+    if (actor.role !== 'athlete' || actor.userId !== athleteId) {
+      throw new Error('Only the athlete on this deal can sign the contract');
+    }
+  } else if (actor.role !== 'brand' || actor.userId !== brandId) {
+    throw new Error('Only the brand on this deal can update the contract status');
+  }
+
   assertContractStatusTransition(currentRow.status as ContractStatus, to);
 
   const patch: Record<string, unknown> = { status: to };
@@ -701,6 +749,8 @@ export async function updatePaymentStatus(
   if (!current) throw new Error('Payment not found');
 
   const currentRow = current as unknown as DbPaymentRow;
+  await assertActorIsDealBrand(supabase, currentRow.deal_id, actor);
+
   const fromStatus = currentRow.status as PaymentStatus;
   assertPaymentStatusTransition(fromStatus, to);
 
@@ -770,6 +820,21 @@ export async function updateDealStatus(
     if (contractErr) throw new Error(contractErr.message);
     if (!contract || (contract as { status: string }).status !== 'signed') {
       throw new Error('Contract must be signed before activating the deal');
+    }
+  }
+
+  if (to === 'approved_completed') {
+    const { data: deliverableStatuses, error: dsErr } = await supabase
+      .from('deal_deliverables')
+      .select('status')
+      .eq('deal_id', dealId);
+    if (dsErr) throw new Error(dsErr.message);
+    const rows = deliverableStatuses ?? [];
+    if (rows.length > 0) {
+      const pending = rows.filter((r: { status: string }) => r.status !== 'completed');
+      if (pending.length > 0) {
+        throw new Error('All deliverables must be completed before completing the deal');
+      }
     }
   }
 
@@ -863,6 +928,8 @@ export async function createSubmissionForDeliverable(
   if (!deliverable) throw new Error('Deliverable not found');
   const deliverableRow = deliverable as unknown as DbDeliverableRow;
 
+  await assertProfileIsDealAthlete(supabase, deliverableRow.deal_id, submittedByProfileId);
+
   assertDeliverableStatusTransition(deliverableRow.status as DeliverableStatus, 'draft_submitted');
 
   const { data: latestSubmission, error: latestErr } = await supabase
@@ -954,6 +1021,8 @@ export async function updateDeliverable(
   if (!current) throw new Error('Deliverable not found');
 
   const row = current as unknown as DbDeliverableRow;
+  await assertActorIsDealBrand(supabase, row.deal_id, actor);
+
   const updatePatch: Record<string, unknown> = {};
   if (typeof patch.title === 'string') {
     const t = patch.title.trim();
@@ -1012,6 +1081,8 @@ export async function updateSubmission(
   if (getErr) throw new Error(getErr.message);
   if (!current) throw new Error('Submission not found');
   const currentRow = current as unknown as DbSubmissionRow;
+
+  await assertActorIsDealBrand(supabase, currentRow.deal_id, actor);
 
   assertSubmissionStatusTransition(currentRow.status as SubmissionStatus, to);
 

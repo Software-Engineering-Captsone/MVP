@@ -55,6 +55,7 @@ export async function POST(
     return NextResponse.json({ contract }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    return NextResponse.json({ error: msg }, { status: 400 });
+    const status = msg === 'Forbidden' || msg.startsWith('Only the brand') ? 403 : 400;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

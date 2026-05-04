@@ -36,6 +36,8 @@ export async function PATCH(
     return NextResponse.json({ payment });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    return NextResponse.json({ error: msg }, { status: 400 });
+    const status =
+      msg === 'Forbidden' || msg.startsWith('Only the brand') ? 403 : msg === 'Payment not found' ? 404 : 400;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

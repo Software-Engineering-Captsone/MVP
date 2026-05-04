@@ -42,7 +42,12 @@ export async function PATCH(
     return NextResponse.json({ deliverable });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    const statusCode = msg === 'Deliverable not found' ? 404 : 400;
+    const statusCode =
+      msg === 'Deliverable not found'
+        ? 404
+        : msg === 'Forbidden' || msg.startsWith('Only the brand')
+          ? 403
+          : 400;
     return NextResponse.json({ error: msg }, { status: statusCode });
   }
 }

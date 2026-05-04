@@ -36,6 +36,12 @@ export async function PATCH(
     return NextResponse.json({ contract });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    return NextResponse.json({ error: msg }, { status: 400 });
+    const status =
+      msg === 'Forbidden' || msg.startsWith('Only the brand') || msg.startsWith('Only the athlete')
+        ? 403
+        : msg === 'Contract not found' || msg === 'Deal not found'
+          ? 404
+          : 400;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

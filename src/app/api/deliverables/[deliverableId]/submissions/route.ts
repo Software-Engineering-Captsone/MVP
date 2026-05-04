@@ -25,7 +25,8 @@ export async function GET(
     return NextResponse.json({ submissions });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    const status = msg === 'Deliverable not found' ? 404 : 400;
+    const status =
+      msg === 'Deliverable not found' ? 404 : msg.startsWith('Only the athlete') ? 403 : 400;
     return NextResponse.json({ error: msg }, { status });
   }
 }
@@ -76,7 +77,8 @@ export async function POST(
     return NextResponse.json({ submission }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    const status = msg === 'Deliverable not found' ? 404 : 400;
+    const status =
+      msg === 'Deliverable not found' ? 404 : msg.startsWith('Only the athlete') ? 403 : 400;
     return NextResponse.json({ error: msg }, { status });
   }
 }
