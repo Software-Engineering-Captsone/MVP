@@ -29,7 +29,10 @@ export async function PATCH(
   }
 
   try {
-    const deal = await updateDealStatus(dealId, status as DealStatus);
+    const deal = await updateDealStatus(dealId, status as DealStatus, {
+      userId: user.userId,
+      role: user.role,
+    });
     return NextResponse.json({ deal });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';

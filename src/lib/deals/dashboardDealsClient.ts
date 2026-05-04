@@ -384,11 +384,56 @@ export async function patchDeliverable(
   return j.deliverable;
 }
 
-export async function postDealContract(dealId: string, fileUrl?: string, fileRef?: string): Promise<ApiContract> {
+export async function requestDealContractUploadUrl(
+  dealId: string,
+  opts: { filename: string; contentType?: string },
+): Promise<{ path: string; signedUrl: string; token: string }> {
+  const res = await authFetch(`/api/deals/${dealId}/contract/upload-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  });
+  if (!res.ok) throw new Error(await readApiError(res));
+  const j = (await res.json()) as { path?: string; signedUrl?: string; token?: string };
+  if (!j.path || !j.signedUrl) throw new Error('Invalid upload URL response');
+  return { path: j.path, signedUrl: j.signedUrl, token: j.token ?? '' };
+}
+
+/** PUT file bytes to the signed URL returned by `requestDealContractUploadUrl`. */
+export async function putFileToContractSignedUploadUrl(signedUrl: string, file: File): Promise<void> {
+  const ct = file.type || 'application/octet-stream';
+  const put = await fetch(signedUrl, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': ct },
+  });
+  if (!put.ok) throw new Error(put.statusText || 'Upload failed');
+}
+
+/** Full flow: signed upload URL → PUT file → persist storage path on the contract row. */
+export async function uploadDealContractFromFile(dealId: string, file: File): Promise<ApiContract> {
+  const { signedUrl, path } = await requestDealContractUploadUrl(dealId, {
+    filename: file.name || 'contract.pdf',
+    contentType: file.type || undefined,
+  });
+  await putFileToContractSignedUploadUrl(signedUrl, file);
+  return postDealContract(dealId, undefined, undefined, path);
+}
+
+export async function postDealContract(
+  dealId: string,
+  fileUrl?: string,
+  fileRef?: string,
+  storagePath?: string,
+): Promise<ApiContract> {
   const res = await authFetch(`/api/deals/${dealId}/contract`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...(fileUrl ? { fileUrl } : {}), ...(fileRef ? { fileRef } : {}) }),
+    body: JSON.stringify({
+      ...(fileUrl ? { fileUrl } : {}),
+      ...(fileRef ? { fileRef } : {}),
+      ...(storagePath ? { storagePath } : {}),
+    }),
   });
   if (!res.ok) throw new Error(await readApiError(res));
   const j = (await res.json()) as { contract?: ApiContract };

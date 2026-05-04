@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
+import { assertStoragePathBelongsToDeal } from '@/lib/campaigns/deals/contractStorage';
 import { createDealContract } from '@/lib/campaigns/deals/supabaseRepository';
 
 export async function POST(
@@ -19,22 +20,38 @@ export async function POST(
     return NextResponse.json({ error: 'Missing dealId' }, { status: 400 });
   }
 
-  let body: { fileUrl?: unknown; fileRef?: unknown } = {};
+  let body: { fileUrl?: unknown; fileRef?: unknown; storagePath?: unknown } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
     /* body optional */
   }
 
-  const fileUrl =
-    typeof body.fileUrl === 'string' && body.fileUrl.trim()
-      ? body.fileUrl.trim()
-      : typeof body.fileRef === 'string' && body.fileRef.trim()
-        ? body.fileRef.trim()
-        : null;
+  const storagePathRaw =
+    typeof body.storagePath === 'string' && body.storagePath.trim() ? body.storagePath.trim() : '';
+
+  let fileUrl: string | null = null;
+  if (storagePathRaw) {
+    try {
+      assertStoragePathBelongsToDeal(dealId, storagePathRaw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid storage path' }, { status: 400 });
+    }
+    fileUrl = storagePathRaw;
+  } else {
+    fileUrl =
+      typeof body.fileUrl === 'string' && body.fileUrl.trim()
+        ? body.fileUrl.trim()
+        : typeof body.fileRef === 'string' && body.fileRef.trim()
+          ? body.fileRef.trim()
+          : null;
+  }
 
   try {
-    const contract = await createDealContract(dealId, fileUrl);
+    const contract = await createDealContract(dealId, fileUrl, {
+      userId: user.userId,
+      role: user.role,
+    });
     return NextResponse.json({ contract }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';

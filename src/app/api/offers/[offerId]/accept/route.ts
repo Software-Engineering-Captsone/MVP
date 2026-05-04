@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { createClient } from '@/lib/supabase/server';
-import { buildTermsSnapshotFromOffer } from '@/lib/campaigns/deals/termsSnapshot';
+import { buildTermsSnapshotFromOffer, getFrozenDeliverableSpecs } from '@/lib/campaigns/deals/termsSnapshot';
+import { recordDealActivity } from '@/lib/campaigns/deals/supabaseRepository';
 import type { StoredOffer } from '@/lib/campaigns/localCampaignStore';
 
 interface DbOfferRow {
@@ -15,6 +16,36 @@ interface DbOfferRow {
   status: string;
   structured_draft: Record<string, unknown> | null;
   notes: string | null;
+}
+
+interface PaymentDefaults {
+  amount: number;
+  currency: string;
+}
+
+function paymentDefaultsFromTermsSnapshot(snapshot: unknown): PaymentDefaults {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return { amount: 0, currency: 'USD' };
+  }
+
+  const root = snapshot as Record<string, unknown>;
+  const frozen = root.frozen;
+  if (!frozen || typeof frozen !== 'object') {
+    return { amount: 0, currency: 'USD' };
+  }
+
+  const compensationSummary = (frozen as Record<string, unknown>).compensationSummary;
+  if (!compensationSummary || typeof compensationSummary !== 'object') {
+    return { amount: 0, currency: 'USD' };
+  }
+
+  const amountRaw = (compensationSummary as Record<string, unknown>).amount;
+  const currencyRaw = (compensationSummary as Record<string, unknown>).currency;
+  const amount = typeof amountRaw === 'number' && Number.isFinite(amountRaw) ? Math.max(0, Math.floor(amountRaw)) : 0;
+  const currency =
+    typeof currencyRaw === 'string' && currencyRaw.trim() ? currencyRaw.trim().toUpperCase() : 'USD';
+
+  return { amount, currency };
 }
 
 function dbOfferToStored(row: DbOfferRow): StoredOffer {
@@ -97,6 +128,67 @@ export async function POST(
   }
   const dealId = insertedDeal.id as string;
 
+  const { amount, currency } = paymentDefaultsFromTermsSnapshot(termsSnapshot);
+
+  const { data: insertedPayment, error: paymentErr } = await supabase
+    .from('deal_payments')
+    .insert({
+      deal_id: dealId,
+      amount,
+      currency,
+      status: 'not_configured',
+      provider: '',
+      provider_reference: '',
+      release_condition: 'on_completion',
+    })
+    .select('id')
+    .single();
+  if (paymentErr || !insertedPayment) {
+    const msg = paymentErr?.message ?? 'Could not create deal payment';
+    return NextResponse.json({ error: `Deal created but payment insert failed: ${msg}`, dealId }, { status: 500 });
+  }
+  const paymentId = insertedPayment.id as string;
+
+  const { error: linkPaymentErr } = await supabase
+    .from('deals')
+    .update({ payment_id: paymentId })
+    .eq('id', dealId);
+  if (linkPaymentErr) {
+    return NextResponse.json(
+      { error: `Deal created but payment link failed: ${linkPaymentErr.message}`, dealId, paymentId },
+      { status: 500 },
+    );
+  }
+
+  const frozenDeliverables = getFrozenDeliverableSpecs(termsSnapshot);
+  if (frozenDeliverables.length > 0) {
+    const deliverableRows = frozenDeliverables.map((spec, index) => ({
+      deal_id: dealId,
+      title: spec.title,
+      order_index: index,
+      type: spec.type,
+      instructions: spec.instructions,
+      status: 'not_started',
+      due_at: spec.dueAt,
+      draft_required: spec.draftRequired,
+      publish_required: spec.publishRequired,
+      proof_required: spec.proofRequired,
+      disclosure_required: spec.disclosureRequired,
+      revision_limit: spec.revisionLimit,
+      revision_count_used: 0,
+    }));
+
+    const { error: deliverablesErr } = await supabase
+      .from('deal_deliverables')
+      .insert(deliverableRows);
+    if (deliverablesErr) {
+      return NextResponse.json(
+        { error: `Deal created but deliverables seed failed: ${deliverablesErr.message}`, dealId, paymentId },
+        { status: 500 },
+      );
+    }
+  }
+
   const acceptedAt = new Date().toISOString();
   const { error: updateErr } = await supabase
     .from('offers')
@@ -112,5 +204,23 @@ export async function POST(
     );
   }
 
-  return NextResponse.json({ ok: true, dealId }, { status: 201 });
+  try {
+    await recordDealActivity({
+      dealId,
+      entityType: 'deal',
+      entityId: dealId,
+      eventType: 'deal_created',
+      actorType: 'athlete',
+      actorId: user.userId,
+      metadata: { offerId: offer.id, paymentId },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Activity log failed';
+    return NextResponse.json(
+      { error: `Deal created but activity log failed: ${msg}`, dealId, paymentId },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ ok: true, dealId, paymentId }, { status: 201 });
 }

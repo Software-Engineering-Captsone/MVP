@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ChevronRight, Loader2, RefreshCw, Search } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
@@ -16,6 +16,7 @@ import {
   patchPaymentStatus,
   patchSubmission,
   postDealContract,
+  uploadDealContractFromFile,
   type ApiDeal,
   type ApiDealDetail,
   type ApiDeliverable,
@@ -102,6 +103,9 @@ export function BusinessDeals() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [contractUrlInput, setContractUrlInput] = useState('');
+  const [contractFile, setContractFile] = useState<File | null>(null);
+  const contractFilePrimaryRef = useRef<HTMLInputElement>(null);
+  const contractFileAdvancedRef = useRef<HTMLInputElement>(null);
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
 
   const loadList = useCallback(async () => {
@@ -467,26 +471,56 @@ export function BusinessDeals() {
                             </p>
                           ) : null}
                           {stageProjection?.primaryAction?.key === 'upload_contract' ? (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <input
-                                className="min-w-[200px] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                placeholder="Contract document URL"
-                                value={contractUrlInput}
-                                onChange={(e) => setContractUrlInput(e.target.value)}
-                              />
-                              <button
-                                type="button"
-                                disabled={pendingAction === 'contract-post'}
-                                onClick={() =>
-                                  void runAction('contract-post', async () => {
-                                    await postDealContract(detail.deal.id, contractUrlInput.trim() || undefined);
-                                    setContractUrlInput('');
-                                  })
-                                }
-                                className="rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
-                              >
-                                Upload contract
-                              </button>
+                            <div className="mt-3 space-y-3">
+                              <div className="flex flex-wrap gap-2">
+                                <input
+                                  className="min-w-[200px] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                  placeholder="Contract document URL"
+                                  value={contractUrlInput}
+                                  onChange={(e) => setContractUrlInput(e.target.value)}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={pendingAction === 'contract-post'}
+                                  onClick={() =>
+                                    void runAction('contract-post', async () => {
+                                      await postDealContract(detail.deal.id, contractUrlInput.trim() || undefined);
+                                      setContractUrlInput('');
+                                    })
+                                  }
+                                  className="rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                >
+                                  Save URL
+                                </button>
+                              </div>
+                              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2">
+                                <p className="text-[11px] text-gray-600">Or upload PDF / Word (stored in Supabase).</p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <input
+                                      ref={contractFilePrimaryRef}
+                                      type="file"
+                                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                      className="max-w-full text-xs text-gray-700 file:mr-2 file:rounded-md file:border file:border-gray-200 file:bg-white file:px-2 file:py-1"
+                                      onChange={(e) => setContractFile(e.target.files?.[0] ?? null)}
+                                    />
+                                  <button
+                                    type="button"
+                                    disabled={pendingAction === 'contract-file' || !contractFile}
+                                    onClick={() =>
+                                      void runAction('contract-file', async () => {
+                                        if (!contractFile) return;
+                                        await uploadDealContractFromFile(detail.deal.id, contractFile);
+                                        setContractFile(null);
+                                        if (contractFilePrimaryRef.current) contractFilePrimaryRef.current.value = '';
+                                        if (contractFileAdvancedRef.current) contractFileAdvancedRef.current.value = '';
+                                      })
+                                    }
+                                    className="rounded-lg bg-nilink-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                  >
+                                    Upload file
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           ) : null}
                         </>
@@ -615,26 +649,56 @@ export function BusinessDeals() {
                                   Open file link
                                 </a>
                               ) : null}
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <input
-                                  className="min-w-[200px] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                  placeholder="Document URL"
-                                  value={contractUrlInput}
-                                  onChange={(e) => setContractUrlInput(e.target.value)}
-                                />
-                                <button
-                                  type="button"
-                                  disabled={pendingAction === 'contract-post'}
-                                  onClick={() =>
-                                    void runAction('contract-post', async () => {
-                                      await postDealContract(detail.deal.id, contractUrlInput.trim() || undefined);
-                                      setContractUrlInput('');
-                                    })
-                                  }
-                                  className="rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
-                                >
-                                  Save contract
-                                </button>
+                              <div className="mt-3 space-y-3">
+                                <div className="flex flex-wrap gap-2">
+                                  <input
+                                    className="min-w-[200px] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                    placeholder="Document URL"
+                                    value={contractUrlInput}
+                                    onChange={(e) => setContractUrlInput(e.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    disabled={pendingAction === 'contract-post'}
+                                    onClick={() =>
+                                      void runAction('contract-post', async () => {
+                                        await postDealContract(detail.deal.id, contractUrlInput.trim() || undefined);
+                                        setContractUrlInput('');
+                                      })
+                                    }
+                                    className="rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                  >
+                                    Save URL
+                                  </button>
+                                </div>
+                                <div className="rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2">
+                                  <p className="text-[11px] text-gray-600">Or upload PDF / Word.</p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <input
+                                      ref={contractFileAdvancedRef}
+                                      type="file"
+                                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                      className="max-w-full text-xs text-gray-700 file:mr-2 file:rounded-md file:border file:border-gray-200 file:bg-white file:px-2 file:py-1"
+                                      onChange={(e) => setContractFile(e.target.files?.[0] ?? null)}
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={pendingAction === 'contract-file' || !contractFile}
+                                      onClick={() =>
+                                        void runAction('contract-file', async () => {
+                                          if (!contractFile) return;
+                                          await uploadDealContractFromFile(detail.deal.id, contractFile);
+                                          setContractFile(null);
+                                          if (contractFilePrimaryRef.current) contractFilePrimaryRef.current.value = '';
+                                          if (contractFileAdvancedRef.current) contractFileAdvancedRef.current.value = '';
+                                        })
+                                      }
+                                      className="rounded-lg bg-nilink-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                    >
+                                      Upload file
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {CONTRACT_STATUSES.filter((s) => s !== 'signed').map((s) => (
