@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { createClient } from '@/lib/supabase/server';
-import { buildTermsSnapshotFromOffer, getFrozenDeliverableSpecs } from '@/lib/campaigns/deals/termsSnapshot';
+import {
+  buildTermsSnapshotFromOffer,
+  getFrozenDeliverableSpecs,
+  type OfferTermsSource,
+} from '@/lib/campaigns/deals/termsSnapshot';
 import { recordDealActivity } from '@/lib/campaigns/deals/supabaseRepository';
-import type { StoredOffer } from '@/lib/campaigns/localCampaignStore';
+import { notifyDealPlaceholder } from '@/lib/campaigns/deals/notifications';
 
 interface DbOfferRow {
   id: string;
@@ -48,7 +52,7 @@ function paymentDefaultsFromTermsSnapshot(snapshot: unknown): PaymentDefaults {
   return { amount, currency };
 }
 
-function dbOfferToStored(row: DbOfferRow): StoredOffer {
+function dbOfferToTermsSource(row: DbOfferRow): OfferTermsSource {
   return {
     _id: row.id,
     brandUserId: row.brand_id,
@@ -60,7 +64,7 @@ function dbOfferToStored(row: DbOfferRow): StoredOffer {
     status: row.status,
     structuredDraft: row.structured_draft ?? {},
     notes: row.notes ?? '',
-  } as StoredOffer;
+  };
 }
 
 export async function POST(
@@ -107,7 +111,7 @@ export async function POST(
     return NextResponse.json({ error: 'Offer already has a deal' }, { status: 409 });
   }
 
-  const termsSnapshot = buildTermsSnapshotFromOffer(dbOfferToStored(offer));
+  const termsSnapshot = buildTermsSnapshotFromOffer(dbOfferToTermsSource(offer));
 
   const { data: insertedDeal, error: insertErr } = await supabase
     .from('deals')
@@ -221,6 +225,8 @@ export async function POST(
       { status: 500 },
     );
   }
+
+  notifyDealPlaceholder('deal_opened', { dealId, offerId: offer.id, paymentId });
 
   return NextResponse.json({ ok: true, dealId, paymentId }, { status: 201 });
 }

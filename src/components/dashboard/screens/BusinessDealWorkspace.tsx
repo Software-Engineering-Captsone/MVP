@@ -32,6 +32,7 @@ import {
   STAGE_ORDER,
 } from '@/lib/deals/stageProjection';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
+import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
 
 function DealStatusBadge({ status, surface = 'light' }: { status: string; surface?: 'light' | 'dark' }) {
   const onLight =
@@ -200,6 +201,11 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
   useEffect(() => {
     void loadDetail(dealId);
   }, [dealId, loadDetail]);
+
+  const refreshFromRealtime = useCallback(() => {
+    void loadDetail(dealId);
+  }, [dealId, loadDetail]);
+  useDealsRealtimeRefresh({ enabled: true, dealId, onInvalidate: refreshFromRealtime });
 
   useEffect(() => {
     if (detail?.contract) setContractStatusDraft(detail.contract.status);

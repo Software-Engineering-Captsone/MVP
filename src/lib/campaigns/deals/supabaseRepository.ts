@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { resolveContractFileUrlForDownload } from '@/lib/campaigns/deals/contractStorage';
+import { notifyDealPlaceholder } from '@/lib/campaigns/deals/notifications';
 import { computeDealNextAction, refineNextActionWithDeliverables } from './nextAction';
 import {
   assertContractStatusTransition,
@@ -31,8 +32,8 @@ import type {
 /**
  * Phase-1 Supabase-backed read API for deals.
  *
- * The legacy repository.ts in this directory is the in-memory localCampaignStore
- * implementation kept as a spec while we migrate. New code reads through here.
+ * Deal reads and mutations for the Supabase-backed API. Legacy in-memory deal
+ * flows were removed; campaigns/applications may still use local JSON separately.
  * RLS scopes results to the calling user (brand or athlete on the deal), so the
  * caller does not need to pass a role.
  *
@@ -602,6 +603,7 @@ export async function createDealContract(
       actorId: actor.userId,
       metadata: { contractId: out.id },
     });
+    notifyDealPlaceholder('contract_uploaded', { dealId, contractId: out.id });
     return out;
   }
 
@@ -630,6 +632,7 @@ export async function createDealContract(
     actorId: actor.userId,
     metadata: { contractId: contract.id },
   });
+  notifyDealPlaceholder('contract_uploaded', { dealId, contractId: contract.id });
 
   return contract;
 }
@@ -677,6 +680,7 @@ export async function updateContractStatus(
       actorId: actor.userId,
       metadata: { contractId },
     });
+    notifyDealPlaceholder('contract_signed', { dealId: currentRow.deal_id, contractId });
   }
   return out;
 }
@@ -725,6 +729,16 @@ export async function updatePaymentStatus(
     actorId: actor.userId,
     metadata: { paymentId, from: fromStatus, to },
   });
+  if (to === 'paid') {
+    notifyDealPlaceholder('payment_paid', { dealId: currentRow.deal_id, paymentId });
+  } else {
+    notifyDealPlaceholder('payment_status_changed', {
+      dealId: currentRow.deal_id,
+      paymentId,
+      from: fromStatus,
+      to,
+    });
+  }
   return out;
 }
 
@@ -787,6 +801,14 @@ export async function updateDealStatus(
       actorId: actor.userId,
       metadata: { from: currentRow.status, to },
     });
+    if (evt === 'deal_completed') {
+      notifyDealPlaceholder('deal_completed', { dealId });
+      notifyDealPlaceholder('payment_pending', { dealId, reason: 'deal_status' });
+    } else if (evt === 'payment_pending') {
+      notifyDealPlaceholder('payment_pending', { dealId, reason: 'deal_status' });
+    } else if (evt === 'payment_paid') {
+      notifyDealPlaceholder('payment_paid', { dealId });
+    }
   }
   return dbDealToApi(outRow);
 }
@@ -907,6 +929,11 @@ export async function createSubmissionForDeliverable(
     actorId: submittedByProfileId,
     metadata: { deliverableId, version: apiSub.version },
   });
+  notifyDealPlaceholder('submission_submitted', {
+    dealId: deliverableRow.deal_id,
+    submissionId: apiSub.id,
+    deliverableId,
+  });
 
   return apiSub;
 }
@@ -963,6 +990,7 @@ export async function updateDeliverable(
       actorId: actor.userId,
       metadata: {},
     });
+    notifyDealPlaceholder('deliverable_completed', { dealId: row.deal_id, deliverableId });
   }
   return api;
 }
@@ -1024,6 +1052,11 @@ export async function updateSubmission(
       }
     } else if (to === 'revision_requested') {
       if (d.revision_count_used >= d.revision_limit) {
+        notifyDealPlaceholder('deal_revision_blocked', {
+          dealId: currentRow.deal_id,
+          deliverableId: currentRow.deliverable_id,
+          submissionId,
+        });
         throw new Error('Revision limit reached for this deliverable');
       }
       assertDeliverableStatusTransition(d.status as DeliverableStatus, 'revision_requested');
@@ -1067,6 +1100,11 @@ export async function updateSubmission(
       actorId: actor.userId,
       metadata: { deliverableId: currentRow.deliverable_id, feedback: feedback ?? null },
     });
+    notifyDealPlaceholder('revision_requested', {
+      dealId: currentRow.deal_id,
+      submissionId,
+      deliverableId: currentRow.deliverable_id,
+    });
   } else if (to === 'approved') {
     await recordDealActivity({
       dealId: currentRow.deal_id,
@@ -1076,6 +1114,11 @@ export async function updateSubmission(
       actorType: roleToActorType(actor.role),
       actorId: actor.userId,
       metadata: { deliverableId: currentRow.deliverable_id },
+    });
+    notifyDealPlaceholder('submission_approved', {
+      dealId: currentRow.deal_id,
+      submissionId,
+      deliverableId: currentRow.deliverable_id,
     });
   }
 

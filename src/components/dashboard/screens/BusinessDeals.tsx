@@ -33,6 +33,7 @@ import {
   stageProgress,
   STAGE_ORDER,
 } from '@/lib/deals/stageProjection';
+import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
 
 function nextOwnerLabel(owner: ApiDeal['nextActionOwner']): string {
   if (owner === 'brand') return 'Brand';
@@ -193,6 +194,12 @@ export function BusinessDeals() {
       setSubmissionsByDeliverable({});
     }
   }, [selectedId, loadDetail]);
+
+  const refreshFromRealtime = useCallback(() => {
+    void loadList();
+    if (selectedId) void loadDetail(selectedId);
+  }, [loadList, loadDetail, selectedId]);
+  useDealsRealtimeRefresh({ enabled: true, dealId: selectedId, onInvalidate: refreshFromRealtime });
 
   const pendingReviews = useMemo(() => {
     if (!detail) return [];

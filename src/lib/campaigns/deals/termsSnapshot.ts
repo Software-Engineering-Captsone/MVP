@@ -1,6 +1,8 @@
-import type { StoredOffer } from '../localCampaignStore';
 import { normalizeStructuredDraft, type OfferWizardState } from '../offerWizardTypes';
 import type { DealTermsFrozenDeliverableSpec, DealTermsSnapshot, DeliverableType } from './types';
+
+/** Offer-shaped input (Supabase row mapped to legacy field names, or JSON store) for building frozen terms. */
+export type OfferTermsSource = Record<string, unknown> & { _id?: string };
 
 function parseMoneyAmount(amountStr: string | undefined): number {
   if (!amountStr || !amountStr.trim()) return 0;
@@ -90,7 +92,7 @@ function buildFrozenDeliverableSpecs(wizard: OfferWizardState): DealTermsFrozenD
  * Builds an immutable snapshot from the offer row at acceptance time only.
  * Callers must not merge live offer fields after the deal exists.
  */
-export function buildTermsSnapshotFromOffer(offer: StoredOffer): DealTermsSnapshot {
+export function buildTermsSnapshotFromOffer(offer: OfferTermsSource): DealTermsSnapshot {
   const structuredDraftRaw =
     offer.structuredDraft != null && typeof offer.structuredDraft === 'object' && !Array.isArray(offer.structuredDraft)
       ? (JSON.parse(JSON.stringify(offer.structuredDraft)) as Record<string, unknown>)

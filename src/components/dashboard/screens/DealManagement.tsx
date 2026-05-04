@@ -31,6 +31,7 @@ import {
   stageProgress,
   STAGE_ORDER,
 } from '@/lib/deals/stageProjection';
+import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
 
 type ListTab = 'open' | 'done';
 type AthleteDealSection = 'needs_action' | 'awaiting_review' | 'in_progress' | 'completed';
@@ -340,6 +341,12 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
       setOpenIntent('default');
     }
   }, [selectedId, loadDetail]);
+
+  const refreshFromRealtime = useCallback(() => {
+    void loadList();
+    if (selectedId) void loadDetail(selectedId);
+  }, [loadList, loadDetail, selectedId]);
+  useDealsRealtimeRefresh({ enabled: true, dealId: selectedId, onInvalidate: refreshFromRealtime });
 
   useEffect(() => {
     if (!initialDealId) return;
