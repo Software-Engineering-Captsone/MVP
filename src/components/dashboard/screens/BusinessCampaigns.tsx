@@ -91,10 +91,29 @@ const statusStyles: Record<CampaignStatus, string> = {
   Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-function StatusBadge({ status }: { status: CampaignStatus }) {
+const ACTIVE_LIKE_STATUSES = new Set<CampaignStatus>([
+  'Open for Applications',
+  'Reviewing Candidates',
+  'Deal Creation in Progress',
+  'Active',
+]);
+
+function isActiveLikeStatus(status: CampaignStatus): boolean {
+  return ACTIVE_LIKE_STATUSES.has(status);
+}
+
+function getCampaignStatusLabel(status: CampaignStatus): CampaignStatus {
+  return isActiveLikeStatus(status) ? 'Active' : status;
+}
+
+function getStatusToneClass(status: CampaignStatus): string {
+  return isActiveLikeStatus(status) ? statusStyles.Active : statusStyles[status];
+}
+
+function StatusBadge({ status, label }: { status: CampaignStatus; label?: CampaignStatus }) {
   return (
-    <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border whitespace-nowrap ${statusStyles[status]}`}>
-      {status}
+    <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border whitespace-nowrap ${getStatusToneClass(status)}`}>
+      {label ?? status}
     </span>
   );
 }
@@ -143,7 +162,7 @@ export function BusinessCampaigns() {
   const campaigns = useMemo(() => apiCampaigns.map((c) => apiCampaignToUi(c, [])), [apiCampaigns]);
   const [listError, setListError] = useState<string | null>(null);
   const brandDisplayName = user?.name ?? '';
-  type CampaignListFilter = 'All' | 'Drafts' | 'Reviewing' | 'Active' | 'Completed';
+  type CampaignListFilter = 'All' | 'Drafts' | 'Active' | 'Completed';
   const [activeFilter, setActiveFilter] = useState<CampaignListFilter>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -556,23 +575,13 @@ export function BusinessCampaigns() {
 
   // Stats (palette matches StatusBadge tokens)
   const draftCampaigns = campaigns.filter((c) => c.status === 'Draft');
-  const reviewingCampaigns = campaigns.filter(
-    (c) => c.status === 'Reviewing Candidates' || c.status === 'Deal Creation in Progress'
-  );
-  const activeCampaigns = campaigns.filter((c) => c.status === 'Active');
+  const activeCampaigns = campaigns.filter((c) => isActiveLikeStatus(c.status));
   const completedCampaigns = campaigns.filter((c) => c.status === 'Completed');
 
   // Filters (order matches stat cards; "All" stays first in the chip row)
   const filteredCampaigns = campaigns.filter((c) => {
     if (activeFilter === 'Drafts' && c.status !== 'Draft') return false;
-    if (
-      activeFilter === 'Reviewing' &&
-      c.status !== 'Reviewing Candidates' &&
-      c.status !== 'Deal Creation in Progress'
-    ) {
-      return false;
-    }
-    if (activeFilter === 'Active' && c.status !== 'Active') return false;
+    if (activeFilter === 'Active' && !isActiveLikeStatus(c.status)) return false;
     if (activeFilter === 'Completed' && c.status !== 'Completed') return false;
     if (searchQuery && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
@@ -626,7 +635,7 @@ export function BusinessCampaigns() {
           {!showCreateOverlay && (
           <>
           {/* Stats — light tint matched to value color */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
             {[
               {
                 label: 'Drafts',
@@ -634,13 +643,6 @@ export function BusinessCampaigns() {
                 valueClass: 'text-gray-600',
                 cardClass: 'border-gray-200 bg-gray-100/80',
                 labelClass: 'text-gray-500',
-              },
-              {
-                label: 'Reviewing',
-                value: reviewingCampaigns.length,
-                valueClass: 'text-red-700',
-                cardClass: 'border-red-200/80 bg-red-50/90',
-                labelClass: 'text-red-800/70',
               },
               {
                 label: 'Active',
@@ -690,7 +692,7 @@ export function BusinessCampaigns() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
-            {(['All', 'Drafts', 'Reviewing', 'Active', 'Completed'] as const).map((tab) => {
+            {(['All', 'Drafts', 'Active', 'Completed'] as const).map((tab) => {
               const on = activeFilter === tab;
               return (
                 <button
@@ -774,7 +776,7 @@ export function BusinessCampaigns() {
                     <AvatarGroup athletes={campaign.athletes} count={campaign.athleteCount} />
                   </td>
                   <td className="px-5 py-4">
-                    <StatusBadge status={campaign.status} />
+                    <StatusBadge status={campaign.status} label={getCampaignStatusLabel(campaign.status)} />
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-2">
