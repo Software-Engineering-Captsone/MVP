@@ -535,7 +535,14 @@ export async function createReferralApplication(input: {
 export async function updateApplicationStatus(
   applicationId: string,
   brandUserId: string,
-  status: 'pending' | 'shortlisted' | 'approved' | 'declined',
+  status:
+    | 'pending'
+    | 'under_review'
+    | 'shortlisted'
+    | 'approved'
+    | 'declined'
+    | 'offer_sent'
+    | 'offer_declined',
 ): Promise<StoredApplication | null> {
   const supabase = await createClient();
 
@@ -644,7 +651,12 @@ export async function withdrawApplicationByAthlete(
   if (existing.status === 'withdrawn') {
     return { ok: false, status: 409, error: 'Application is already withdrawn' };
   }
-  if (existing.status === 'approved' || existing.status === 'declined') {
+  if (
+    existing.status === 'approved' ||
+    existing.status === 'declined' ||
+    existing.status === 'offer_sent' ||
+    existing.status === 'offer_declined'
+  ) {
     return { ok: false, status: 409, error: 'Cannot withdraw a decided application' };
   }
 
@@ -945,6 +957,46 @@ export async function updateOfferDraftFields(
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? dbOfferToStored(data as unknown as DbOfferRow) : null;
+}
+
+/**
+ * Brand publishes a draft offer to the athlete (`draft` → `sent`).
+ * When the offer is linked to an application, syncs that row to `offer_sent`
+ * (requires DB constraint + RLS from `supabase-applications-offer-sent.sql`).
+ */
+export async function sendOfferDraftByBrand(
+  offerId: string,
+  brandUserId: string,
+): Promise<StoredOffer | null> {
+  const supabase = await createClient();
+  const current = await getOfferByIdForBrand(offerId, brandUserId);
+  if (!current) return null;
+  if (current.status !== 'draft') {
+    throw new Error(`Cannot send offer in status '${current.status}'`);
+  }
+
+  const { data, error } = await supabase
+    .from('offers')
+    .update({ status: 'sent' })
+    .eq('id', offerId)
+    .eq('brand_id', brandUserId)
+    .eq('status', 'draft')
+    .select(OFFER_SELECT)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const sent = data ? dbOfferToStored(data as unknown as DbOfferRow) : null;
+  if (!sent?.applicationId) return sent;
+
+  const app = await getApplicationById(sent.applicationId);
+  if (!app) return sent;
+  if (app.status === 'shortlisted' || app.status === 'approved') {
+    try {
+      await updateApplicationStatus(sent.applicationId, brandUserId, 'offer_sent');
+    } catch (e) {
+      console.warn('[sendOfferDraftByBrand] could not sync application to offer_sent', e);
+    }
+  }
+  return sent;
 }
 
 

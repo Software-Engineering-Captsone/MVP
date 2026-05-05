@@ -289,12 +289,32 @@ export function OfferWizard({ offerId, onClose, onSubmitted }: Props) {
       meta: { submitted: true, submittedAt },
       assembled: { ...assembled, submittedAt },
     };
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    setSaveError(null);
     const ok = await flushSave(next);
     if (!ok) return;
     setDraft(next);
+
+    const sendRes = await authFetch(`/api/offers/${offerId}/send`, { method: 'POST' });
+    const sendData = (await sendRes.json()) as { error?: string; offer?: ApiOfferRow };
+    if (!sendRes.ok || !sendData.offer) {
+      setSaveError(
+        sendData.error ||
+          'Offer terms were saved, but sending failed. Try sending again from Dashboard → Offers.',
+      );
+      return;
+    }
+    setOffer(sendData.offer);
     setSubmittedBanner(true);
     trackAnalyticsEvent('offer_submit', {
+      offerId: offer.id,
+      offerOrigin: offer.offerOrigin,
+      campaignId: offer.campaignId ?? undefined,
+    });
+    trackAnalyticsEvent('offer_send', {
       offerId: offer.id,
       offerOrigin: offer.offerOrigin,
       campaignId: offer.campaignId ?? undefined,
@@ -332,7 +352,7 @@ export function OfferWizard({ offerId, onClose, onSubmitted }: Props) {
                 {COPY_SEND_OFFER}
               </h2>
               <p id="offer-wizard-desc" className="mt-1 text-xs text-gray-500">
-                Step through each section, then submit to save this structured offer draft to the athlete record.
+                Step through each section, then use Submit offer to save terms and send the offer to the athlete.
               </p>
               {offer && (
                 <p className="mt-1 text-xs text-gray-500">
@@ -908,7 +928,9 @@ export function OfferWizard({ offerId, onClose, onSubmitted }: Props) {
                 </span>
               )}
               {submittedBanner && !saveError && (
-                <span className="text-emerald-700">Draft saved to offer record.</span>
+                <span className="max-w-md text-emerald-800">
+                  Offer sent. The athlete can review and respond under their Offers tab.
+                </span>
               )}
             </div>
             <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
@@ -935,11 +957,11 @@ export function OfferWizard({ offerId, onClose, onSubmitted }: Props) {
                 <button
                   type="button"
                   onClick={() => void handleSubmit()}
-                  disabled={!draft || saving}
+                  disabled={!draft || saving || offer?.status !== 'draft'}
                   aria-busy={saving}
                   className="min-h-11 flex-1 rounded-lg bg-nilink-accent px-4 py-2 text-sm font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent disabled:opacity-40 sm:flex-initial"
                 >
-                  {saving ? 'Submitting…' : 'Submit offer'}
+                  {saving ? 'Submitting…' : submittedBanner ? 'Sent' : 'Submit offer'}
                 </button>
               )}
             </div>

@@ -101,95 +101,186 @@ export async function POST(
   if (offer.athlete_id !== user.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const termsSnapshot = buildTermsSnapshotFromOffer(dbOfferToTermsSource(offer));
+  const frozenDeliverables = getFrozenDeliverableSpecs(termsSnapshot);
+  const { amount, currency } = paymentDefaultsFromTermsSnapshot(termsSnapshot);
+
+  /** Idempotent success when the athlete retries after a partial accept. */
+  if (offer.status === 'accepted') {
+    const { data: existingForOffer, error: exErr } = await supabase
+      .from('deals')
+      .select('id, payment_id')
+      .eq('offer_id', offer.id)
+      .maybeSingle();
+    if (exErr) {
+      return NextResponse.json({ error: exErr.message }, { status: 500 });
+    }
+    const dealId = (existingForOffer as { id?: string } | null)?.id ?? offer.deal_id;
+    if (!dealId) {
+      return NextResponse.json(
+        { error: 'Offer is accepted but no deal is linked. Contact support.' },
+        { status: 500 },
+      );
+    }
+    const payRow = await supabase.from('deals').select('payment_id').eq('id', dealId).maybeSingle();
+    const paymentId =
+      (existingForOffer as { payment_id?: string | null } | null)?.payment_id ??
+      (payRow.data as { payment_id?: string | null } | null)?.payment_id ??
+      null;
+    return NextResponse.json(
+      {
+        ok: true,
+        dealId,
+        paymentId: paymentId ?? undefined,
+        deal: { id: dealId },
+        alreadyAccepted: true,
+      },
+      { status: 200 },
+    );
+  }
+
   if (offer.status !== 'sent') {
     return NextResponse.json(
       { error: `Cannot accept offer in status '${offer.status}'` },
-      { status: 400 }
-    );
-  }
-  if (offer.deal_id) {
-    return NextResponse.json({ error: 'Offer already has a deal' }, { status: 409 });
-  }
-
-  const termsSnapshot = buildTermsSnapshotFromOffer(dbOfferToTermsSource(offer));
-
-  const { data: insertedDeal, error: insertErr } = await supabase
-    .from('deals')
-    .insert({
-      offer_id: offer.id,
-      brand_id: offer.brand_id,
-      athlete_id: offer.athlete_id,
-      campaign_id: offer.campaign_id,
-      application_id: offer.application_id,
-      terms_snapshot: termsSnapshot,
-      status: 'created',
-    })
-    .select('id')
-    .single();
-  if (insertErr || !insertedDeal) {
-    const msg = insertErr?.message ?? 'Could not create deal';
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-  const dealId = insertedDeal.id as string;
-
-  const { amount, currency } = paymentDefaultsFromTermsSnapshot(termsSnapshot);
-
-  const { data: insertedPayment, error: paymentErr } = await supabase
-    .from('deal_payments')
-    .insert({
-      deal_id: dealId,
-      amount,
-      currency,
-      status: 'not_configured',
-      provider: '',
-      provider_reference: '',
-      release_condition: 'on_completion',
-    })
-    .select('id')
-    .single();
-  if (paymentErr || !insertedPayment) {
-    const msg = paymentErr?.message ?? 'Could not create deal payment';
-    return NextResponse.json({ error: `Deal created but payment insert failed: ${msg}`, dealId }, { status: 500 });
-  }
-  const paymentId = insertedPayment.id as string;
-
-  const { error: linkPaymentErr } = await supabase
-    .from('deals')
-    .update({ payment_id: paymentId })
-    .eq('id', dealId);
-  if (linkPaymentErr) {
-    return NextResponse.json(
-      { error: `Deal created but payment link failed: ${linkPaymentErr.message}`, dealId, paymentId },
-      { status: 500 },
+      { status: 400 },
     );
   }
 
-  const frozenDeliverables = getFrozenDeliverableSpecs(termsSnapshot);
-  if (frozenDeliverables.length > 0) {
-    const deliverableRows = frozenDeliverables.map((spec, index) => ({
-      deal_id: dealId,
-      title: spec.title,
-      order_index: index,
-      type: spec.type,
-      instructions: spec.instructions,
-      status: 'not_started',
-      due_at: spec.dueAt,
-      draft_required: spec.draftRequired,
-      publish_required: spec.publishRequired,
-      proof_required: spec.proofRequired,
-      disclosure_required: spec.disclosureRequired,
-      revision_limit: spec.revisionLimit,
-      revision_count_used: 0,
-    }));
+  const { data: dealByOffer, error: dealLookupErr } = await supabase
+    .from('deals')
+    .select('id, payment_id')
+    .eq('offer_id', offer.id)
+    .maybeSingle();
+  if (dealLookupErr) {
+    return NextResponse.json({ error: dealLookupErr.message }, { status: 500 });
+  }
 
-    const { error: deliverablesErr } = await supabase
-      .from('deal_deliverables')
-      .insert(deliverableRows);
-    if (deliverablesErr) {
+  let dealId: string;
+  if (dealByOffer?.id) {
+    dealId = dealByOffer.id as string;
+  } else {
+    const { data: insertedDeal, error: insertErr } = await supabase
+      .from('deals')
+      .insert({
+        offer_id: offer.id,
+        brand_id: offer.brand_id,
+        athlete_id: offer.athlete_id,
+        campaign_id: offer.campaign_id,
+        application_id: offer.application_id,
+        terms_snapshot: termsSnapshot,
+        status: 'created',
+      })
+      .select('id')
+      .single();
+    if (insertErr?.message?.includes('deals_offer_id_key') || insertErr?.code === '23505') {
+      const { data: raced } = await supabase.from('deals').select('id').eq('offer_id', offer.id).maybeSingle();
+      if (!raced?.id) {
+        return NextResponse.json({ error: insertErr.message ?? 'Could not create deal' }, { status: 500 });
+      }
+      dealId = raced.id as string;
+    } else if (insertErr || !insertedDeal) {
+      const msg = insertErr?.message ?? 'Could not create deal';
+      return NextResponse.json({ error: msg }, { status: 500 });
+    } else {
+      dealId = insertedDeal.id as string;
+    }
+  }
+
+  let paymentId: string | undefined =
+    (dealByOffer as { payment_id?: string | null } | null)?.payment_id ?? undefined;
+  if (!paymentId) {
+    const { data: dealPayRow } = await supabase.from('deals').select('payment_id').eq('id', dealId).maybeSingle();
+    paymentId = (dealPayRow as { payment_id?: string | null } | undefined)?.payment_id ?? undefined;
+  }
+  if (!paymentId) {
+    const { data: orphanPayment } = await supabase
+      .from('deal_payments')
+      .select('id')
+      .eq('deal_id', dealId)
+      .maybeSingle();
+    if (orphanPayment?.id) {
+      paymentId = orphanPayment.id as string;
+      const { error: linkOrphanErr } = await supabase
+        .from('deals')
+        .update({ payment_id: paymentId })
+        .eq('id', dealId);
+      if (linkOrphanErr) {
+        return NextResponse.json(
+          { error: `Deal exists but payment link failed: ${linkOrphanErr.message}`, dealId, paymentId },
+          { status: 500 },
+        );
+      }
+    }
+  }
+
+  if (!paymentId) {
+    const { data: insertedPayment, error: paymentErr } = await supabase
+      .from('deal_payments')
+      .insert({
+        deal_id: dealId,
+        amount,
+        currency,
+        status: 'not_configured',
+        provider: '',
+        provider_reference: '',
+        release_condition: 'on_completion',
+      })
+      .select('id')
+      .single();
+    if (paymentErr || !insertedPayment) {
+      const msg = paymentErr?.message ?? 'Could not create deal payment';
+      return NextResponse.json({ error: `Deal exists but payment insert failed: ${msg}`, dealId }, { status: 500 });
+    }
+    paymentId = insertedPayment.id as string;
+
+    const { error: linkPaymentErr } = await supabase
+      .from('deals')
+      .update({ payment_id: paymentId })
+      .eq('id', dealId);
+    if (linkPaymentErr) {
       return NextResponse.json(
-        { error: `Deal created but deliverables seed failed: ${deliverablesErr.message}`, dealId, paymentId },
+        { error: `Deal exists but payment link failed: ${linkPaymentErr.message}`, dealId, paymentId },
         { status: 500 },
       );
+    }
+  }
+
+  if (frozenDeliverables.length > 0) {
+    const { count: deliverableCount, error: countErr } = await supabase
+      .from('deal_deliverables')
+      .select('id', { count: 'exact', head: true })
+      .eq('deal_id', dealId);
+    if (countErr) {
+      return NextResponse.json(
+        { error: `Could not verify deliverables: ${countErr.message}`, dealId, paymentId },
+        { status: 500 },
+      );
+    }
+    if ((deliverableCount ?? 0) === 0) {
+      const deliverableRows = frozenDeliverables.map((spec, index) => ({
+        deal_id: dealId,
+        title: spec.title,
+        order_index: index,
+        type: spec.type,
+        instructions: spec.instructions,
+        status: 'not_started',
+        due_at: spec.dueAt,
+        draft_required: spec.draftRequired,
+        publish_required: spec.publishRequired,
+        proof_required: spec.proofRequired,
+        disclosure_required: spec.disclosureRequired,
+        revision_limit: spec.revisionLimit,
+        revision_count_used: 0,
+      }));
+
+      const { error: deliverablesErr } = await supabase.from('deal_deliverables').insert(deliverableRows);
+      if (deliverablesErr) {
+        return NextResponse.json(
+          { error: `Deliverables seed failed: ${deliverablesErr.message}`, dealId, paymentId },
+          { status: 500 },
+        );
+      }
     }
   }
 
@@ -201,10 +292,10 @@ export async function POST(
   if (updateErr) {
     return NextResponse.json(
       {
-        error: `Deal created but offer update failed: ${updateErr.message}`,
+        error: `Offer update failed: ${updateErr.message}`,
         dealId,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -221,12 +312,22 @@ export async function POST(
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Activity log failed';
     return NextResponse.json(
-      { error: `Deal created but activity log failed: ${msg}`, dealId, paymentId },
+      { error: `Deal ready but activity log failed: ${msg}`, dealId, paymentId },
       { status: 500 },
     );
   }
 
   notifyDealPlaceholder('deal_opened', { dealId, offerId: offer.id, paymentId });
 
-  return NextResponse.json({ ok: true, dealId, paymentId }, { status: 201 });
+  const httpStatus = dealByOffer?.id ? 200 : 201;
+  return NextResponse.json(
+    {
+      ok: true,
+      dealId,
+      paymentId,
+      deal: { id: dealId },
+      resumed: Boolean(dealByOffer?.id),
+    },
+    { status: httpStatus },
+  );
 }

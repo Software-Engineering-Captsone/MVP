@@ -12,6 +12,7 @@ type ApplicationStatus =
   | 'applied'
   | 'under_review'
   | 'shortlisted'
+  | 'approved'
   | 'offer_sent'
   | 'offer_declined'
   | 'rejected'
@@ -64,7 +65,8 @@ function normalizeStatus(row: ApplicationWithCampaign['application']): Applicati
   if (status === 'withdrawn') return 'withdrawn';
   if (status === 'applied' || status === 'pending') return 'applied';
   if (status === 'under_review') return 'under_review';
-  if (status === 'shortlisted' || status === 'approved') return 'shortlisted';
+  if (status === 'shortlisted') return 'shortlisted';
+  if (status === 'approved') return 'approved';
   if (status === 'offer_sent') return 'offer_sent';
   if (status === 'offer_declined') return 'offer_declined';
   return 'rejected';
@@ -72,6 +74,7 @@ function normalizeStatus(row: ApplicationWithCampaign['application']): Applicati
 
 function statusLabel(status: ApplicationStatus): string {
   if (status === 'under_review') return 'Under review';
+  if (status === 'approved') return 'Approved';
   if (status === 'offer_sent') return 'Offer sent';
   if (status === 'offer_declined') return 'Offer declined';
   if (status === 'shortlisted') return 'Shortlisted';
@@ -82,6 +85,7 @@ function statusLabel(status: ApplicationStatus): string {
 
 function statusClass(status: ApplicationStatus): string {
   if (status === 'offer_sent') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'approved') return 'border-teal-200 bg-teal-50 text-teal-800';
   if (status === 'offer_declined') return 'border-orange-200 bg-orange-50 text-orange-700';
   if (status === 'shortlisted') return 'border-amber-200 bg-amber-50 text-amber-700';
   if (status === 'under_review') return 'border-blue-200 bg-blue-50 text-blue-700';
@@ -100,6 +104,9 @@ function statusHelperCopy(status: ApplicationStatus): string {
   if (status === 'shortlisted') {
     return 'You made the shortlist. You may receive an offer next.';
   }
+  if (status === 'approved') {
+    return 'The brand approved your application and is finalizing terms. You will see the formal offer under Offers once it is sent.';
+  }
   if (status === 'offer_sent') {
     return 'An offer has been sent. Review details and respond in your Offers tab.';
   }
@@ -116,7 +123,8 @@ function pipelineIndex(status: ApplicationStatus): number | null {
   if (status === 'applied') return 0;
   if (status === 'under_review') return 1;
   if (status === 'shortlisted') return 2;
-  if (status === 'offer_sent') return 3;
+  /** Past shortlist: offer step in progress (draft) or delivered. */
+  if (status === 'approved' || status === 'offer_sent') return 3;
   return null;
 }
 
@@ -210,6 +218,7 @@ export function AthleteApplications() {
         status === 'applied' ||
         status === 'under_review' ||
         status === 'shortlisted' ||
+        status === 'approved' ||
         status === 'offer_sent'
       ) {
         counts.active += 1;
@@ -249,6 +258,7 @@ export function AthleteApplications() {
           status === 'applied' ||
           status === 'under_review' ||
           status === 'shortlisted' ||
+          status === 'approved' ||
           status === 'offer_sent'
         );
       }

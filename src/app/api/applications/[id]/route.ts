@@ -17,7 +17,8 @@ import {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const ALLOWED = new Set(['shortlisted', 'approved', 'declined']);
+/** Inbound from brand UI; `rejected` is normalized to `declined` for the DB. */
+const ALLOWED_INBOUND = new Set(['shortlisted', 'approved', 'declined', 'under_review', 'rejected']);
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const user = await getAuthUser();
@@ -55,17 +56,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return jsonError(403, 'Forbidden');
   }
 
-  const status = body.status;
-  if (typeof status !== 'string' || !ALLOWED.has(status)) {
+  const raw = body.status;
+  if (typeof raw !== 'string' || !ALLOWED_INBOUND.has(raw)) {
     return jsonError(400, 'Invalid status');
   }
+  const status: 'under_review' | 'shortlisted' | 'approved' | 'declined' =
+    raw === 'rejected' ? 'declined' : (raw as 'under_review' | 'shortlisted' | 'approved' | 'declined');
 
   try {
-    const updated = await updateApplicationStatus(
-      id,
-      user.userId,
-      status as 'shortlisted' | 'approved' | 'declined'
-    );
+    const updated = await updateApplicationStatus(id, user.userId, status);
     if (!updated) {
       return NextResponse.json({ error: 'Not found or forbidden' }, { status: 404 });
     }

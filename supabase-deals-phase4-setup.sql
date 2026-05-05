@@ -2,6 +2,10 @@
 -- NILINK — Supabase Database Setup (Deals — Phase 4)
 -- Run this AFTER supabase-deals-phase3-setup.sql.
 --
+-- If `deal_deliverables` already existed from supabase-business-setup.sql,
+-- CREATE TABLE IF NOT EXISTS will skip this block — run
+-- supabase-deal-deliverables-legacy-to-phase4.sql to add missing columns.
+--
 -- Adds:
 --   • deal_deliverables
 --   • deliverable_submissions

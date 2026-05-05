@@ -484,7 +484,7 @@ export function BusinessCampaigns() {
 
   const handlePatchApplication = async (
     applicationId: string,
-    status: 'under_review' | 'shortlisted' | 'rejected'
+    status: 'under_review' | 'shortlisted' | 'rejected' | 'approved'
   ) => {
     const res = await authFetch(`/api/applications/${applicationId}`, {
       method: 'PATCH',

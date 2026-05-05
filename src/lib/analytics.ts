@@ -8,7 +8,8 @@ export type AnalyticsEventName =
   | 'send_offer_modal_open'
   | 'direct_draft_create'
   | 'referral_invite_create'
-  | 'offer_submit';
+  | 'offer_submit'
+  | 'offer_send';
 
 export type AnalyticsEventDetail = {
   name: AnalyticsEventName;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Edit3, Calendar, DollarSign, MapPin,
   Users, Eye, Target, Package, Globe, Lock,
@@ -92,7 +92,7 @@ interface Props {
   brandReviewMode?: boolean;
   onPatchApplication?: (
     applicationId: string,
-    status: 'under_review' | 'shortlisted' | 'rejected'
+    status: 'under_review' | 'shortlisted' | 'rejected' | 'approved'
   ) => Promise<{ warnings?: { code?: string; message: string }[] } | undefined>;
   onPatchCampaignStatus?: (campaignId: string, status: CampaignStatus) => Promise<void>;
   /**
@@ -222,42 +222,39 @@ export function CampaignDetail({
     void authFetch(`/api/chat/threads/${activeThreadId}/read`, { method: 'POST' });
   }, [activeThreadId, threadLoading]);
 
-  useEffect(() => {
-    if (!brandReviewMode) return;
-    let cancelled = false;
+  const loadOfferIdMap = useCallback(async (): Promise<Record<string, string>> => {
+    if (!brandReviewMode) return {};
     setOffersMapLoading(true);
     setOffersMapError(null);
-    void (async () => {
-      try {
-        const res = await authFetch(`/api/campaigns/${campaign.id}/offers`);
-        const data = (await res.json()) as {
-          offers?: { id: string; applicationId: string | null }[];
-          error?: string;
-        };
-        if (cancelled) return;
-        if (!res.ok || !data.offers) {
-          setOfferIdByApplicationId({});
-          setOffersMapError(data.error || 'Could not load offer links');
-          return;
-        }
-        const map: Record<string, string> = {};
-        for (const o of data.offers) {
-          if (o.applicationId) map[o.applicationId] = o.id;
-        }
-        setOfferIdByApplicationId(map);
-      } catch {
-        if (!cancelled) {
-          setOfferIdByApplicationId({});
-          setOffersMapError('Network error while loading offers');
-        }
-      } finally {
-        if (!cancelled) setOffersMapLoading(false);
+    try {
+      const res = await authFetch(`/api/campaigns/${campaign.id}/offers`);
+      const data = (await res.json()) as {
+        offers?: { id: string; applicationId: string | null }[];
+        error?: string;
+      };
+      if (!res.ok || !data.offers) {
+        setOfferIdByApplicationId({});
+        setOffersMapError(data.error || 'Could not load offer links');
+        return {};
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [brandReviewMode, campaign.id, campaign.status, campaign.candidates.length]);
+      const map: Record<string, string> = {};
+      for (const o of data.offers) {
+        if (o.applicationId) map[o.applicationId] = o.id;
+      }
+      setOfferIdByApplicationId(map);
+      return map;
+    } catch {
+      setOfferIdByApplicationId({});
+      setOffersMapError('Network error while loading offers');
+      return {};
+    } finally {
+      setOffersMapLoading(false);
+    }
+  }, [brandReviewMode, campaign.id]);
+
+  useEffect(() => {
+    void loadOfferIdMap();
+  }, [loadOfferIdMap, campaign.status, campaign.candidates.length]);
 
   const sendThreadMessage = async () => {
     if (!messageAppId || !messageDraft.trim() || !currentUserId) return;
@@ -780,6 +777,58 @@ export function CampaignDetail({
                                       }}
                                     >
                                       Shortlist
+                                    </button>
+                                  )}
+                                  {(candidate.status === 'Applied' ||
+                                    candidate.status === 'Under Review' ||
+                                    candidate.status === 'Shortlisted') && (
+                                    <button
+                                      type="button"
+                                      title="Marks the application approved, ensures a campaign offer draft exists, and opens the offer editor"
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                                      onClick={() => {
+                                        setOpenMenuForId(null);
+                                        void (async () => {
+                                          const r = await onPatchApplication(candidate.id, 'approved');
+                                          if (r?.warnings?.length) {
+                                            setApplicationPatchNotice(
+                                              r.warnings.map((w) => w.message).join(' ')
+                                            );
+                                          }
+                                          let offerId: string | undefined;
+                                          const offerRes = await authFetch(
+                                            `/api/campaigns/${campaign.id}/offers`,
+                                            {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({
+                                                applicationIds: [candidate.id],
+                                              }),
+                                            }
+                                          );
+                                          const offerData = (await offerRes.json()) as {
+                                            offers?: { id: string; applicationId?: string | null }[];
+                                            error?: string;
+                                          };
+                                          if (offerRes.ok && offerData.offers?.length) {
+                                            offerId = offerData.offers.find(
+                                              (o) => o.applicationId === candidate.id
+                                            )?.id;
+                                          } else if (!offerRes.ok) {
+                                            setApplicationPatchNotice(
+                                              offerData.error ||
+                                                'Application was approved but offer draft could not be created.'
+                                            );
+                                          }
+                                          const map = await loadOfferIdMap();
+                                          offerId = offerId ?? map[candidate.id];
+                                          if (offerId) setWizardOfferId(offerId);
+                                          await onApplicationsUpdated?.();
+                                        })();
+                                      }}
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                      Approve
                                     </button>
                                   )}
                                   {(candidate.status === 'Applied' ||
