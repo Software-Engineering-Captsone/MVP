@@ -18,7 +18,9 @@ export type DealsRealtimeOptions = {
  */
 export function useDealsRealtimeRefresh({ enabled, dealId, onInvalidate }: DealsRealtimeOptions): void {
   const onInvalidateRef = useRef(onInvalidate);
-  onInvalidateRef.current = onInvalidate;
+  useEffect(() => {
+    onInvalidateRef.current = onInvalidate;
+  }, [onInvalidate]);
 
   useEffect(() => {
     if (!enabled) return;
