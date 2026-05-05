@@ -8,7 +8,7 @@ import useSWR from 'swr';
 import type { OffersListResponse } from '@/hooks/api/useOffersList';
 import { apiFetcher } from '@/hooks/api/fetcher';
 import {
-  Home, Search, FileText, MessageSquare, Heart,
+  Home, Search, FileText, MessageSquare,
   CreditCard, Megaphone, BarChart3, MoreVertical, Handshake,
   ClipboardList,
   type LucideIcon,
@@ -59,7 +59,6 @@ const athleteNavigation: NavItem[] = [
 const businessNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/dashboard/search', icon: Search, label: 'Explore' },
-  { href: '/dashboard/saved', icon: Heart, label: 'Saved' },
   { href: '/dashboard/campaigns', icon: Megaphone, label: 'Campaigns' },
   { href: '/dashboard/deals', icon: CreditCard, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },

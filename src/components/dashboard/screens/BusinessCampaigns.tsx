@@ -80,15 +80,15 @@ export type {
   Deliverable,
 } from '@/components/dashboard/screens/campaignDashboardTypes';
 
-/* ── Status Badge ───────────────────────────────────────────── */
+/* ── Status Badge (aligned with dashboard stat card palette) ── */
 const statusStyles: Record<CampaignStatus, string> = {
-  'Draft': 'bg-gray-100 text-gray-500 border-gray-200',
+  Draft: 'bg-gray-100 text-gray-500 border-gray-200',
   'Ready to Launch': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
   'Open for Applications': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
-  'Reviewing Candidates': 'bg-amber-50 text-amber-700 border-amber-200',
-  'Deal Creation in Progress': 'bg-gray-100 text-nilink-ink border-gray-300',
-  'Active': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'Completed': 'bg-gray-100 text-gray-600 border-gray-300',
+  'Reviewing Candidates': 'bg-red-50 text-red-700 border-red-200',
+  'Deal Creation in Progress': 'bg-red-50 text-red-800 border-red-200',
+  Active: 'bg-amber-50 text-amber-700 border-amber-200',
+  Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 function StatusBadge({ status }: { status: CampaignStatus }) {
@@ -143,7 +143,8 @@ export function BusinessCampaigns() {
   const campaigns = useMemo(() => apiCampaigns.map((c) => apiCampaignToUi(c, [])), [apiCampaigns]);
   const [listError, setListError] = useState<string | null>(null);
   const brandDisplayName = user?.name ?? '';
-  const [activeFilter, setActiveFilter] = useState('All');
+  type CampaignListFilter = 'All' | 'Drafts' | 'Reviewing' | 'Active' | 'Completed';
+  const [activeFilter, setActiveFilter] = useState<CampaignListFilter>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   /** Restore create wizard from sessionStorage when returning to this page with an open session. */
@@ -553,16 +554,24 @@ export function BusinessCampaigns() {
     await mutateCampaigns();
   };
 
-  // Stats
-  const activeCampaigns = campaigns.filter((c) => c.status === 'Active');
-  const openCampaigns = campaigns.filter((c) => c.status === 'Open for Applications');
+  // Stats (palette matches StatusBadge tokens)
+  const draftCampaigns = campaigns.filter((c) => c.status === 'Draft');
   const reviewingCampaigns = campaigns.filter(
     (c) => c.status === 'Reviewing Candidates' || c.status === 'Deal Creation in Progress'
   );
+  const activeCampaigns = campaigns.filter((c) => c.status === 'Active');
   const completedCampaigns = campaigns.filter((c) => c.status === 'Completed');
 
-  // Filters
+  // Filters (order matches stat cards; "All" stays first in the chip row)
   const filteredCampaigns = campaigns.filter((c) => {
+    if (activeFilter === 'Drafts' && c.status !== 'Draft') return false;
+    if (
+      activeFilter === 'Reviewing' &&
+      c.status !== 'Reviewing Candidates' &&
+      c.status !== 'Deal Creation in Progress'
+    ) {
+      return false;
+    }
     if (activeFilter === 'Active' && c.status !== 'Active') return false;
     if (activeFilter === 'Completed' && c.status !== 'Completed') return false;
     if (searchQuery && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -587,7 +596,7 @@ export function BusinessCampaigns() {
           {!showCreateOverlay && (
             <DashboardPageHeader
               title="Campaigns"
-              subtitle="Create, manage, and track NIL campaigns (saved to server file data/local-campaign-store.json)"
+              subtitle="Create, manage, and track NIL campaigns"
               className="mb-6"
             />
           )}
@@ -620,22 +629,22 @@ export function BusinessCampaigns() {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
               {
-                label: 'Active',
-                value: activeCampaigns.length,
-                valueClass: 'text-emerald-700',
-                cardClass: 'border-emerald-200/80 bg-emerald-50/90',
-                labelClass: 'text-emerald-700/70',
-              },
-              {
-                label: 'Open for Apps',
-                value: openCampaigns.length,
-                valueClass: 'text-nilink-accent',
-                cardClass: 'border-nilink-accent-border bg-nilink-accent-soft',
-                labelClass: 'text-nilink-accent/80',
+                label: 'Drafts',
+                value: draftCampaigns.length,
+                valueClass: 'text-gray-600',
+                cardClass: 'border-gray-200 bg-gray-100/80',
+                labelClass: 'text-gray-500',
               },
               {
                 label: 'Reviewing',
                 value: reviewingCampaigns.length,
+                valueClass: 'text-red-700',
+                cardClass: 'border-red-200/80 bg-red-50/90',
+                labelClass: 'text-red-800/70',
+              },
+              {
+                label: 'Active',
+                value: activeCampaigns.length,
                 valueClass: 'text-amber-700',
                 cardClass: 'border-amber-200/80 bg-amber-50/90',
                 labelClass: 'text-amber-800/70',
@@ -643,9 +652,9 @@ export function BusinessCampaigns() {
               {
                 label: 'Completed',
                 value: completedCampaigns.length,
-                valueClass: 'text-gray-600',
-                cardClass: 'border-gray-200 bg-gray-100/80',
-                labelClass: 'text-gray-500',
+                valueClass: 'text-emerald-700',
+                cardClass: 'border-emerald-200/80 bg-emerald-50/90',
+                labelClass: 'text-emerald-700/70',
               },
             ].map((stat) => (
               <div
@@ -681,7 +690,7 @@ export function BusinessCampaigns() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
-            {(['All', 'Active', 'Completed'] as const).map((tab) => {
+            {(['All', 'Drafts', 'Reviewing', 'Active', 'Completed'] as const).map((tab) => {
               const on = activeFilter === tab;
               return (
                 <button

@@ -310,7 +310,7 @@ export async function listOpenCampaignsForAthlete(): Promise<StoredCampaign[]> {
     .select(CAMPAIGN_SELECT)
     .eq('visibility', 'Public')
     .eq('accept_applications', true)
-    .in('status', ['Open for Applications', 'Reviewing Candidates'])
+    .in('status', ['Active', 'Open for Applications'])
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => dbCampaignToStored(r as unknown as DbCampaignRow));

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
+import { deriveCampaignStatusFromSubmission } from '@/lib/campaigns/campaignStatusDerivation';
 import {
   getCampaignById,
   listApplicationsForCampaign,
@@ -66,8 +67,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  const intent = body.intent === 'publish' ? 'publish' : body.intent === 'draft' ? 'draft' : null;
   const patch: Record<string, unknown> = {};
-  if (typeof body.status === 'string') patch.status = body.status;
+  if (intent) {
+    patch.status = deriveCampaignStatusFromSubmission(body, { intent });
+  } else if (typeof body.status === 'string') {
+    patch.status = body.status;
+  }
   if (typeof body.acceptApplications === 'boolean') patch.acceptApplications = body.acceptApplications;
 
   if (Object.keys(patch).length === 0) {

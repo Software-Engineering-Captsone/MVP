@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  Lightbulb,
   Shield,
   Zap,
   Calendar,
@@ -16,8 +15,6 @@ import {
   Globe,
   Lock,
   SlidersHorizontal,
-  Target,
-  Tag,
   RefreshCw,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -35,7 +32,6 @@ import {
   type CampaignPublishValidationResult,
 } from '@/lib/campaigns/publishValidation';
 import type {
-  AudienceGeoRequirementV2,
   CampaignBriefV2,
   CtaTypeV2,
   DeliverableSpecV2,
@@ -102,7 +98,7 @@ const packages = [
     priceLevel: '$$$',
     tag: null,
     deliverables: ['2 Reels (Collaborator)', '4 Stories (48h apart)'],
-    platforms: ['Instagram', 'Facebook'],
+    platforms: ['Instagram', 'TikTok'],
   },
   {
     id: 'ugc-photo',
@@ -118,15 +114,6 @@ const packages = [
 const OBJECTIVE_TYPE_OPTIONS: { value: ObjectiveTypeV2; label: string }[] = (
   ['awareness', 'consideration', 'conversion', 'ugc_library'] as const
 ).map((value) => ({ value, label: OBJECTIVE_TYPE_LABELS[value] }));
-
-const PRIMARY_KPI_OPTIONS: { value: PrimaryKpiV2; label: string }[] = [
-  { value: 'reach', label: 'Reach' },
-  { value: 'engagement_rate', label: 'Engagement rate' },
-  { value: 'ctr', label: 'CTR' },
-  { value: 'cpa', label: 'CPA' },
-  { value: 'leads', label: 'Leads' },
-  { value: 'sales', label: 'Sales' },
-];
 
 const CTA_TYPE_OPTIONS: { value: CtaTypeV2; label: string }[] = [
   { value: 'learn_more', label: 'Learn more' },
@@ -147,12 +134,6 @@ const USAGE_MODE_OPTIONS: { value: UsageRightsModeV2; label: string }[] = [
   { value: 'paid_usage', label: 'Paid usage' },
 ];
 
-const GEO_REQ_OPTIONS: { value: AudienceGeoRequirementV2; label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'preferred', label: 'Preferred' },
-  { value: 'strict', label: 'Strict' },
-];
-
 const SHORTLIST_OPTIONS: { value: ShortlistStrategyV2; label: string }[] = [
   { value: 'manual', label: 'Manual shortlist' },
   { value: 'assisted', label: 'Assisted matching' },
@@ -161,17 +142,6 @@ const SHORTLIST_OPTIONS: { value: ShortlistStrategyV2; label: string }[] = [
 const V2_PLATFORM_CHOICES = [
   { slug: 'instagram', label: 'Instagram' },
   { slug: 'tiktok', label: 'TikTok' },
-  { slug: 'youtube', label: 'YouTube' },
-  { slug: 'x', label: 'X' },
-  { slug: 'linkedin', label: 'LinkedIn' },
-] as const;
-
-const BRAND_FIT_OPTIONS = [
-  'Values-aligned',
-  'School spirit',
-  'Professional tone',
-  'Family-friendly',
-  'Performance-focused',
 ] as const;
 
 const STEP_INFO: Record<number, { title: string; subtitle: string }> = {
@@ -181,7 +151,7 @@ const STEP_INFO: Record<number, { title: string; subtitle: string }> = {
   },
   2: {
     title: 'Audience & Creator Fit',
-    subtitle: 'Sport, reach, engagement, and brand-voice tags for athlete alignment.',
+    subtitle: 'Sport, reach, and engagement filters for athlete alignment.',
   },
   3: {
     title: 'Content & Deliverables',
@@ -223,22 +193,6 @@ export type CampaignSubmitBody = {
 
 /** @deprecated Use CampaignSubmitBody */
 export type CreateCampaignPayload = CampaignSubmitBody;
-
-function formatDisplayDate(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function formatDurationDays(start: string, end: string): string {
-  if (!start || !end) return 'TBD';
-  const s = new Date(`${start}T12:00:00`);
-  const e = new Date(`${end}T12:00:00`);
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 'TBD';
-  const days = Math.max(0, Math.round((e.getTime() - s.getTime()) / 86400000));
-  return days === 0 ? 'Same day' : `${days} days`;
-}
 
 const V2_SECTION_ORDER: readonly CampaignBriefV2SectionKey[] = [
   'strategy',
@@ -371,7 +325,7 @@ function WizardStepChecklistRail({
               key={s.id}
               aria-current={isCurrent ? 'step' : undefined}
               aria-label={stateLabel}
-              className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
                 isCurrent
                   ? 'border-nilink-accent/35 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]'
                   : isDone
@@ -380,7 +334,7 @@ function WizardStepChecklistRail({
               }`}
             >
               <span
-                className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                   isDone
                     ? 'bg-nilink-accent text-white shadow-[0_4px_12px_rgba(42,144,176,0.28)]'
                     : isCurrent
@@ -463,14 +417,14 @@ export function CreateCampaignOverlay({
     submitKindRef.current = submitKind;
   }, [submitKind]);
   const lastSavedDraftSigRef = useRef<string | null>(null);
-  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'autosaving' | 'saved' | 'failed'>('idle');
+  const autosaveInFlightRef = useRef(false);
+  const [saveDraftButtonState, setSaveDraftButtonState] = useState<'idle' | 'saved'>('idle');
   const [templateSaveName, setTemplateSaveName] = useState('');
   const [templateSaveDesc, setTemplateSaveDesc] = useState('');
   const [templateSaveBusy, setTemplateSaveBusy] = useState(false);
   const [templateSaveFeedback, setTemplateSaveFeedback] = useState<string | null>(null);
 
   const [campaignName, setCampaignName] = useState('');
-  const [opportunityContext, setOpportunityContext] = useState('');
   const [budgetMin, setBudgetMin] = useState('');
   const [budgetMax, setBudgetMax] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -489,8 +443,6 @@ export function CreateCampaignOverlay({
   const [sport, setSport] = useState('All Sports');
   const [gender, setGender] = useState('Any');
   const [followerMin, setFollowerMin] = useState(0);
-  const [engagementMinPct, setEngagementMinPct] = useState(0);
-  const [brandFitTags, setBrandFitTags] = useState<string[]>([]);
 
   const [acceptApplications, setAcceptApplications] = useState(true);
   const [visibility, setVisibility] = useState<'Public' | 'Private'>('Public');
@@ -504,11 +456,7 @@ export function CreateCampaignOverlay({
   const [primaryKpiTarget, setPrimaryKpiTarget] = useState(3);
   const [secondaryKpi, setSecondaryKpi] = useState<PrimaryKpiV2 | ''>('');
   const [secondaryKpiTarget, setSecondaryKpiTarget] = useState('');
-  const [marketRegion, setMarketRegion] = useState('Global');
-  const [audiencePersona, setAudiencePersona] = useState('');
-  const [audienceGeoRequirement, setAudienceGeoRequirement] = useState<AudienceGeoRequirementV2>('open');
-  const [languagePreferencesText, setLanguagePreferencesText] = useState('');
-  const [creatorExclusionsText, setCreatorExclusionsText] = useState('');
+  const [marketRegion, setMarketRegion] = useState('NA');
   const [v2Platforms, setV2Platforms] = useState<string[]>(['instagram']);
   const [deliverableBundle, setDeliverableBundle] = useState<DeliverableSpecV2[]>([]);
   const [ctaType, setCtaType] = useState<CtaTypeV2>('learn_more');
@@ -525,7 +473,6 @@ export function CreateCampaignOverlay({
   const [templateSelection, setTemplateSelection] = useState<WizardV2TemplateSelection>({ source: 'blank' });
   /** Step 1: strategy fields show only after user picks Start blank or a saved template card. */
   const [strategyTemplatePathConfirmed, setStrategyTemplatePathConfirmed] = useState(false);
-  const [pinnedTemplateName, setPinnedTemplateName] = useState<string | null>(null);
 
   const [templates, setTemplates] = useState<CampaignTemplateListItem[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -566,18 +513,18 @@ export function CreateCampaignOverlay({
 
     const h = hydrateOverlayFromCampaignBriefV2(p.campaignBriefV2Hydration);
     setCampaignName(h.campaignName);
-    setOpportunityContext(h.opportunityContext);
     setBudgetMin(h.budgetMin);
     setBudgetMax(h.budgetMax);
     setStartDate(h.startDate);
     setEndDate(h.endDate);
-    setBrief(h.brief);
+    {
+      const parts = [h.opportunityContext?.trim(), h.brief?.trim()].filter(Boolean) as string[];
+      setBrief(parts.length ? parts.join('\n\n') : '');
+    }
     setSelectedPackage(p.selectedPackage);
     setSport(h.sport);
     setGender(h.gender);
     setFollowerMin(h.followerMin);
-    setEngagementMinPct(h.engagementMinPct);
-    setBrandFitTags(h.brandFitTags);
     setAcceptApplications(h.acceptApplications);
     setVisibility(h.visibility);
     setVisibilityV2(h.visibilityV2);
@@ -588,11 +535,7 @@ export function CreateCampaignOverlay({
     setPrimaryKpiTarget(h.primaryKpiTarget);
     setSecondaryKpi(h.secondaryKpi);
     setSecondaryKpiTarget(h.secondaryKpiTarget);
-    setMarketRegion(h.marketRegion);
-    setAudiencePersona(h.audiencePersona);
-    setAudienceGeoRequirement(h.audienceGeoRequirement);
-    setLanguagePreferencesText(h.languagePreferencesText);
-    setCreatorExclusionsText(h.creatorExclusionsText);
+    setMarketRegion(h.marketRegion?.trim() || 'NA');
     setV2Platforms(h.platforms.length > 0 ? h.platforms : ['instagram']);
     setDeliverableBundle(h.deliverableBundle);
     setCtaType(h.ctaType);
@@ -607,12 +550,10 @@ export function CreateCampaignOverlay({
     setShortlistStrategy(h.shortlistStrategy);
     if (!p.hadPersistedCampaignBriefV2) {
       setTemplateSelection({ source: 'blank' });
-      setPinnedTemplateName(null);
     } else {
       setTemplateSelection(
         h.templateSelection.source ? h.templateSelection : { source: 'blank' }
       );
-      setPinnedTemplateName(null);
     }
     setStrategyTemplatePathConfirmed(true);
   }, [draftResume, initialStep]);
@@ -690,17 +631,17 @@ export function CreateCampaignOverlay({
     });
     const h = hydrateOverlayFromCampaignBriefV2(merged);
     setCampaignName(h.campaignName);
-    setOpportunityContext(h.opportunityContext);
     setBudgetMin(h.budgetMin);
     setBudgetMax(h.budgetMax);
     setStartDate(h.startDate);
     setEndDate(h.endDate);
-    setBrief(h.brief);
+    {
+      const parts = [h.opportunityContext?.trim(), h.brief?.trim()].filter(Boolean) as string[];
+      setBrief(parts.length ? parts.join('\n\n') : '');
+    }
     setSport(h.sport);
     setGender(h.gender);
     setFollowerMin(h.followerMin);
-    setEngagementMinPct(h.engagementMinPct);
-    setBrandFitTags(h.brandFitTags);
     setAcceptApplications(h.acceptApplications);
     setVisibility(h.visibility);
     setVisibilityV2(h.visibilityV2);
@@ -710,11 +651,7 @@ export function CreateCampaignOverlay({
     setPrimaryKpiTarget(h.primaryKpiTarget);
     setSecondaryKpi(h.secondaryKpi);
     setSecondaryKpiTarget(h.secondaryKpiTarget);
-    setMarketRegion(h.marketRegion);
-    setAudiencePersona(h.audiencePersona);
-    setAudienceGeoRequirement(h.audienceGeoRequirement);
-    setLanguagePreferencesText(h.languagePreferencesText);
-    setCreatorExclusionsText(h.creatorExclusionsText);
+    setMarketRegion(h.marketRegion?.trim() || 'NA');
     setV2Platforms(h.platforms.length > 0 ? h.platforms : ['instagram']);
     setDeliverableBundle(h.deliverableBundle);
     setCtaType(h.ctaType);
@@ -732,13 +669,44 @@ export function CreateCampaignOverlay({
       templateVersion: t.version,
       source: t.orgId ? 'org' : 'system',
     });
-    setPinnedTemplateName(t.name);
     setStrategyTemplatePathConfirmed(true);
   };
 
   const selectBlankStrategyPath = () => {
+    setCampaignName('');
+    setBudgetMin('');
+    setBudgetMax('');
+    setStartDate('');
+    setEndDate('');
+    setBrief('');
+    setSelectedPackage(null);
+    setSport('All Sports');
+    setGender('Any');
+    setFollowerMin(0);
+    setAcceptApplications(true);
+    setVisibility('Public');
+    setVisibilityV2('public');
+    setLocationRadius('');
+    setReviewPublishConfirmed(false);
+    setObjectiveType('awareness');
+    setPrimaryKpi('engagement_rate');
+    setPrimaryKpiTarget(3);
+    setSecondaryKpi('');
+    setSecondaryKpiTarget('');
+    setMarketRegion('NA');
+    setV2Platforms(['instagram']);
+    setDeliverableBundle([]);
+    setCtaType('learn_more');
+    setMessagePillars([]);
+    setMustSayLines('');
+    setMustAvoidLines('');
+    setDraftRequired(true);
+    setRevisionRounds(1);
+    setPaymentModel('flat');
+    setUsageRightsMode('organic_only');
+    setUsageDurationDays(90);
+    setShortlistStrategy('manual');
     setTemplateSelection({ source: 'blank' });
-    setPinnedTemplateName(null);
     setStrategyTemplatePathConfirmed(true);
   };
 
@@ -754,7 +722,7 @@ export function CreateCampaignOverlay({
 
     const tb = buildCampaignBriefV2FromWizardState({
       campaignName,
-      opportunityContext,
+      opportunityContext: brief,
       brief,
       goal: goalLabel,
       startDate,
@@ -762,8 +730,8 @@ export function CreateCampaignOverlay({
       sport,
       gender,
       followerMin,
-      engagementMinPct,
-      brandFitTags,
+      engagementMinPct: 0,
+      brandFitTags: [],
       acceptApplications,
       visibility: visibilityV2 === 'public' ? 'Public' : 'Private',
       locationRadius,
@@ -776,14 +744,14 @@ export function CreateCampaignOverlay({
       secondaryKpi,
       secondaryKpiTarget,
       marketRegion,
-      audiencePersona,
-      audienceGeoRequirement,
-      languagePreferencesText,
-      creatorExclusionsText,
+      audiencePersona: '',
+      audienceGeoRequirement: 'open',
+      languagePreferencesText: '',
+      creatorExclusionsText: '',
       platforms: v2Platforms,
       deliverableBundle,
       ctaType,
-      messagePillars: messagePillars.length > 0 ? messagePillars : [...brandFitTags],
+      messagePillars,
       mustSayLines,
       mustAvoidLines,
       draftRequired,
@@ -807,31 +775,23 @@ export function CreateCampaignOverlay({
     };
   }, [
     acceptApplications,
-    audienceGeoRequirement,
-    audiencePersona,
-    brandFitTags,
     brief,
     budgetMax,
     budgetMin,
     campaignName,
-    creatorExclusionsText,
     ctaType,
     deliverableBundle,
     draftRequired,
     endDate,
-    engagementMinPct,
     followerMin,
     gender,
-    languagePreferencesText,
     locationRadius,
     marketRegion,
     messagePillars,
     mustAvoidLines,
     mustSayLines,
     objectiveType,
-    opportunityContext,
     paymentModel,
-    pinnedTemplateName,
     primaryKpi,
     primaryKpiTarget,
     reviewPublishConfirmed,
@@ -896,7 +856,9 @@ export function CreateCampaignOverlay({
     () =>
       computeV2ReviewRiskFlags({
         secondaryKpi: secondaryKpi === '' ? '' : secondaryKpi,
-        creatorExclusionsText,
+        creatorExclusionsText: (
+          publishGateBody.campaignBriefV2?.audienceCreatorFit?.creatorExclusions ?? []
+        ).join('\n'),
         preview:
           step === REVIEW_STEP && previewData
             ? {
@@ -906,7 +868,7 @@ export function CreateCampaignOverlay({
               }
             : null,
       }),
-    [secondaryKpi, creatorExclusionsText, previewData, step]
+    [secondaryKpi, previewData, publishGateBody, step]
   );
 
   const canPublish = publishLiveCheck.blockingIssues.length === 0;
@@ -929,11 +891,9 @@ export function CreateCampaignOverlay({
       const isQuietAutosave = Boolean(opts?.isAutosave && intent === 'draft');
       if (!isQuietAutosave) {
         setSubmitError(null);
+        setSubmitKind(intent);
       }
-      setSubmitKind(intent);
-      if (intent === 'draft' && opts?.isAutosave) {
-        setAutosaveStatus('autosaving');
-      }
+      if (isQuietAutosave) autosaveInFlightRef.current = true;
       try {
         const { campaignId: nextId } = await onSubmitCampaign({
           body: buildBody(),
@@ -943,36 +903,32 @@ export function CreateCampaignOverlay({
         });
         setCampaignId(nextId);
         lastSavedDraftSigRef.current = stableSerializeForAutosave(buildBody());
-        if (intent === 'draft') {
-          if (opts?.isAutosave) {
-            setAutosaveStatus('saved');
-          } else {
-            setAutosaveStatus('idle');
-          }
-        }
         if (intent === 'publish') {
           onClose();
         }
         return { campaignId: nextId };
       } catch (e) {
-        if (intent === 'draft' && opts?.isAutosave) {
-          setAutosaveStatus('failed');
-        } else if (e instanceof CampaignPublishRejectedError) {
+        if (e instanceof CampaignPublishRejectedError) {
           setSubmitError(e.message);
-        } else {
+        } else if (!isQuietAutosave) {
           setSubmitError(intent === 'draft' ? 'Could not save draft' : 'Could not publish campaign');
         }
         return undefined;
       } finally {
-        setSubmitKind(null);
+        if (isQuietAutosave) {
+          autosaveInFlightRef.current = false;
+        } else {
+          setSubmitKind(null);
+        }
       }
     },
     [buildBody, campaignId, onClose, onSubmitCampaign]
   );
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!canSaveDraft || busy) return;
-    void runSubmit('draft');
+    const result = await runSubmit('draft');
+    if (result) setSaveDraftButtonState('saved');
   };
 
   const handleDiscardOrAbandon = useCallback(async () => {
@@ -1013,6 +969,7 @@ export function CreateCampaignOverlay({
     const id = window.setTimeout(() => {
       void (async () => {
         if (submitKindRef.current !== null) return;
+        if (autosaveInFlightRef.current) return;
         const body = buildBodyFnRef.current();
         const sig = stableSerializeForAutosave(body);
         if (sig === lastSavedDraftSigRef.current) return;
@@ -1023,10 +980,10 @@ export function CreateCampaignOverlay({
   }, [campaignName, runSubmit]);
 
   useEffect(() => {
-    if (autosaveStatus !== 'saved') return;
-    const t = window.setTimeout(() => setAutosaveStatus('idle'), 6000);
+    if (saveDraftButtonState !== 'saved') return;
+    const t = window.setTimeout(() => setSaveDraftButtonState('idle'), 2000);
     return () => window.clearTimeout(t);
-  }, [autosaveStatus]);
+  }, [saveDraftButtonState]);
 
   useEffect(() => {
     if (step !== REVIEW_STEP) return;
@@ -1072,7 +1029,6 @@ export function CreateCampaignOverlay({
         templateVersion: tpl.version,
         source: tpl.orgId ? 'org' : 'system',
       });
-      setPinnedTemplateName(tpl.name);
       setTemplateSaveFeedback(`Saved template "${tpl.name}" (v${tpl.version}).`);
     } catch (e: unknown) {
       setTemplateSaveFeedback(e instanceof Error ? e.message : 'Template save failed');
@@ -1192,12 +1148,6 @@ export function CreateCampaignOverlay({
     };
   }, [step, campaignId, previewFetchNonce]);
 
-  const toggleBrandFit = (tag: string) => {
-    setBrandFitTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
-
   const toggleV2PlatformSlug = (slug: string) => {
     setV2Platforms((prev) => {
       const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug];
@@ -1289,7 +1239,10 @@ export function CreateCampaignOverlay({
             >
               Create campaign
             </h2>
-            <p id="campaign-wizard-subtitle" className="mt-1 text-sm text-gray-500">
+            <p
+              id="campaign-wizard-subtitle"
+              className="mb-6 mt-3 text-sm leading-relaxed text-gray-500 sm:mb-7 sm:mt-4"
+            >
               Guided setup — save anytime as a draft. Use the checklist to see what is left before launch.
             </p>
             <WizardStepChecklistRail currentStep={step} steps={STEPS} />
@@ -1299,18 +1252,6 @@ export function CreateCampaignOverlay({
             <p className="sr-only">
               Step {step} of {STEP_COUNT}: {stepA11y.title}. {stepA11y.subtitle}
             </p>
-            {campaignName.trim() ? (
-              <div
-                className="shrink-0 border-b border-gray-100/80 bg-white px-4 py-2 text-xs font-medium text-gray-500 sm:px-6 lg:px-8 xl:px-10"
-                aria-live="polite"
-              >
-                {autosaveStatus === 'autosaving' && 'Autosaving draft...'}
-                {autosaveStatus === 'saved' && 'Draft saved'}
-                {autosaveStatus === 'failed' && 'Autosave failed'}
-                {autosaveStatus === 'idle' && 'Draft ready'}
-              </div>
-            ) : null}
-
             <div
               className={`min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 lg:px-10 xl:px-12 ${
                 step === 1 ? 'py-5 sm:py-6 lg:py-7' : 'py-6 sm:py-7 lg:py-8'
@@ -1351,10 +1292,6 @@ export function CreateCampaignOverlay({
                 <div>
                   <p id="strategy-template-label" className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     Campaign template
-                  </p>
-                  <p className="mb-3 max-w-3xl text-xs text-gray-500">
-                    Pick a starting point. Saved templates load defaults into this wizard; everything remains editable before
-                    launch.
                   </p>
                   {templatesError ? <p className="mb-3 text-xs text-red-600">{templatesError}</p> : null}
                   {templatesLoading ? <p className="mb-3 text-xs text-gray-500">Loading templates…</p> : null}
@@ -1409,9 +1346,6 @@ export function CreateCampaignOverlay({
                         >
                           <span className="flex items-start justify-between gap-2">
                             <span className="min-w-0 font-bold leading-snug text-nilink-ink">{t.name}</span>
-                            <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-bold text-gray-500">
-                              v{t.version}
-                            </span>
                           </span>
                           {t.description ? (
                             <span className="mt-2 line-clamp-2 block text-xs text-gray-500">{t.description}</span>
@@ -1428,37 +1362,16 @@ export function CreateCampaignOverlay({
                   <p className="text-sm text-gray-600">Select a template card above to show strategy fields.</p>
                 ) : (
                   <>
-                    {templateSelection.source === 'blank' && !templateSelection.templateId ? (
-                      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/90 p-4 text-sm text-gray-800">
-                        <p className="font-semibold text-nilink-ink">Starting from a blank brief</p>
-                        <p className="mt-1 text-xs leading-relaxed text-gray-600">
-                          Complete the fields below from scratch. Name the campaign to enable Save draft from any step; budget
-                          and usage rights are set later in the wizard.
-                        </p>
-                      </div>
-                    ) : null}
-                    {templateSelection.templateId ? (
-                      <div className="rounded-xl border border-nilink-accent-border bg-nilink-accent-soft/25 p-4 text-sm text-nilink-ink">
-                        <p className="font-semibold text-nilink-ink">Prefilled from template — edit before continuing</p>
-                        <p className="mt-1 text-xs leading-relaxed text-gray-700">
-                          Values below were loaded from{' '}
-                          <span className="font-semibold text-nilink-ink">{pinnedTemplateName ?? 'your template'}</span>. Change
-                          anything you need; updates apply to this campaign draft only.
-                        </p>
-                        {pinnedTemplateName ? (
-                          <p className="mt-2 text-[11px] text-gray-600">
-                            Pinned record: id {templateSelection.templateId}, version {templateSelection.templateVersion ?? '—'}
-                            , {templateSelection.source}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
                     <div className="space-y-6">
                       <div>
-                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <label
+                          htmlFor="ccw-strategy-campaign-name"
+                          className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                        >
                           Campaign name <span className="text-red-400">*</span>
                         </label>
                         <input
+                          id="ccw-strategy-campaign-name"
                           type="text"
                           value={campaignName}
                           onChange={(e) => setCampaignName(e.target.value)}
@@ -1467,10 +1380,14 @@ export function CreateCampaignOverlay({
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <label
+                          htmlFor="ccw-objective-type"
+                          className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                        >
                           Objective <span className="text-red-400">*</span>
                         </label>
                         <select
+                          id="ccw-objective-type"
                           value={objectiveType}
                           onChange={(e) => setObjectiveType(e.target.value as ObjectiveTypeV2)}
                           className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
@@ -1482,77 +1399,20 @@ export function CreateCampaignOverlay({
                           ))}
                         </select>
                       </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            Primary KPI <span className="text-red-400">*</span>
-                          </label>
-                          <select
-                            value={primaryKpi}
-                            onChange={(e) => setPrimaryKpi(e.target.value as PrimaryKpiV2)}
-                            className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                          >
-                            {PRIMARY_KPI_OPTIONS.map((o) => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            Primary KPI target <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            step={1}
-                            value={primaryKpiTarget}
-                            onChange={(e) => setPrimaryKpiTarget(Number(e.target.value) || 0)}
-                            className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            Secondary KPI (optional)
-                          </label>
-                          <select
-                            value={secondaryKpi}
-                            onChange={(e) => setSecondaryKpi(e.target.value as PrimaryKpiV2 | '')}
-                            className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                          >
-                            <option value="">None</option>
-                            {PRIMARY_KPI_OPTIONS.map((o) => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            Secondary KPI target
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={secondaryKpiTarget}
-                            onChange={(e) => setSecondaryKpiTarget(e.target.value)}
-                            disabled={!secondaryKpi}
-                            className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-70"
-                          />
-                        </div>
-                      </div>
                       <div>
-                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                          Flight window <span className="text-red-400">*</span>
-                        </label>
+                        <p className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          Date <span className="text-red-400">*</span>
+                        </p>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-400">Start</p>
+                            <label
+                              htmlFor="ccw-flight-start"
+                              className="mb-1 block text-[10px] uppercase tracking-wider text-gray-400"
+                            >
+                              Start
+                            </label>
                             <input
+                              id="ccw-flight-start"
                               type="date"
                               value={startDate}
                               onChange={(e) => setStartDate(e.target.value)}
@@ -1560,8 +1420,14 @@ export function CreateCampaignOverlay({
                             />
                           </div>
                           <div>
-                            <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-400">End</p>
+                            <label
+                              htmlFor="ccw-flight-end"
+                              className="mb-1 block text-[10px] uppercase tracking-wider text-gray-400"
+                            >
+                              End
+                            </label>
                             <input
+                              id="ccw-flight-end"
                               type="date"
                               value={endDate}
                               onChange={(e) => setEndDate(e.target.value)}
@@ -1571,34 +1437,14 @@ export function CreateCampaignOverlay({
                         </div>
                       </div>
                       <div>
-                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                          Market / region <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={marketRegion}
-                          onChange={(e) => setMarketRegion(e.target.value)}
-                          placeholder="e.g. United States, DFW metro, or Global"
-                          className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <label
+                          htmlFor="ccw-short-brief"
+                          className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                        >
                           Opportunity context <span className="text-red-400">*</span>
                         </label>
                         <textarea
-                          value={opportunityContext}
-                          onChange={(e) => setOpportunityContext(e.target.value)}
-                          placeholder="High-level context: what you are promoting and why it matters."
-                          rows={3}
-                          className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm leading-relaxed placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                          Short brief <span className="text-red-400">*</span>
-                        </label>
-                        <textarea
+                          id="ccw-short-brief"
                           value={brief}
                           onChange={(e) => setBrief(e.target.value)}
                           placeholder="Key talking points and guidelines for athletes."
@@ -1607,12 +1453,6 @@ export function CreateCampaignOverlay({
                         />
                       </div>
                     </div>
-                    <div className="mt-2 flex gap-3 rounded-xl border border-nilink-accent-border bg-white p-4 text-nilink-ink shadow-sm">
-                      <Lightbulb className="h-5 w-5 shrink-0 text-nilink-accent" aria-hidden />
-                      <p className="text-xs leading-relaxed text-gray-600">
-                        You can save a draft with just a campaign name. Budget and rights are configured in a later step.
-                      </p>
-                    </div>
                   </>
                 )}
               </div>
@@ -1620,326 +1460,205 @@ export function CreateCampaignOverlay({
 
             {showPresets && (
               <div className="w-full min-w-0 space-y-6">
-                    <div className="mb-4 rounded-xl border border-gray-100 bg-white p-4">
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                        Campaign name (for drafts)
-                      </label>
-                      <input
-                        type="text"
-                        value={campaignName}
-                        onChange={(e) => setCampaignName(e.target.value)}
-                        placeholder="Name your campaign to enable Save draft from any step"
-                        className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                      />
-                    </div>
-                    <p className="mb-4 text-xs text-gray-500">
-                      Presets set package structure and campaign type. You can change everything later.
+                <div className="space-y-6 rounded-2xl border border-gray-100 bg-white p-6">
+                  <div>
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                      Platforms <span className="text-red-400">*</span>
                     </p>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {packages.map((pkg) => {
-                        const isSelected = selectedPackage === pkg.id;
+                    <div className="flex flex-wrap gap-2">
+                      {V2_PLATFORM_CHOICES.map((p) => {
+                        const slug = p.slug;
+                        const on = v2Platforms.includes(slug);
                         return (
                           <button
-                            key={pkg.id}
+                            key={slug}
                             type="button"
-                            onClick={() => setSelectedPackage(pkg.id)}
-                            className={`rounded-2xl border-2 p-6 text-left transition-all ${
-                              isSelected
-                                ? 'border-nilink-accent bg-white shadow-lg'
-                                : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                            onClick={() => toggleV2PlatformSlug(slug)}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-1 ${
+                              on
+                                ? 'border-nilink-accent bg-nilink-accent text-white'
+                                : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
                             }`}
                           >
-                            <div className="mb-3 flex items-start justify-between">
-                              <div>
-                                {pkg.tag && (
-                                  <span className="mb-2 inline-block rounded-full border border-nilink-accent-border bg-nilink-accent-soft px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-nilink-accent">
-                                    {pkg.tag}
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-sm font-bold text-gray-400">{pkg.priceLevel}</span>
-                            </div>
-                            <h3 className="mb-1 text-lg font-bold text-nilink-ink">{pkg.name}</h3>
-                            <p className="mb-4 text-xs text-gray-400">{pkg.subtitle}</p>
-                            <div className="mb-4 space-y-2">
-                              {pkg.deliverables.map((d, i) => (
-                                <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                                  <Check className="h-3.5 w-3.5 shrink-0 text-nilink-accent-bright" />
-                                  {d}
-                                </div>
-                              ))}
-                            </div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                              {pkg.platforms.join(' · ')}
-                            </p>
+                            {p.label}
                           </button>
                         );
                       })}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPackage(null)}
-                      className="mt-4 rounded-md px-1 py-1.5 text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:bg-gray-100 hover:text-nilink-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-1"
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="ccw-message-pillars"
+                      className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
                     >
-                      Clear preset (custom campaign)
-                    </button>
-
-                    <div className="mt-8 space-y-6 rounded-2xl border border-gray-100 bg-white p-6">
-                      <h3 className="text-sm font-bold text-nilink-ink">Content & deliverables</h3>
-                      <p className="text-xs text-gray-500">
-                        Preset packages above still populate package listing fields. These controls define the
-                        structured brief sent as{' '}
-                        <span className="font-mono text-[11px]">campaignBriefV2</span>.
+                      Message pillars (comma-separated) <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      id="ccw-message-pillars"
+                      type="text"
+                      value={messagePillars.join(', ')}
+                      onChange={(e) =>
+                        setMessagePillars(
+                          e.target.value
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean)
+                        )
+                      }
+                      placeholder="e.g. Authentic moments, Clear CTA"
+                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="ccw-cta-type"
+                      className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                    >
+                      CTA type
+                    </label>
+                    <select
+                      id="ccw-cta-type"
+                      value={ctaType}
+                      onChange={(e) => setCtaType(e.target.value as CtaTypeV2)}
+                      className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    >
+                      {CTA_TYPE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label
+                        htmlFor="ccw-must-say"
+                        className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                      >
+                        Must say (optional)
+                      </label>
+                      <textarea
+                        id="ccw-must-say"
+                        value={mustSayLines}
+                        onChange={(e) => setMustSayLines(e.target.value)}
+                        placeholder="One line per must-say phrase."
+                        rows={3}
+                        className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="ccw-must-avoid"
+                        className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                      >
+                        Must avoid (optional)
+                      </label>
+                      <textarea
+                        id="ccw-must-avoid"
+                        value={mustAvoidLines}
+                        onChange={(e) => setMustAvoidLines(e.target.value)}
+                        placeholder="One line per topic to avoid."
+                        rows={3}
+                        className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        Deliverable bundle
                       </p>
-                        <div>
-                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            Platforms <span className="text-red-400">*</span>
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {V2_PLATFORM_CHOICES.map((p) => {
-                              const slug = p.slug;
-                              const on = v2Platforms.includes(slug);
-                              return (
-                                <button
-                                  key={slug}
-                                  type="button"
-                                  onClick={() => toggleV2PlatformSlug(slug)}
-                                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-1 ${
-                                    on
-                                      ? 'border-nilink-accent bg-nilink-accent text-white'
-                                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                                  }`}
-                                >
+                      <button
+                        type="button"
+                        onClick={addDeliverableRow}
+                        className="rounded-md px-1 py-1.5 text-xs font-bold uppercase tracking-wider text-nilink-accent transition-colors hover:bg-gray-100 hover:text-nilink-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-1"
+                      >
+                        Add row
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {deliverableBundle.length === 0 ? (
+                        <p className="text-xs text-gray-500">Add lines manually.</p>
+                      ) : (
+                        deliverableBundle.map((row, idx) => (
+                          <div key={idx} className="flex flex-wrap items-center gap-2">
+                            <select
+                              value={row.platform}
+                              onChange={(e) =>
+                                updateDeliverableRow(idx, {
+                                  platform: normalizePlatformSlug(e.target.value),
+                                })
+                              }
+                              className="min-w-[7rem] rounded-lg border border-gray-200 px-2 py-2 text-xs font-semibold"
+                            >
+                              {V2_PLATFORM_CHOICES.map((p) => (
+                                <option key={p.slug} value={p.slug}>
                                   {p.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            Message pillars (comma-separated) <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={messagePillars.join(', ')}
-                            onChange={(e) =>
-                              setMessagePillars(
-                                e.target.value
-                                  .split(',')
-                                  .map((s) => s.trim())
-                                  .filter(Boolean)
-                              )
-                            }
-                            placeholder="e.g. Authentic moments, Clear CTA"
-                            className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                          />
-                          <p className="mt-1 text-[11px] text-gray-400">
-                            If empty, brand-fit tags from the previous step are used when saving.
-                          </p>
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            CTA type
-                          </label>
-                          <select
-                            value={ctaType}
-                            onChange={(e) => setCtaType(e.target.value as CtaTypeV2)}
-                            className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                          >
-                            {CTA_TYPE_OPTIONS.map((o) => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                          <div>
-                            <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                              Must say (optional)
-                            </label>
-                            <textarea
-                              value={mustSayLines}
-                              onChange={(e) => setMustSayLines(e.target.value)}
-                              placeholder="One line per must-say phrase."
-                              rows={3}
-                              className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                                </option>
+                              ))}
+                              <option value="other">Other</option>
+                            </select>
+                            <input
+                              type="text"
+                              value={row.notes ?? ''}
+                              onChange={(e) => updateDeliverableRow(idx, { notes: e.target.value })}
+                              placeholder="Deliverable description"
+                              className="min-w-[12rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
                             />
-                          </div>
-                          <div>
-                            <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                              Must avoid (optional)
-                            </label>
-                            <textarea
-                              value={mustAvoidLines}
-                              onChange={(e) => setMustAvoidLines(e.target.value)}
-                              placeholder="One line per topic to avoid."
-                              rows={3}
-                              className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                              Deliverable bundle
-                            </p>
                             <button
                               type="button"
-                              onClick={addDeliverableRow}
-                              className="rounded-md px-1 py-1.5 text-xs font-bold uppercase tracking-wider text-nilink-accent transition-colors hover:bg-gray-100 hover:text-nilink-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-1"
+                              onClick={() => removeDeliverableRow(idx)}
+                              className="text-xs font-bold text-gray-400 hover:text-red-600"
                             >
-                              Add row
+                              Remove
                             </button>
                           </div>
-                          <div className="space-y-2">
-                            {deliverableBundle.length === 0 ? (
-                              <p className="text-xs text-gray-500">
-                                Pick a preset above to auto-fill rows, or add lines manually.
-                              </p>
-                            ) : (
-                              deliverableBundle.map((row, idx) => (
-                                <div key={idx} className="flex flex-wrap items-center gap-2">
-                                  <select
-                                    value={row.platform}
-                                    onChange={(e) =>
-                                      updateDeliverableRow(idx, {
-                                        platform: normalizePlatformSlug(e.target.value),
-                                      })
-                                    }
-                                    className="min-w-[7rem] rounded-lg border border-gray-200 px-2 py-2 text-xs font-semibold"
-                                  >
-                                    {V2_PLATFORM_CHOICES.map((p) => (
-                                      <option key={p.slug} value={p.slug}>
-                                        {p.label}
-                                      </option>
-                                    ))}
-                                    <option value="other">Other</option>
-                                  </select>
-                                  <input
-                                    type="text"
-                                    value={row.notes ?? ''}
-                                    onChange={(e) => updateDeliverableRow(idx, { notes: e.target.value })}
-                                    placeholder="Deliverable description"
-                                    className="min-w-[12rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeDeliverableRow(idx)}
-                                    className="text-xs font-bold text-gray-400 hover:text-red-600"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-6">
-                          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 rounded border-gray-300 text-nilink-accent focus:ring-nilink-accent"
-                              checked={draftRequired}
-                              onChange={(e) => setDraftRequired(e.target.checked)}
-                            />
-                            Draft required before posting
-                          </label>
-                          <div className="flex items-center gap-2 text-sm text-gray-700">
-                            <span className="text-xs font-semibold text-gray-500">Revision rounds</span>
-                            <input
-                              type="number"
-                              min={0}
-                              value={revisionRounds}
-                              onChange={(e) => setRevisionRounds(Number(e.target.value) || 0)}
-                              className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm font-bold"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    <div className="flex gap-3 rounded-xl border border-nilink-accent-border bg-white p-5 text-nilink-ink shadow-sm">
-                      <Target className="h-5 w-5 shrink-0 text-nilink-accent" aria-hidden />
-                      <p className="text-xs leading-relaxed text-gray-600">
-                        Presets speed up package setup. Offer terms stay in the deal flow, separate from these campaign fields.
-                      </p>
+                        ))
+                      )}
                     </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-6">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-nilink-accent focus:ring-nilink-accent"
+                        checked={draftRequired}
+                        onChange={(e) => setDraftRequired(e.target.checked)}
+                      />
+                      Draft required before posting
+                    </label>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <span className="text-xs font-semibold text-gray-500">Revision rounds</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={revisionRounds}
+                        onChange={(e) => setRevisionRounds(Number(e.target.value) || 0)}
+                        className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
             {showAudienceCreatorFitV2 && (
               <div className="space-y-12">
-                <section className="space-y-6" aria-labelledby="audience-profile-heading">
-                  <div id="audience-profile-heading" className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-nilink-ink" aria-hidden />
-                    <h3 className="text-base font-semibold text-gray-900">Audience & creator profile</h3>
-                  </div>
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <div className="md:col-span-2">
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                        Audience persona <span className="text-red-400">*</span>
-                      </label>
-                      <textarea
-                        value={audiencePersona}
-                        onChange={(e) => setAudiencePersona(e.target.value)}
-                        placeholder="Who you want to reach and how they should feel about the brand."
-                        rows={3}
-                        className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm leading-relaxed placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                        Geo match for creators
-                      </label>
-                      <select
-                        value={audienceGeoRequirement}
-                        onChange={(e) => setAudienceGeoRequirement(e.target.value as AudienceGeoRequirementV2)}
-                        className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                      >
-                        {GEO_REQ_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                        Language preferences (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={languagePreferencesText}
-                        onChange={(e) => setLanguagePreferencesText(e.target.value)}
-                        placeholder="e.g. English, Spanish"
-                        className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                        Creator exclusions (optional)
-                      </label>
-                      <textarea
-                        value={creatorExclusionsText}
-                        onChange={(e) => setCreatorExclusionsText(e.target.value)}
-                        placeholder="One exclusion per line (topics, competitors, etc.)"
-                        rows={3}
-                        className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm leading-relaxed placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                      />
-                    </div>
-                  </div>
-                </section>
-                <section className="space-y-6 border-t border-gray-100 pt-12" aria-labelledby="audience-metrics-heading">
+                <section className="space-y-6" aria-labelledby="audience-metrics-heading">
                   <div id="audience-metrics-heading" className="flex items-center gap-2">
                     <SlidersHorizontal className="h-5 w-5 text-nilink-ink" aria-hidden />
                     <h3 className="text-base font-semibold text-gray-900">Audience & social metrics</h3>
                   </div>
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                      <label
+                        htmlFor="ccw-preferred-sport"
+                        className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                      >
                         Preferred sport
                       </label>
                       <select
+                        id="ccw-preferred-sport"
                         value={sport}
                         onChange={(e) => setSport(e.target.value)}
                         className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
@@ -1955,32 +1674,42 @@ export function CreateCampaignOverlay({
                       </select>
                     </div>
                     <div>
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                      <p className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
                         Gender identity
-                      </label>
+                      </p>
                       <div className="flex gap-2">
-                        {(['Any', 'Men', 'Women'] as const).map((g) => (
-                          <button
-                            key={g}
-                            type="button"
-                            onClick={() => setGender(g)}
-                            className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors ${
-                              gender === g
-                                ? 'border border-nilink-accent bg-nilink-accent text-white'
-                                : 'border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
-                            }`}
-                          >
-                            {g}
-                          </button>
-                        ))}
+                        {(['Any', 'Male', 'Female'] as const).map((g) => {
+                          const active =
+                            gender === g ||
+                            (g === 'Male' && gender === 'Men') ||
+                            (g === 'Female' && gender === 'Women');
+                          return (
+                            <button
+                              key={g}
+                              type="button"
+                              onClick={() => setGender(g)}
+                              className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors ${
+                                active
+                                  ? 'border border-nilink-accent bg-nilink-accent text-white'
+                                  : 'border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                              }`}
+                            >
+                              {g}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                     <div>
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                      <label
+                        htmlFor="ccw-follower-min"
+                        className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                      >
                         Follower range (min)
                       </label>
                       <div className="px-1">
                         <input
+                          id="ccw-follower-min"
                           type="range"
                           min={0}
                           max={100}
@@ -1997,52 +1726,6 @@ export function CreateCampaignOverlay({
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                        Minimum engagement rate (%)
-                      </label>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={engagementMinPct}
-                        onChange={(e) => setEngagementMinPct(Number(e.target.value))}
-                        className="w-full accent-[#2A90B0]"
-                      />
-                      <p className="mt-1 text-[11px] text-gray-500">
-                        {engagementMinPct <= 0 ? 'No minimum' : `At least ${engagementMinPct}% engagement`}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-                <section className="space-y-4 border-t border-gray-100 pt-12" aria-labelledby="brand-fit-heading">
-                  <div id="brand-fit-heading" className="flex items-center gap-2">
-                    <Tag className="h-5 w-5 text-nilink-ink" aria-hidden />
-                    <h3 className="text-base font-semibold text-gray-900">Brand fit filters</h3>
-                  </div>
-                  <p className="text-sm text-gray-500">
-                    Select tags that describe the athlete voice you want. These stay on the campaign, not on
-                    offers.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {BRAND_FIT_OPTIONS.map((tag) => {
-                      const on = brandFitTags.includes(tag);
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => toggleBrandFit(tag)}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-1 ${
-                            on
-                              ? 'border-nilink-accent bg-nilink-accent text-white'
-                              : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                          }`}
-                        >
-                          {tag}
-                        </button>
-                      );
-                    })}
                   </div>
                 </section>
               </div>
@@ -2051,20 +1734,22 @@ export function CreateCampaignOverlay({
             {showBudgetRightsV2 && (
               <div className="w-full min-w-0 space-y-7">
                       <div>
-                        <label className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <p className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
                           Budget range
-                        </label>
+                        </p>
                         <div className="flex items-center gap-3">
                           <div className="relative flex-1">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
                               $
                             </span>
                             <input
+                              id="ccw-budget-min"
                               type="text"
                               value={budgetMin}
                               onChange={(e) => setBudgetMin(e.target.value)}
                               placeholder="5,000"
                               aria-invalid={budgetRangeInverted}
+                              aria-label="Budget minimum"
                               className={`w-full rounded-lg border py-3 pl-8 pr-4 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200 ${
                                 budgetRangeInverted ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-gray-200'
                               }`}
@@ -2076,11 +1761,13 @@ export function CreateCampaignOverlay({
                               $
                             </span>
                             <input
+                              id="ccw-budget-max"
                               type="text"
                               value={budgetMax}
                               onChange={(e) => setBudgetMax(e.target.value)}
                               placeholder="10,000"
                               aria-invalid={budgetRangeInverted}
+                              aria-label="Budget maximum"
                               className={`w-full rounded-lg border py-3 pl-8 pr-4 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200 ${
                                 budgetRangeInverted ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-gray-200'
                               }`}
@@ -2094,10 +1781,14 @@ export function CreateCampaignOverlay({
                         ) : null}
                       </div>
                       <div>
-                        <label className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        <label
+                          htmlFor="ccw-payment-model"
+                          className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                        >
                           Payment model
                         </label>
                         <select
+                          id="ccw-payment-model"
                           value={paymentModel}
                           onChange={(e) => setPaymentModel(e.target.value as PaymentModelV2)}
                           className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
@@ -2111,10 +1802,14 @@ export function CreateCampaignOverlay({
                       </div>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          <label
+                            htmlFor="ccw-usage-rights-mode"
+                            className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                          >
                             Usage rights mode
                           </label>
                           <select
+                            id="ccw-usage-rights-mode"
                             value={usageRightsMode}
                             onChange={(e) => setUsageRightsMode(e.target.value as UsageRightsModeV2)}
                             className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
@@ -2127,10 +1822,14 @@ export function CreateCampaignOverlay({
                           </select>
                         </div>
                         <div>
-                          <label className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          <label
+                            htmlFor="ccw-usage-duration-days"
+                            className="mb-2.5 block text-[11px] font-bold uppercase tracking-wider text-gray-400"
+                          >
                             Usage duration (days)
                           </label>
                           <input
+                            id="ccw-usage-duration-days"
                             type="number"
                             min={1}
                             value={usageDurationDays}
@@ -2139,12 +1838,6 @@ export function CreateCampaignOverlay({
                           />
                         </div>
                       </div>
-                    <div className="flex gap-3 rounded-lg border border-nilink-accent-border/70 bg-nilink-accent-soft/15 px-4 py-3.5 text-nilink-ink">
-                      <Shield className="h-5 w-5 shrink-0 text-nilink-accent" aria-hidden />
-                      <p className="text-xs leading-relaxed text-gray-600">
-                        Flight dates come from strategy. Usage rights here shape the structured brief; binding legal terms are finalized in offers.
-                      </p>
-                    </div>
               </div>
             )}
 
@@ -2237,11 +1930,15 @@ export function CreateCampaignOverlay({
                     <MapPin className="h-5 w-5 text-nilink-ink" aria-hidden />
                     <h3 className="text-base font-semibold text-gray-900">Location targeting</h3>
                   </div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                  <label
+                    htmlFor="ccw-location-radius"
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500"
+                  >
                     City, metro, or campus focus
                   </label>
                   <div className="relative max-w-lg">
                     <input
+                      id="ccw-location-radius"
                       type="text"
                       value={locationRadius}
                       onChange={(e) => setLocationRadius(e.target.value)}
@@ -2340,14 +2037,6 @@ export function CreateCampaignOverlay({
                     <p>
                       <span className="text-gray-500">Follower min:</span>{' '}
                       {followerMin <= 0 ? 'Any' : `${followerMin}K+`}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Engagement min:</span>{' '}
-                      {engagementMinPct <= 0 ? 'None' : `${engagementMinPct}%`}
-                    </p>
-                    <p>
-                      <span className="text-gray-500">Brand fit:</span>{' '}
-                      {brandFitTags.length ? brandFitTags.join(', ') : '—'}
                     </p>
                     <p>
                       <span className="text-gray-500">Location:</span> {locationRadius.trim() || '—'}
@@ -2711,15 +2400,21 @@ export function CreateCampaignOverlay({
               </button>
               <button
                 type="button"
-                onClick={handleSaveDraft}
-                disabled={!canSaveDraft || busy}
+                onClick={() => void handleSaveDraft()}
+                disabled={!canSaveDraft || busy || saveDraftButtonState === 'saved'}
                 className={`rounded-lg border px-5 py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 ${
-                  canSaveDraft && !busy
-                    ? 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'
-                    : 'cursor-not-allowed border-gray-100 text-gray-300'
+                  saveDraftButtonState === 'saved'
+                    ? 'cursor-not-allowed border-green-200 bg-green-50 text-green-700'
+                    : canSaveDraft && !busy
+                      ? 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50'
+                      : 'cursor-not-allowed border-gray-100 text-gray-300'
                 }`}
               >
-                {submitKind === 'draft' && !discardBusy ? 'Saving…' : 'Save draft'}
+                {submitKind === 'draft' && !discardBusy
+                  ? 'Saving…'
+                  : saveDraftButtonState === 'saved'
+                    ? 'Saved'
+                    : 'Save draft'}
               </button>
               <button
                 type="button"

@@ -1,7 +1,6 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { SavedAthletes } from '@/components/dashboard/screens/SavedAthletes';
-
+/** Saved athletes/brands moved under Explore tabs; legacy URL keeps working. */
 export default function SavedPage() {
-  return <SavedAthletes />;
+  redirect('/dashboard/search');
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { createCampaign, listCampaignsForBrand, listOpenCampaignsForAthlete } from '@/lib/campaigns/repository';
+import { deriveCampaignStatusFromSubmission } from '@/lib/campaigns/campaignStatusDerivation';
 import { campaignToJSON } from '@/lib/campaigns/serialization';
 import { createClient } from '@/lib/supabase/server';
 
@@ -58,7 +59,8 @@ export async function POST(request: NextRequest) {
   }
 
   const acceptApplications = body.acceptApplications !== false;
-  const status = acceptApplications ? 'Open for Applications' : 'Ready to Launch';
+  const intent = body.intent === 'publish' ? 'publish' : 'draft';
+  const status = deriveCampaignStatusFromSubmission(body, { intent });
 
   const payload: Record<string, unknown> = {
     brandUserId: user.userId,

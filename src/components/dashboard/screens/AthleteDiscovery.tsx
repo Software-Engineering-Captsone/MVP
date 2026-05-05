@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { Search, Instagram, Facebook, X, Twitter, Heart } from 'lucide-react';
+import { Search, Instagram, X, Twitter, Heart, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { useDashboard } from '../DashboardShell';
 import { Athlete, Brand } from '@/lib/mockData';
@@ -19,41 +19,31 @@ const TiktokIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const FootballIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <ellipse cx="12" cy="12" rx="10" ry="7" transform="rotate(-45 12 12)" />
-    <path d="M8 8l8 8" />
-    <path d="M11 9l2 2" />
-    <path d="M9 11l2 2" />
-    <path d="M13 11l2 2" />
-  </svg>
-);
-
-const BaseballIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 2A10 10 0 0 1 12 22" />
-    <path d="M12 2A10 10 0 0 0 12 22" />
-    <path d="M8 5a8 8 0 0 0 0 14" />
-    <path d="M16 5a8 8 0 0 1 0 14" />
-  </svg>
-);
-
 const sports = ['Football', 'Baseball', 'Softball', 'Cheerleading', 'Dance', 'Basketball', 'Beach Volleyball'];
-const industries = ['Sports Nutrition', 'Apparel', 'Fitness Tech', 'Beverages', 'Footwear', 'Fitness Equipment'];
 
 type MarketplaceItem = Athlete | Brand;
 type MarketplaceCategory = { id: string; title: string; items: MarketplaceItem[] };
+
+type BusinessExploreTab = 'athletes' | 'saved';
 
 function isBrandItem(item: MarketplaceItem): item is Brand {
   return 'industry' in item;
 }
 
+const exploreFocusRing =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent/30 focus-visible:ring-offset-2';
+
 export function AthleteDiscovery() {
   const { accountType } = useDashboard();
   const isAthleteView = accountType === 'athlete';
   const { brands, athletes, loading, error } = useMarketplaceCatalog();
-  const { toggleAthlete, toggleBrand, isAthleteSaved, isBrandSaved } = useSavedMarketplace();
+  const {
+    toggleAthlete,
+    toggleBrand,
+    isAthleteSaved,
+    isBrandSaved,
+    savedAthleteIds,
+  } = useSavedMarketplace();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSport, setActiveSport] = useState<string | null>(null);
@@ -62,6 +52,8 @@ export function AthleteDiscovery() {
   const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [businessExploreTab, setBusinessExploreTab] = useState<BusinessExploreTab>('athletes');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const athleteCategories = useMemo<MarketplaceCategory[]>(
     () => [
@@ -133,10 +125,59 @@ export function AthleteDiscovery() {
         return matchesSearch && matchesSport;
       });
 
+  const savedAthletesFiltered = useMemo<Athlete[]>(() => {
+    if (isAthleteView || businessExploreTab !== 'saved') return [];
+
+    const q = searchQuery.toLowerCase();
+    return athletes.filter((a) => {
+      if (!isAthleteSaved(a.id)) return false;
+      const matchesSearch =
+        !q ||
+        a.name.toLowerCase().includes(q) ||
+        a.school.toLowerCase().includes(q) ||
+        a.sport.toLowerCase().includes(q);
+      return matchesSearch;
+    });
+  }, [athletes, businessExploreTab, isAthleteSaved, isAthleteView, searchQuery]);
+
+  const currentAthleteList = useMemo<Athlete[]>(() => {
+    if (isAthleteView) return [];
+
+    if (!isAthleteView && businessExploreTab === 'saved') {
+      return savedAthletesFiltered;
+    }
+
+    if (isFiltering) {
+      return filteredItems.filter((item): item is Athlete => !isBrandItem(item));
+    }
+
+    if (expandedCategory) {
+      const category = athleteCategories.find((cat) => cat.id === expandedCategory);
+      if (!category) return [];
+      return category.items.filter((item): item is Athlete => !isBrandItem(item));
+    }
+
+    return athletes;
+  }, [
+    athleteCategories,
+    athletes,
+    businessExploreTab,
+    expandedCategory,
+    filteredItems,
+    isAthleteView,
+    isFiltering,
+    savedAthletesFiltered,
+  ]);
+
+  const handleNextAthlete = () => {
+    if (!selectedAthlete || currentAthleteList.length === 0) return;
+
+    const currentIndex = currentAthleteList.findIndex((athlete) => athlete.id === selectedAthlete.id);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % currentAthleteList.length : 0;
+    setSelectedAthlete(currentAthleteList[nextIndex]);
+  };
+
   const displayCategory = isFiltering ? 'search' : expandedCategory;
-  const activeFilter = isAthleteView ? activeIndustry : activeSport;
-  const setActiveFilter = isAthleteView ? setActiveIndustry : setActiveSport;
-  const filterOptions = isAthleteView ? industries : sports;
   const hasSelection = isAthleteView ? !!selectedBrand : !!selectedAthlete;
 
   if (error) {
@@ -163,49 +204,115 @@ export function AthleteDiscovery() {
           }
         />
       </div>
-      {/* Top Filter Bar */}
-      <div className="dash-main-gutter-x flex shrink-0 items-center gap-3 border-b border-gray-100 py-4">
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={isAthleteView ? 'Search brands…' : 'Search athletes…'}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-300"
-          />
+      <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 bg-white/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[min(100%,560px)] sm:pr-2">
+            {businessExploreTab === 'athletes' ? (
+              <>
+                <label className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search athletes..."
+                    className="h-10 w-full rounded-full border border-gray-200 bg-white px-9 text-sm text-gray-900 shadow-sm transition-[border-color,box-shadow] duration-200 ease-out placeholder:text-gray-400 hover:border-gray-300 focus:border-nilink-accent/40 focus:outline-none focus:ring-2 focus:ring-nilink-accent/15 focus:ring-offset-0"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 shadow-sm transition-colors duration-200 ease-out hover:bg-gray-50 ${exploreFocusRing}`}
+                  onClick={() => setShowAdvancedFilters((v) => !v)}
+                  aria-expanded={showAdvancedFilters}
+                  aria-controls="explore-advanced-filters"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                  Filters
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
+                    aria-hidden
+                  />
+                </button>
+              </>
+            ) : (
+              <label className="relative w-full min-w-0">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search saved athletes..."
+                  className="h-10 w-full rounded-full border border-gray-200 bg-white px-9 text-sm text-gray-900 shadow-sm transition-[border-color,box-shadow] duration-200 ease-out placeholder:text-gray-400 hover:border-gray-300 focus:border-nilink-accent/40 focus:outline-none focus:ring-2 focus:ring-nilink-accent/15 focus:ring-offset-0"
+                />
+              </label>
+            )}
+          </div>
+          <div
+            className="flex shrink-0 items-center justify-start gap-1 self-stretch rounded-full border border-gray-200 bg-gray-100 p-1 sm:justify-end sm:self-center"
+            role="tablist"
+            aria-label="Explore sections"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={businessExploreTab === 'athletes'}
+              onClick={() => {
+                setBusinessExploreTab('athletes');
+                setShowAdvancedFilters(false);
+              }}
+              className={`rounded-full px-3 py-2 text-sm font-semibold transition-colors duration-200 ease-out ${exploreFocusRing} ${
+                businessExploreTab === 'athletes'
+                  ? 'bg-nilink-accent text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-white hover:text-gray-900'
+              }`}
+            >
+              Athletes
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={businessExploreTab === 'saved'}
+              onClick={() => {
+                setBusinessExploreTab('saved');
+                setExpandedCategory(null);
+                setShowAdvancedFilters(false);
+              }}
+              className={`rounded-full px-3 py-2 text-sm font-semibold transition-colors duration-200 ease-out ${exploreFocusRing} ${
+                businessExploreTab === 'saved'
+                  ? 'bg-nilink-accent text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-white hover:text-gray-900'
+              }`}
+            >
+              Saved
+            </button>
+          </div>
         </div>
-        
-        <button
-          type="button"
-          className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-        >
-          All Filters
-        </button>
-
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 pb-1">
-          {filterOptions.map((option) => {
-            const isActive = activeFilter === option;
-            return (
-              <button
-                key={option}
-                onClick={() => setActiveFilter(isActive ? null : option)}
-                className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'border-gray-800 bg-gray-100 text-gray-900'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {!isAthleteView && option === 'Football' && <FootballIcon className="w-4 h-4" />}
-                {!isAthleteView && (option === 'Baseball' || option === 'Softball') && <BaseballIcon className="w-4 h-4" />}
-                {(isAthleteView || (option !== 'Football' && option !== 'Baseball' && option !== 'Softball')) && (
-                  <div className="w-4 h-4 rounded-full border border-current opacity-50 flex items-center justify-center text-[8px]">✦</div>
-                )}
-                {option}
-              </button>
-            )
-          })}
-        </div>
+        {businessExploreTab === 'athletes' && showAdvancedFilters ? (
+          <div
+            id="explore-advanced-filters"
+            className="mt-3 flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3"
+          >
+            <select
+              value={activeSport ?? ''}
+              onChange={(e) => setActiveSport(e.target.value || null)}
+              className="w-[140px] rounded-lg border border-gray-200 bg-white px-2 py-2 text-xs font-medium text-gray-800 shadow-sm transition-[border-color,box-shadow] duration-200 ease-out hover:border-gray-300 focus:border-nilink-accent/40 focus:outline-none focus:ring-2 focus:ring-nilink-accent/15 focus:ring-offset-0"
+            >
+              <option value="">Sport</option>
+              {sports.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={`rounded-md px-2 py-1 text-xs font-semibold text-nilink-accent transition-colors duration-200 ease-out hover:bg-nilink-accent/5 hover:underline ${exploreFocusRing}`}
+              onClick={() => setActiveSport(null)}
+            >
+              Clear
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex min-w-0 flex-1 overflow-hidden">
@@ -214,8 +321,89 @@ export function AthleteDiscovery() {
           {loading && (
             <div className="mb-4 text-xs text-gray-400">Loading marketplace…</div>
           )}
-          
-          {displayCategory ? (() => {
+
+          {businessExploreTab === 'saved' ? (
+            savedAthleteIds.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200/90 bg-gray-50/80 px-5 py-12 text-center sm:py-14">
+                <p className="text-sm font-medium text-gray-900">No saved athletes</p>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-500">
+                  Save athletes while browsing to find them faster next time.
+                </p>
+              </div>
+            ) : savedAthletesFiltered.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200/90 bg-gray-50/80 px-5 py-12 text-center sm:py-14">
+                <p className="text-sm font-medium text-gray-900">No saved athletes match your search</p>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-500">
+                  Try another keyword to filter your saved list.
+                </p>
+              </div>
+            ) : (
+              <section className="pb-8">
+                <div className="mb-6 flex flex-col gap-2 border-b border-gray-100 pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold tracking-tight text-gray-900">Saved athletes</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-500">
+                      Bookmarked NIL talent you want to revisit.
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    {savedAthletesFiltered.length} saved
+                  </span>
+                </div>
+                <div className={`grid gap-4 ${hasSelection ? 'grid-cols-2' : 'grid-cols-4'}`}>
+                  {savedAthletesFiltered.map((item, i) => (
+                    <div
+                      key={`${item.id}_saved_${i}`}
+                      onClick={() => setSelectedAthlete(item)}
+                      className="group cursor-pointer"
+                    >
+                      <div
+                        className={`relative ${hasSelection ? 'aspect-[4/3]' : 'aspect-square md:aspect-[4/3]'} mb-3 overflow-hidden rounded-xl`}
+                      >
+                        <ImageWithFallback
+                          src={item.image}
+                          alt={item.name}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                        />
+                        <button
+                          type="button"
+                          title={isAthleteSaved(item.id) ? 'Remove from saved' : 'Save athlete'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAthlete(item.id);
+                          }}
+                          className={`absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full shadow-md transition-colors ${
+                            isAthleteSaved(item.id)
+                              ? 'bg-nilink-accent text-white'
+                              : 'bg-white/95 text-gray-600 hover:bg-white'
+                          }`}
+                        >
+                          <Heart className={`h-4 w-4 ${isAthleteSaved(item.id) ? 'fill-current' : ''}`} />
+                        </button>
+                      </div>
+                      <div className="mb-1 flex items-center gap-1">
+                        <span className="font-bold text-gray-900 transition-colors group-hover:text-nilink-accent">
+                          {item.name}
+                        </span>
+                        {item.verified ? <VerifiedBadge /> : null}
+                      </div>
+                      <p className="mb-2 truncate text-xs text-gray-500">
+                        {item.sport} | {item.school}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs font-medium text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Instagram className="h-3.5 w-3.5 text-pink-600" /> {item.stats.instagram}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {item.stats.tiktok}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )
+          ) : displayCategory ? (() => {
             const activeCat: MarketplaceCategory | undefined = isFiltering
               ? { id: 'search', title: 'Results', items: filteredItems }
               : categories.find((c) => c.id === displayCategory);
@@ -277,12 +465,17 @@ export function AthleteDiscovery() {
                           : `${item.sport} | ${item.school}`}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {item.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {item.stats.tiktok}</span>
                         <span className="flex items-center gap-1">
-                          {isBrandItem(item) ? <Twitter className="w-3.5 h-3.5" /> : <Facebook className="w-3.5 h-3.5" />}{' '}
-                          {isBrandItem(item) ? item.stats.twitter : item.stats.facebook}
+                          <Instagram className="h-3.5 w-3.5 text-pink-600" /> {item.stats.instagram}
                         </span>
+                        <span className="flex items-center gap-1">
+                          <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {item.stats.tiktok}
+                        </span>
+                        {isBrandItem(item) ? (
+                          <span className="flex items-center gap-1">
+                            <Twitter className="h-3.5 w-3.5 text-sky-500" /> {item.stats.twitter}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -354,12 +547,17 @@ export function AthleteDiscovery() {
                             : `${item.sport} | ${item.school}`}
                         </p>
                         <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                          <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {item.stats.instagram}</span>
-                          <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {item.stats.tiktok}</span>
                           <span className="flex items-center gap-1">
-                            {isBrandItem(item) ? <Twitter className="w-3.5 h-3.5" /> : <Facebook className="w-3.5 h-3.5" />}{' '}
-                            {isBrandItem(item) ? item.stats.twitter : item.stats.facebook}
+                            <Instagram className="h-3.5 w-3.5 text-pink-600" /> {item.stats.instagram}
                           </span>
+                          <span className="flex items-center gap-1">
+                            <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {item.stats.tiktok}
+                          </span>
+                          {isBrandItem(item) ? (
+                            <span className="flex items-center gap-1">
+                              <Twitter className="h-3.5 w-3.5 text-sky-500" /> {item.stats.twitter}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -405,9 +603,15 @@ export function AthleteDiscovery() {
                         {selectedBrand.industry} | {selectedBrand.location}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {selectedBrand.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {selectedBrand.stats.tiktok}</span>
-                        <span className="flex items-center gap-1"><Twitter className="w-3.5 h-3.5" /> {selectedBrand.stats.twitter}</span>
+                        <span className="flex items-center gap-1">
+                          <Instagram className="h-3.5 w-3.5 text-pink-600" /> {selectedBrand.stats.instagram}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" /> {selectedBrand.stats.tiktok}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Twitter className="h-3.5 w-3.5 text-sky-500" /> {selectedBrand.stats.twitter}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -425,44 +629,37 @@ export function AthleteDiscovery() {
               // ATHLETE SIDEBAR
               <div className="flex-1 overflow-y-auto py-6 scrollbar-hide dash-detail-pane-x">
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm relative">
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => setSelectedAthlete(null)}
-                    className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center bg-black/20 hover:bg-black/40 rounded-full transition-colors z-10"
+                    className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/20 transition-colors hover:bg-black/40"
                   >
-                    <X className="w-5 h-5 text-white" />
+                    <X className="h-5 w-5 text-white" />
                   </button>
-                  {/* Banner */}
-                  <div className="h-32 bg-[#FFCD00] relative">
-                    {selectedAthlete.teamLogo && (
-                      <ImageWithFallback
-                        src={selectedAthlete.teamLogo}
-                        alt="Team Logo"
-                        className="absolute right-4 top-4 h-16 opacity-80"
-                      />
-                    )}
-                  </div>
-                  
                   {/* Profile Header */}
-                  <div className="px-6 relative pb-6 border-b border-gray-100">
-                    <div className="absolute -top-12 left-6">
+                  <div className="border-b border-gray-100 px-6 pb-6 pt-6">
+                    <div className="flex items-center gap-5">
                       <ImageWithFallback
-                        src={selectedAthlete.image} 
-                        alt={selectedAthlete.name} 
-                        className="w-24 h-24 rounded-full border-4 border-white object-cover shadow-sm bg-white" 
+                        src={selectedAthlete.image}
+                        alt={selectedAthlete.name}
+                        className="h-56 w-56 shrink-0 rounded-full border-4 border-white bg-white object-cover shadow-sm"
                       />
-                    </div>
-                    <div className="ml-28 pt-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h2 className="text-2xl font-bold">{selectedAthlete.name}</h2>
-                        {selectedAthlete.verified && <VerifiedBadge className="w-5 h-5 shrink-0" />}
-                      </div>
-                      <p className="text-xs text-gray-500 mb-2">
-                        {selectedAthlete.sport} | {selectedAthlete.school}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
-                        <span className="flex items-center gap-1"><Instagram className="w-3.5 h-3.5" /> {selectedAthlete.stats.instagram}</span>
-                        <span className="flex items-center gap-1"><TiktokIcon className="w-3.5 h-3.5" /> {selectedAthlete.stats.tiktok}</span>
-                        <span className="flex items-center gap-1"><Facebook className="w-3.5 h-3.5" /> {selectedAthlete.stats.facebook}</span>
+                      <div className="min-w-0">
+                        <div className="mb-1 flex items-center gap-2">
+                          <h2 className="text-3xl font-bold leading-tight">{selectedAthlete.name}</h2>
+                          {selectedAthlete.verified && <VerifiedBadge className="h-6 w-6 shrink-0" />}
+                        </div>
+                        <p className="mb-3 text-sm text-gray-500">
+                          {selectedAthlete.sport} | {selectedAthlete.school}
+                        </p>
+                        <div className="flex items-center gap-4 text-sm font-medium text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Instagram className="h-4 w-4 text-pink-600" /> {selectedAthlete.stats.instagram}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <TiktokIcon className="h-4 w-4 text-nilink-ink" /> {selectedAthlete.stats.tiktok}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -508,7 +705,7 @@ export function AthleteDiscovery() {
             ) : null}
 
             {/* Sticky Actions Footer */}
-            <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3 shrink-0">
+            <div className="flex shrink-0 justify-center gap-3 border-t border-gray-100 bg-white p-4">
               {isAthleteView && selectedBrand ? (
                 <button
                   type="button"
@@ -555,6 +752,7 @@ export function AthleteDiscovery() {
               )}
               <button
                 type="button"
+                onClick={handleNextAthlete}
                 className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
               >
                 Next {isAthleteView ? 'Brand' : 'Athlete'}
