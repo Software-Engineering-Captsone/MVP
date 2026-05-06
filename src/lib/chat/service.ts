@@ -368,6 +368,69 @@ type LastMsgView = {
   created_at: string | null;
 };
 
+type CounterpartMetadata = {
+  displayName?: string;
+  avatarUrl?: string;
+  sport?: string;
+  school?: string;
+  verified?: boolean;
+};
+
+function hasText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+async function loadCounterpartMetadata(
+  supabase: SupabaseClient,
+  userIds: string[]
+): Promise<Map<string, CounterpartMetadata>> {
+  const ids = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  const meta = new Map<string, CounterpartMetadata>();
+  if (ids.length === 0) return meta;
+
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url, verified')
+    .in('id', ids);
+  if (!profileError) {
+    for (const row of profiles ?? []) {
+      const id = String(row.id);
+      meta.set(id, {
+        displayName: hasText(row.full_name) ? row.full_name.trim() : undefined,
+        avatarUrl: hasText(row.avatar_url) ? row.avatar_url.trim() : undefined,
+        verified: row.verified === true,
+      });
+    }
+  }
+
+  const { data: sports } = await supabase
+    .from('athlete_sports')
+    .select('athlete_id, sport, is_primary')
+    .in('athlete_id', ids)
+    .order('is_primary', { ascending: false });
+  for (const row of sports ?? []) {
+    const id = String(row.athlete_id);
+    const existing = meta.get(id) ?? {};
+    if (!existing.sport && hasText(row.sport)) {
+      meta.set(id, { ...existing, sport: row.sport.trim() });
+    }
+  }
+
+  const { data: academics } = await supabase
+    .from('athlete_academics')
+    .select('athlete_id, school')
+    .in('athlete_id', ids);
+  for (const row of academics ?? []) {
+    const id = String(row.athlete_id);
+    const existing = meta.get(id) ?? {};
+    if (hasText(row.school)) {
+      meta.set(id, { ...existing, school: row.school.trim() });
+    }
+  }
+
+  return meta;
+}
+
 export async function loadInboxItems(
   supabase: SupabaseClient,
   userId: string,
@@ -424,6 +487,11 @@ export async function loadInboxItems(
     participantsByThread.set(tid, list);
   }
 
+  const counterpartIds = [...participantsByThread.values()]
+    .map((participants) => participants.find((p) => p.userId !== userId)?.userId ?? '')
+    .filter(Boolean);
+  const counterpartMeta = await loadCounterpartMetadata(supabase, counterpartIds);
+
   const items: ChatInboxItem[] = [];
   const qNorm = searchQ?.trim().toLowerCase();
 
@@ -437,8 +505,10 @@ export async function loadInboxItems(
 
     const participants = participantsByThread.get(threadId) ?? [];
     const counterpart = participants.find((p) => p.userId !== userId);
-    const counterpartName = counterpart?.displayName ?? 'Unknown';
     const counterpartId = counterpart?.userId ?? '';
+    const enriched = counterpartMeta.get(counterpartId);
+    const participantName = counterpart?.displayName ?? '';
+    const counterpartName = enriched?.displayName || participantName || 'Unknown';
 
     const last = lastByThread.get(threadId);
     const lastMessage =
@@ -453,7 +523,9 @@ export async function loadInboxItems(
     if (qNorm) {
       const inName = counterpartName.toLowerCase().includes(qNorm);
       const inBody = (lastMessage?.body ?? '').toLowerCase().includes(qNorm);
-      if (!inName && !inBody) continue;
+      const inSport = (enriched?.sport ?? '').toLowerCase().includes(qNorm);
+      const inSchool = (enriched?.school ?? '').toLowerCase().includes(qNorm);
+      if (!inName && !inBody && !inSport && !inSchool) continue;
     }
 
     const lr = readMap.get(threadId);
@@ -464,7 +536,14 @@ export async function loadInboxItems(
       threadId,
       applicationId,
       threadKind,
-      counterpart: { userId: counterpartId, displayName: counterpartName },
+      counterpart: {
+        userId: counterpartId,
+        displayName: counterpartName,
+        avatarUrl: enriched?.avatarUrl,
+        sport: enriched?.sport,
+        school: enriched?.school,
+        verified: enriched?.verified,
+      },
       lastMessage,
       unreadCount,
       updatedAt,

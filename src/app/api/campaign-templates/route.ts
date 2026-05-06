@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { buildSeedSystemCampaignTemplates } from '@/lib/campaigns/seedCampaignTemplates';
-import { createClient } from '@/lib/supabase/server';
 import { listCampaignTemplatesForBrand } from '@/lib/campaigns/repository';
+import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 
 /**
  * GET /api/campaign-templates?scope=all
@@ -32,10 +32,9 @@ export async function GET() {
     defaults: Record<string, unknown>;
   }> = [];
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const rows = await listCampaignTemplatesForBrand(user.id);
+    const user = await getAuthUser();
+    if (user?.role === 'brand') {
+      const rows = await listCampaignTemplatesForBrand(user.userId);
       brandTemplates = rows.map((r) => ({
         id: r.id,
         name: r.name,

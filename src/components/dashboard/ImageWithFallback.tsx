@@ -13,8 +13,10 @@ export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElemen
   };
 
   const { src, alt, style, className, ...rest } = props;
+  const normalizedSrc = typeof src === 'string' ? src.trim() : src;
+  const shouldShowFallback = didError || !normalizedSrc;
 
-  return didError ? (
+  return shouldShowFallback ? (
     <div
       className={`inline-block bg-gray-100 text-center align-middle ${className ?? ''}`}
       style={style}
@@ -26,6 +28,6 @@ export function ImageWithFallback(props: React.ImgHTMLAttributes<HTMLImageElemen
     </div>
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} className={className} style={style} {...rest} onError={handleError} />
+    <img src={normalizedSrc} alt={alt} className={className} style={style} {...rest} onError={handleError} />
   );
 }

@@ -34,6 +34,16 @@ export async function POST(request: NextRequest) {
     return jsonError(400, 'athleteUserId is required');
   }
 
+  const { data: athlete, error: athleteError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', athleteUserId)
+    .eq('role', 'athlete')
+    .not('onboarding_completed_at', 'is', null)
+    .maybeSingle<{ id: string }>();
+  if (athleteError) return jsonError(500, athleteError.message);
+  if (!athlete) return jsonError(404, 'Athlete not found');
+
   let offer;
   try {
     offer = await createDirectProfileOfferDraft({

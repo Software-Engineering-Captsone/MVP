@@ -4,14 +4,12 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ChevronRight, Handshake, Loader2, RefreshCw, Search } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
-import { authFetch } from '@/lib/authFetch';
 import {
   activitySummary,
   fetchDealDetail,
   fetchDealsList,
   fetchSubmissionsForDeliverable,
   formatIsoDate,
-  formatShortId,
   humanizeDealStatus,
   parseTermsSnapshot,
   patchContractStatus,
@@ -102,7 +100,6 @@ export function BusinessDeals() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [submissionsByDeliverable, setSubmissionsByDeliverable] = useState<Record<string, ApiSubmission[]>>({});
-  const [campaignTitle, setCampaignTitle] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [contractUrlInput, setContractUrlInput] = useState('');
@@ -138,6 +135,10 @@ export function BusinessDeals() {
       const terms = parseTermsSnapshot(d.termsSnapshot);
       const hay = [
         d.athleteUserId,
+        d.athleteName ?? '',
+        d.athleteSport ?? '',
+        d.athleteSchool ?? '',
+        d.campaignName ?? '',
         d.id,
         d.status,
         d.nextActionLabel,
@@ -154,7 +155,6 @@ export function BusinessDeals() {
     setDetailLoading(true);
     setDetailError(null);
     setActionError(null);
-    setCampaignTitle(null);
     try {
       const d = await fetchDealDetail(dealId);
       setDetail(d);
@@ -169,17 +169,6 @@ export function BusinessDeals() {
         })
       );
       setSubmissionsByDeliverable(subMap);
-      if (d.deal.campaignId) {
-        try {
-          const cRes = await authFetch(`/api/campaigns/${d.deal.campaignId}`);
-          if (cRes.ok) {
-            const cj = (await cRes.json()) as { name?: string };
-            if (typeof cj.name === 'string' && cj.name) setCampaignTitle(cj.name);
-          }
-        } catch {
-          /* optional */
-        }
-      }
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Failed to load deal');
       setDetail(null);
@@ -350,15 +339,17 @@ export function BusinessDeals() {
                 </thead>
                 <tbody>
                   {filteredDeals.map((d) => {
-                    const terms = parseTermsSnapshot(d.termsSnapshot);
+                    const athleteName = d.athleteName?.trim() || 'Athlete';
+                    const athleteMeta = [d.athleteSport, d.athleteSchool].filter(Boolean).join(' · ');
                     return (
                       <tr
                         key={d.id}
                         className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50/80"
                         onClick={() => setSelectedId(d.id)}
                       >
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-nilink-ink">
-                          {formatShortId(d.athleteUserId)}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="font-semibold text-nilink-ink">{athleteName}</div>
+                          {athleteMeta ? <div className="mt-0.5 text-xs text-gray-500">{athleteMeta}</div> : null}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <DealStatusBadge status={d.status} />
@@ -368,7 +359,7 @@ export function BusinessDeals() {
                           <span className="line-clamp-2">{d.nextActionLabel || '—'}</span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                          {d.campaignId ? 'Campaign deal' : 'Direct deal'}
+                          {d.campaignName ?? (d.campaignId ? 'Campaign deal' : 'Direct deal')}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{formatIsoDate(d.updatedAt)}</td>
                         <td className="px-2 py-3 text-gray-300">
@@ -409,7 +400,7 @@ export function BusinessDeals() {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Deal overview</p>
                     <p className="mt-1 text-lg font-semibold">Collaboration with this athlete</p>
                     <p className="mt-1 text-xs text-white/85">
-                      {campaignTitle ? `Campaign: ${campaignTitle}` : 'Direct collaboration'}
+                      {detail.deal.campaignName ? `Campaign: ${detail.deal.campaignName}` : 'Direct collaboration'}
                     </p>
                     <p className="mt-1 text-xs text-white/85">
                       {stageProjection?.stageLabel ?? 'Deal'} · {stageProjection?.statusLine ?? humanizeDealStatus(detail.deal.status)}

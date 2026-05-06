@@ -365,15 +365,64 @@ export async function createCampaign(input: Record<string, unknown>): Promise<St
   return dbCampaignToStored(data as unknown as DbCampaignRow);
 }
 
+export type CampaignUpdatePatch = Partial<
+  Pick<
+    StoredCampaign,
+    | 'name'
+    | 'subtitle'
+    | 'packageName'
+    | 'packageId'
+    | 'goal'
+    | 'brief'
+    | 'budget'
+    | 'duration'
+    | 'location'
+    | 'startDate'
+    | 'endDate'
+    | 'visibility'
+    | 'acceptApplications'
+    | 'sport'
+    | 'genderFilter'
+    | 'followerMin'
+    | 'packageDetails'
+    | 'platforms'
+    | 'image'
+    | 'status'
+  >
+>;
+
 export async function updateCampaign(
   campaignId: string,
   brandUserId: string,
-  patch: Partial<Pick<StoredCampaign, 'status' | 'acceptApplications'>>,
+  patch: CampaignUpdatePatch,
 ): Promise<StoredCampaign | null> {
   const supabase = await createClient();
   const update: Record<string, unknown> = {};
+  if (patch.name !== undefined) update.name = patch.name;
+  if (patch.subtitle !== undefined) update.subtitle = patch.subtitle;
+  if (patch.goal !== undefined) update.goal = patch.goal;
+  if (patch.brief !== undefined) update.brief = patch.brief;
+  if (patch.image !== undefined) update.image_url = patch.image;
   if (patch.status !== undefined) update.status = patch.status;
+  if (patch.visibility !== undefined) update.visibility = patch.visibility === 'Private' ? 'Private' : 'Public';
   if (patch.acceptApplications !== undefined) update.accept_applications = patch.acceptApplications;
+  if (patch.packageId !== undefined) update.package_id = patch.packageId;
+  if (patch.packageName !== undefined) update.package_name = patch.packageName;
+  if (patch.packageDetails !== undefined) update.package_details = patch.packageDetails;
+  if (patch.platforms !== undefined) update.platforms = patch.platforms;
+  if (patch.budget !== undefined) update.budget_label = patch.budget;
+  if (patch.startDate !== undefined) update.start_date = parseDateForDb(patch.startDate);
+  if (patch.endDate !== undefined) update.end_date = parseDateForDb(patch.endDate);
+  if (patch.duration !== undefined) update.duration_label = patch.duration;
+  if (patch.sport !== undefined) update.target_sport = patch.sport;
+  if (patch.genderFilter !== undefined) update.target_gender = toDbGender(patch.genderFilter);
+  if (patch.followerMin !== undefined) {
+    update.target_follower_min =
+      typeof patch.followerMin === 'number'
+        ? patch.followerMin
+        : Number(patch.followerMin) || 0;
+  }
+  if (patch.location !== undefined) update.target_location = patch.location;
   if (Object.keys(update).length === 0) return getCampaignById(campaignId);
 
   const { data, error } = await supabase
@@ -385,6 +434,23 @@ export async function updateCampaign(
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? dbCampaignToStored(data as unknown as DbCampaignRow) : null;
+}
+
+export async function deleteDraftCampaign(
+  campaignId: string,
+  brandUserId: string,
+): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('campaigns')
+    .delete()
+    .eq('id', campaignId)
+    .eq('brand_id', brandUserId)
+    .eq('status', 'Draft')
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return !!data;
 }
 
 export async function listApplicationsForCampaign(campaignId: string): Promise<StoredApplication[]> {

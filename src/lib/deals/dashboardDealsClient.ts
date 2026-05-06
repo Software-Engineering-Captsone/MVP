@@ -7,6 +7,11 @@ export type ApiDeal = {
   offerId: string;
   brandUserId: string;
   athleteUserId: string;
+  athleteName?: string;
+  athleteAvatarUrl?: string;
+  athleteSport?: string;
+  athleteSchool?: string;
+  campaignName?: string | null;
   campaignId: string | null;
   applicationId: string | null;
   chatThreadId: string | null;

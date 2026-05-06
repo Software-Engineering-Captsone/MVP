@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { isValidSavedSnapshot } from '@/lib/saved/types';
 import type { SavedSnapshot } from '@/lib/saved/types';
 
@@ -12,18 +13,16 @@ import type { SavedSnapshot } from '@/lib/saved/types';
  */
 export async function GET() {
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) {
+  const user = await getAuthUser();
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const role = user.user_metadata?.role === 'brand' ? 'brand' : 'athlete';
-
-  if (role === 'brand') {
+  if (user.role === 'brand') {
     const { data, error: qErr } = await supabase
       .from('saved_athletes')
       .select('athlete_id')
-      .eq('brand_id', user.id);
+      .eq('brand_id', user.userId);
     if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
     const snapshot: SavedSnapshot = {
       athleteIds: (data ?? []).map((r) => String(r.athlete_id)),
@@ -35,7 +34,7 @@ export async function GET() {
   const { data, error: qErr } = await supabase
     .from('saved_brands')
     .select('brand_id')
-    .eq('athlete_id', user.id);
+    .eq('athlete_id', user.userId);
   if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
   const snapshot: SavedSnapshot = {
     athleteIds: [],
@@ -46,8 +45,8 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) {
+  const user = await getAuthUser();
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -61,14 +60,12 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
 
-  const role = user.user_metadata?.role === 'brand' ? 'brand' : 'athlete';
-
-  if (role === 'brand') {
+  if (user.role === 'brand') {
     const desired = new Set(body.athleteIds);
     const { data: existing, error: qErr } = await supabase
       .from('saved_athletes')
       .select('athlete_id')
-      .eq('brand_id', user.id);
+      .eq('brand_id', user.userId);
     if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
     const current = new Set((existing ?? []).map((r) => String(r.athlete_id)));
 
@@ -78,14 +75,14 @@ export async function PUT(request: Request) {
     if (toInsert.length > 0) {
       const { error: insErr } = await supabase
         .from('saved_athletes')
-        .insert(toInsert.map((athlete_id) => ({ brand_id: user.id, athlete_id })));
+        .insert(toInsert.map((athlete_id) => ({ brand_id: user.userId, athlete_id })));
       if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
     }
     if (toDelete.length > 0) {
       const { error: delErr } = await supabase
         .from('saved_athletes')
         .delete()
-        .eq('brand_id', user.id)
+        .eq('brand_id', user.userId)
         .in('athlete_id', toDelete);
       if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
     }
@@ -98,7 +95,7 @@ export async function PUT(request: Request) {
   const { data: existing, error: qErr } = await supabase
     .from('saved_brands')
     .select('brand_id')
-    .eq('athlete_id', user.id);
+    .eq('athlete_id', user.userId);
   if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
   const current = new Set((existing ?? []).map((r) => String(r.brand_id)));
 
@@ -108,14 +105,14 @@ export async function PUT(request: Request) {
   if (toInsert.length > 0) {
     const { error: insErr } = await supabase
       .from('saved_brands')
-      .insert(toInsert.map((brand_id) => ({ athlete_id: user.id, brand_id })));
+      .insert(toInsert.map((brand_id) => ({ athlete_id: user.userId, brand_id })));
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
   if (toDelete.length > 0) {
     const { error: delErr } = await supabase
       .from('saved_brands')
       .delete()
-      .eq('athlete_id', user.id)
+      .eq('athlete_id', user.userId)
       .in('brand_id', toDelete);
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
   }

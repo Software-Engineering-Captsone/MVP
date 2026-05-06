@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ensureBrandOutreachThread } from '@/lib/chat/service';
+import { getChatSessionUser } from '@/lib/chat/session';
 
 /**
  * POST /api/chat/threads
@@ -11,15 +12,12 @@ import { ensureBrandOutreachThread } from '@/lib/chat/service';
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
+  const session = await getChatSessionUser(supabase);
+  if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const role =
-    (user.app_metadata as Record<string, unknown> | undefined)?.role ??
-    (user.user_metadata as Record<string, unknown> | undefined)?.role;
-  if (role !== 'brand') {
+  if (session.role !== 'brand') {
     return NextResponse.json({ error: 'Only brands can start outreach threads' }, { status: 403 });
   }
 
@@ -40,8 +38,22 @@ export async function POST(request: Request) {
   if (!athleteUserId) {
     return NextResponse.json({ error: 'athleteUserId is required' }, { status: 400 });
   }
-  if (athleteUserId === user.id) {
+  if (athleteUserId === session.id) {
     return NextResponse.json({ error: 'Cannot message yourself' }, { status: 400 });
+  }
+
+  const { data: athlete, error: athleteError } = await supabase
+    .from('profiles')
+    .select('id, role')
+    .eq('id', athleteUserId)
+    .eq('role', 'athlete')
+    .not('onboarding_completed_at', 'is', null)
+    .maybeSingle<{ id: string; role: string }>();
+  if (athleteError) {
+    return NextResponse.json({ error: athleteError.message }, { status: 500 });
+  }
+  if (!athlete) {
+    return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
   }
 
   const athleteDisplayName =
@@ -53,7 +65,7 @@ export async function POST(request: Request) {
 
   try {
     const thread = await ensureBrandOutreachThread(supabase, {
-      brandUserId: user.id,
+      brandUserId: session.id,
       athleteUserId,
       athleteDisplayName,
       campaignId,

@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+async function roleForCurrentUser(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle<{ role: string | null }>();
+  return data?.role === 'brand' ? 'brand' : 'athlete';
+}
+
 /**
  * GET /api/auth/me — return the current authenticated user.
  * Uses Supabase server-side session (cookie-based, no more Bearer token).
@@ -14,13 +23,14 @@ export async function GET() {
   }
 
   const meta = user.user_metadata ?? {};
+  const role = await roleForCurrentUser(supabase, user.id);
 
   return NextResponse.json({
     user: {
       id: user.id,
       email: user.email,
       name: (meta.full_name as string) || (meta.name as string) || user.email?.split('@')[0] || 'User',
-      role: meta.role === 'brand' ? 'brand' : 'athlete',
+      role,
       verified: !!user.email_confirmed_at,
     },
   });
@@ -63,13 +73,14 @@ export async function PATCH(request: Request) {
   }
 
   const meta = data.user.user_metadata ?? {};
+  const role = await roleForCurrentUser(supabase, data.user.id);
 
   return NextResponse.json({
     user: {
       id: data.user.id,
       email: data.user.email,
       name: (meta.full_name as string) || (meta.name as string) || data.user.email?.split('@')[0] || 'User',
-      role: meta.role === 'brand' ? 'brand' : 'athlete',
+      role,
       verified: !!data.user.email_confirmed_at,
       athleteProfile: meta.athlete_profile ?? undefined,
     },

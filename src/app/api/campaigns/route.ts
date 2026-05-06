@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { createCampaign, listCampaignsForBrand, listOpenCampaignsForAthlete } from '@/lib/campaigns/repository';
 import { deriveCampaignStatusFromSubmission } from '@/lib/campaigns/campaignStatusDerivation';
+import { campaignBriefV2ToLegacy } from '@/lib/campaigns/campaignBriefV2Mapper';
 import { campaignToJSON } from '@/lib/campaigns/serialization';
 import { createClient } from '@/lib/supabase/server';
 
@@ -23,7 +24,51 @@ async function ensureBrandProfile(userId: string, brandDisplayName: string): Pro
   return null;
 }
 
-export async function GET(request: NextRequest) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeCampaignCreatePayload(
+  body: Record<string, unknown>,
+  brandUserId: string,
+): Record<string, unknown> {
+  const legacyFromBrief = isRecord(body.campaignBriefV2)
+    ? campaignBriefV2ToLegacy(body.campaignBriefV2 as Parameters<typeof campaignBriefV2ToLegacy>[0])
+    : {};
+  const merged = { ...legacyFromBrief, ...body };
+  const acceptApplications = merged.acceptApplications !== false;
+  const intent = body.intent === 'publish' ? 'publish' : 'draft';
+
+  return {
+    brandUserId,
+    brandDisplayName: String(merged.brandDisplayName ?? ''),
+    name: merged.name,
+    subtitle: merged.subtitle ?? '',
+    packageName: merged.packageName ?? '',
+    packageId: merged.packageId ?? '',
+    goal: merged.goal ?? '',
+    brief: merged.brief ?? '',
+    budget: merged.budgetHint ?? merged.budget ?? '',
+    duration: merged.duration ?? '',
+    location: merged.location ?? '',
+    startDate: merged.startDate ?? '',
+    endDate: merged.endDate ?? '',
+    visibility: merged.visibility === 'Private' ? 'Private' : 'Public',
+    acceptApplications,
+    sport: merged.sport ?? 'All Sports',
+    genderFilter: merged.genderFilter ?? 'Any',
+    followerMin:
+      typeof merged.followerMin === 'number'
+        ? merged.followerMin
+        : Number(merged.followerMin) || 0,
+    packageDetails: Array.isArray(merged.packageDetails) ? merged.packageDetails : [],
+    platforms: Array.isArray(merged.platforms) ? merged.platforms : [],
+    image: typeof merged.image === 'string' && merged.image.trim() ? merged.image.trim() : '',
+    status: deriveCampaignStatusFromSubmission({ ...body, ...legacyFromBrief }, { intent }),
+  };
+}
+
+export async function GET() {
   const user = await getAuthUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -58,40 +103,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const acceptApplications = body.acceptApplications !== false;
-  const intent = body.intent === 'publish' ? 'publish' : 'draft';
-  const status = deriveCampaignStatusFromSubmission(body, { intent });
-
-  const payload: Record<string, unknown> = {
-    brandUserId: user.userId,
-    brandDisplayName: String(body.brandDisplayName ?? ''),
-    name: body.name,
-    subtitle: body.subtitle ?? '',
-    packageName: body.packageName ?? '',
-    packageId: body.packageId ?? '',
-    goal: body.goal ?? '',
-    brief: body.brief ?? '',
-    budget: body.budget ?? '',
-    duration: body.duration ?? '',
-    location: body.location ?? '',
-    startDate: body.startDate ?? '',
-    endDate: body.endDate ?? '',
-    visibility: body.visibility === 'Private' ? 'Private' : 'Public',
-    acceptApplications,
-    sport: body.sport ?? 'All Sports',
-    genderFilter: body.genderFilter ?? 'Any',
-    followerMin: typeof body.followerMin === 'number' ? body.followerMin : Number(body.followerMin) || 0,
-    packageDetails: Array.isArray(body.packageDetails) ? body.packageDetails : [],
-    platforms: Array.isArray(body.platforms) ? body.platforms : [],
-    image: typeof body.image === 'string' && body.image.trim() ? body.image.trim() : '',
-    status,
-  };
+  const payload = normalizeCampaignCreatePayload(body, user.userId);
 
   // Guarantee the brand_profiles row exists before inserting the campaign.
   // Without it, the FK campaigns.brand_id → brand_profiles.brand_id fails.
   const brandProfileErr = await ensureBrandProfile(
     user.userId,
-    String(body.brandDisplayName ?? '')
+    String(payload.brandDisplayName ?? '')
   );
   if (brandProfileErr) {
     return NextResponse.json(

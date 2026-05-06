@@ -18,6 +18,7 @@ import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader'
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { authFetch } from '@/lib/authFetch';
+import { createClient } from '@/lib/supabase/client';
 import type { ChatInboxItem, ChatMessageRow } from '@/lib/chat/types';
 
 const PLACEHOLDER_AVATAR =
@@ -86,6 +87,38 @@ function getRenderableMessagePreview(body: string): string {
   return body;
 }
 
+function chatMessageFromRealtimeRow(row: Record<string, unknown>): {
+  threadId: string;
+  message: ChatMessageRow;
+} | null {
+  const threadId = typeof row.thread_id === 'string' ? row.thread_id : '';
+  const id = typeof row.id === 'string' ? row.id : '';
+  const fromUserId = typeof row.from_user_id === 'string' ? row.from_user_id : '';
+  if (!threadId || !id || !fromUserId) return null;
+  return {
+    threadId,
+    message: {
+      id,
+      fromUserId,
+      body: typeof row.body === 'string' ? row.body : '',
+      createdAt: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
+      messageKind:
+        row.message_kind === 'system' || row.message_kind === 'offer' || row.message_kind === 'user'
+          ? row.message_kind
+          : 'user',
+      offerId: typeof row.offer_id === 'string' ? row.offer_id : null,
+    },
+  };
+}
+
+function sortInboxItems(items: ChatInboxItem[]): ChatInboxItem[] {
+  return [...items].sort((a, b) => {
+    const ta = new Date(a.updatedAt).getTime();
+    const tb = new Date(b.updatedAt).getTime();
+    return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
+  });
+}
+
 export function DashboardInbox({
   variant,
   initialThreadId = null,
@@ -113,6 +146,22 @@ export function DashboardInbox({
   const [offerActionLoadingById, setOfferActionLoadingById] = useState<Record<string, 'accept' | 'decline' | 'send' | null>>({});
   const orphanAttemptedRef = useRef<string | null>(null);
   const initialThreadAppliedRef = useRef(false);
+  const selectedThreadIdRef = useRef<string | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
+  const debouncedSearchRef = useRef('');
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  useEffect(() => {
+    debouncedSearchRef.current = debouncedSearch;
+  }, [debouncedSearch]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
@@ -161,6 +210,23 @@ export function DashboardInbox({
     } finally {
       setInboxLoading(false);
     }
+  }, []);
+
+  const markThreadReadLocally = useCallback((threadId: string) => {
+    setItems((prev) => prev.map((i) => (i.threadId === threadId ? { ...i, unreadCount: 0 } : i)));
+    void authFetch(`/api/chat/threads/${threadId}/read`, { method: 'POST' });
+  }, []);
+
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const scroll = () => {
+      const node = messagesScrollRef.current;
+      if (!node) return;
+      node.scrollTo({ top: node.scrollHeight, behavior });
+    };
+    window.requestAnimationFrame(() => {
+      scroll();
+      window.requestAnimationFrame(scroll);
+    });
   }, []);
 
 
@@ -213,21 +279,25 @@ export function DashboardInbox({
     let list = showUnread ? items.filter((i) => i.unreadCount > 0) : [...items];
     if (activeFilter) {
       const k = activeFilter.toLowerCase();
-      list = list.filter(
-        (i) =>
+      list = list.filter((i) => {
+        if (variant === 'business') {
+          return (i.counterpart.sport ?? '').toLowerCase() === k;
+        }
+        return (
           i.counterpart.displayName.toLowerCase().includes(k) ||
           (i.lastMessage?.body ?? '').toLowerCase().includes(k)
-      );
+        );
+      });
     }
     return list;
-  }, [items, showUnread, activeFilter]);
+  }, [items, showUnread, activeFilter, variant]);
 
   const listCount = displayedItems.length;
 
   const activeItem = selectedThreadId ? items.find((i) => i.threadId === selectedThreadId) : undefined;
 
   const counterpartName = activeItem?.counterpart.displayName ?? 'Conversation';
-  const counterpartImage = PLACEHOLDER_AVATAR;
+  const counterpartImage = activeItem?.counterpart.avatarUrl || PLACEHOLDER_AVATAR;
 
   const loadAthleteOfferStatuses = useCallback(async () => {
     if (variant !== 'athlete') return;
@@ -246,6 +316,91 @@ export function DashboardInbox({
       // Keep chat usable even if offer status endpoint is unavailable.
     }
   }, [variant]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const supabase = createClient();
+    const channel = supabase.channel(`chat-realtime-${currentUserId}-${Date.now()}`);
+    let inboxRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const refreshInboxSoon = () => {
+      if (inboxRefreshTimer) clearTimeout(inboxRefreshTimer);
+      inboxRefreshTimer = setTimeout(() => {
+        void fetchInbox(debouncedSearchRef.current);
+      }, 350);
+    };
+
+    channel.on(
+      'postgres_changes',
+      { schema: 'public', table: 'chat_messages', event: 'INSERT' },
+      (payload) => {
+        const parsed = chatMessageFromRealtimeRow(payload.new as Record<string, unknown>);
+        if (!parsed) return;
+
+        const { threadId, message } = parsed;
+        const activeThreadId = selectedThreadIdRef.current;
+        const signedInUserId = currentUserIdRef.current;
+        const isSelectedThread = threadId === activeThreadId;
+        const isOwnMessage = message.fromUserId === signedInUserId;
+
+        setItems((prev) => {
+          let found = false;
+          const next = prev.map((item) => {
+            if (item.threadId !== threadId) return item;
+            found = true;
+            return {
+              ...item,
+              lastMessage: {
+                body: message.body,
+                createdAt: message.createdAt,
+                fromUserId: message.fromUserId,
+              },
+              unreadCount: isOwnMessage || isSelectedThread ? 0 : item.unreadCount + 1,
+              updatedAt: message.createdAt,
+            };
+          });
+          if (!found) refreshInboxSoon();
+          return sortInboxItems(next);
+        });
+
+        if (isSelectedThread) {
+          setMessages((prev) => {
+            if (prev.some((existing) => existing.id === message.id)) return prev;
+            const optimisticIndex = prev.findIndex(
+              (existing) =>
+                existing.id.startsWith('tmp-') &&
+                existing.fromUserId === message.fromUserId &&
+                existing.body === message.body
+            );
+            if (optimisticIndex >= 0) {
+              const next = [...prev];
+              next[optimisticIndex] = message;
+              return next;
+            }
+            return [...prev, message];
+          });
+          markThreadReadLocally(threadId);
+          if (variant === 'athlete' && message.messageKind === 'offer') {
+            void loadAthleteOfferStatuses();
+          }
+        }
+      }
+    );
+
+    channel.on(
+      'postgres_changes',
+      { schema: 'public', table: 'chat_threads', event: '*' },
+      refreshInboxSoon
+    );
+
+    void channel.subscribe();
+
+    return () => {
+      if (inboxRefreshTimer) clearTimeout(inboxRefreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId, fetchInbox, loadAthleteOfferStatuses, markThreadReadLocally, variant]);
 
   const loadThreadMessages = useCallback(
     async (threadId: string): Promise<void> => {
@@ -280,6 +435,11 @@ export function DashboardInbox({
       cancelled = true;
     };
   }, [selectedThreadId, loadThreadMessages, loadAthleteOfferStatuses, variant]);
+
+  useEffect(() => {
+    if (!selectedThreadId || messagesLoading) return;
+    scrollMessagesToBottom('auto');
+  }, [messages.length, messagesLoading, selectedThreadId, scrollMessagesToBottom]);
 
   const subtitle =
     variant === 'business'
@@ -553,7 +713,6 @@ export function DashboardInbox({
                 displayedItems.map((row) => (
                   <ConversationListRow
                     key={row.threadId}
-                    variant={variant}
                     selected={selectedThreadId === row.threadId}
                     onSelect={() => setSelectedThreadId(row.threadId)}
                     title={row.counterpart.displayName}
@@ -562,12 +721,13 @@ export function DashboardInbox({
                         ? getRenderableMessagePreview(row.lastMessage.body)
                         : 'No messages yet'
                     }
-                    image={counterpartImage}
-                    verified={false}
+                    image={row.counterpart.avatarUrl || PLACEHOLDER_AVATAR}
+                    verified={row.counterpart.verified === true}
                     online={false}
                     unread={row.unreadCount > 0}
                     unreadCount={row.unreadCount}
                     time={row.lastMessage ? formatShortTime(row.lastMessage.createdAt) : undefined}
+                    meta={[row.counterpart.sport, row.counterpart.school].filter(Boolean).join(' · ')}
                   />
                 ))
               )}
@@ -623,7 +783,7 @@ export function DashboardInbox({
                   <p className="text-sm">Loading messages…</p>
                 </div>
               ) : selectedThreadId && messages.length > 0 ? (
-                <div className="scrollbar-hide flex-1 space-y-4 overflow-y-auto p-6 pb-28">
+                <div ref={messagesScrollRef} className="scrollbar-hide flex-1 space-y-4 overflow-y-auto p-6 pb-28">
                   <div className="text-center">
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Today</span>
                   </div>
@@ -739,7 +899,6 @@ export function DashboardInbox({
 }
 
 function ConversationListRow({
-  variant,
   selected,
   onSelect,
   title,
@@ -752,7 +911,6 @@ function ConversationListRow({
   time,
   meta,
 }: {
-  variant: InboxVariant;
   selected: boolean;
   onSelect: () => void;
   title: string;
@@ -786,7 +944,7 @@ function ConversationListRow({
           <h3 className="truncate text-sm font-bold text-gray-900">{title}</h3>
           {verified ? <VerifiedBadge className="h-4 w-4 shrink-0" /> : null}
         </div>
-        {variant === 'athlete' && meta ? (
+        {meta ? (
           <p className="truncate text-xs text-gray-500">{meta}</p>
         ) : null}
         <p className={`truncate text-[13px] ${unread ? 'font-medium text-gray-900' : 'text-gray-500'}`}>{subtitle}</p>

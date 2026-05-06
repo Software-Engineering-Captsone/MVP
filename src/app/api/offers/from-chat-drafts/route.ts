@@ -40,6 +40,27 @@ export async function POST(request: NextRequest) {
     return jsonError(400, 'athleteUserId is required');
   }
 
+  const { data: athlete, error: athleteError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', athleteUserId)
+    .eq('role', 'athlete')
+    .not('onboarding_completed_at', 'is', null)
+    .maybeSingle<{ id: string }>();
+  if (athleteError) return jsonError(500, athleteError.message);
+  if (!athlete) return jsonError(404, 'Athlete not found');
+
+  if (campaignId) {
+    const { data: campaign, error: campaignError } = await supabase
+      .from('campaigns')
+      .select('id')
+      .eq('id', campaignId)
+      .eq('brand_id', session.id)
+      .maybeSingle<{ id: string }>();
+    if (campaignError) return jsonError(500, campaignError.message);
+    if (!campaign) return jsonError(404, 'Campaign not found');
+  }
+
   if (chatThreadId === 'placeholder-thread') {
     chatThreadId = '';
   }

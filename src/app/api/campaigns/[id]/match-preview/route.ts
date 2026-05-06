@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getCampaignById } from '@/lib/campaigns/repository';
 import { buildMatchPreviewEstimate } from '@/lib/campaigns/matchPreview';
 import type { MatchPreviewStatus } from '@/lib/campaigns/matchPreview';
+import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 
 /**
  * GET /api/campaigns/:id/match-preview
@@ -13,10 +14,21 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (user.role !== 'brand') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const { id } = await params;
   const campaign = await getCampaignById(id);
   if (!campaign) {
     return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+  }
+  if (campaign.brandUserId !== user.userId) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const baseEstimate = buildMatchPreviewEstimate(campaign as unknown as Parameters<typeof buildMatchPreviewEstimate>[0]);

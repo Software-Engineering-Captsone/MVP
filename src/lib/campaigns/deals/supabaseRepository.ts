@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/serviceClient';
 import { resolveContractFileUrlForDownload } from '@/lib/campaigns/deals/contractStorage';
 import { notifyDealPlaceholder } from '@/lib/campaigns/deals/notifications';
 import { computeDealNextAction, refineNextActionWithDeliverables } from './nextAction';
@@ -59,11 +60,34 @@ interface DbDealRow {
   updated_at: string;
 }
 
+type DealDisplayMetaMap = Map<string, {
+  athleteName: string;
+  athleteAvatarUrl: string;
+  athleteSport: string;
+  athleteSchool: string;
+}>;
+type DealCampaignNameMap = Map<string, string>;
+
+function readSnapshotAthleteName(snapshot: unknown): string {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return '';
+  const record = snapshot as Record<string, unknown>;
+  const candidates = [record.name, record.fullName, record.full_name];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
 export interface ApiDealRow {
   id: string;
   offerId: string;
   brandUserId: string;
   athleteUserId: string;
+  athleteName: string;
+  athleteAvatarUrl: string;
+  athleteSport: string;
+  athleteSchool: string;
+  campaignName: string | null;
   campaignId: string | null;
   applicationId: string | null;
   chatThreadId: string | null;
@@ -352,7 +376,10 @@ function buildApiDealRowForDetail(
   contract: ApiContractRow | null,
   payment: ApiPaymentRow | null,
   deliverableRows: DbDeliverableRow[],
+  displayMeta: DealDisplayMetaMap = new Map(),
+  campaignNames: DealCampaignNameMap = new Map(),
 ): ApiDealRow {
+  const athleteMeta = displayMeta.get(dealRow.athlete_id);
   const dealStub: StoredDeal = {
     _id: dealRow.id,
     offerId: dealRow.offer_id,
@@ -388,6 +415,11 @@ function buildApiDealRowForDetail(
     offerId: dealRow.offer_id,
     brandUserId: dealRow.brand_id,
     athleteUserId: dealRow.athlete_id,
+    athleteName: athleteMeta?.athleteName ?? '',
+    athleteAvatarUrl: athleteMeta?.athleteAvatarUrl ?? '',
+    athleteSport: athleteMeta?.athleteSport ?? '',
+    athleteSchool: athleteMeta?.athleteSchool ?? '',
+    campaignName: dealRow.campaign_id ? campaignNames.get(dealRow.campaign_id) ?? null : null,
     campaignId: dealRow.campaign_id,
     applicationId: dealRow.application_id,
     chatThreadId: dealRow.chat_thread_id,
@@ -459,7 +491,151 @@ const DEAL_SELECT =
   'chat_thread_id, terms_snapshot, status, contract_id, payment_id, ' +
   'created_at, updated_at';
 
-function dbDealToApi(row: DbDealRow): ApiDealRow {
+async function loadAthleteMetaForDeals(
+  supabase: SupabaseClient,
+  rows: DbDealRow[],
+): Promise<DealDisplayMetaMap> {
+  const lookupClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceClient() : supabase;
+  const athleteIds = Array.from(new Set(rows.map((r) => r.athlete_id).filter(Boolean)));
+  const meta = new Map<string, {
+    athleteName: string;
+    athleteAvatarUrl: string;
+    athleteSport: string;
+    athleteSchool: string;
+  }>();
+
+  const ensureMeta = (athleteId: string) => {
+    const current = meta.get(athleteId);
+    if (current) return current;
+    const next = {
+      athleteName: '',
+      athleteAvatarUrl: '',
+      athleteSport: '',
+      athleteSchool: '',
+    };
+    meta.set(athleteId, next);
+    return next;
+  };
+
+  if (athleteIds.length > 0) {
+    const { data, error } = await lookupClient
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .in('id', athleteIds);
+    if (error) throw new Error(error.message);
+
+    for (const row of data ?? []) {
+      const id = String(row.id ?? '');
+      if (!id) continue;
+      const m = ensureMeta(id);
+      const name = typeof row.full_name === 'string' ? row.full_name.trim() : '';
+      const avatar = typeof row.avatar_url === 'string' ? row.avatar_url.trim() : '';
+      if (name) m.athleteName = name;
+      if (avatar) m.athleteAvatarUrl = avatar;
+    }
+
+    const { data: sports, error: sportError } = await lookupClient
+      .from('athlete_sports')
+      .select('athlete_id, sport, is_primary')
+      .in('athlete_id', athleteIds)
+      .order('is_primary', { ascending: false });
+    if (sportError) throw new Error(sportError.message);
+    for (const row of sports ?? []) {
+      const athleteId = String(row.athlete_id ?? '');
+      const sport = typeof row.sport === 'string' ? row.sport.trim() : '';
+      if (!athleteId || !sport) continue;
+      const m = ensureMeta(athleteId);
+      if (!m.athleteSport) m.athleteSport = sport;
+    }
+
+    const { data: academics, error: academicError } = await lookupClient
+      .from('athlete_academics')
+      .select('athlete_id, school')
+      .in('athlete_id', athleteIds);
+    if (academicError) throw new Error(academicError.message);
+    for (const row of academics ?? []) {
+      const athleteId = String(row.athlete_id ?? '');
+      const school = typeof row.school === 'string' ? row.school.trim() : '';
+      if (!athleteId || !school) continue;
+      ensureMeta(athleteId).athleteSchool = school;
+    }
+  }
+
+  const applicationIds = Array.from(new Set(rows.map((r) => r.application_id).filter((id): id is string => !!id)));
+  if (applicationIds.length > 0) {
+    const { data, error } = await lookupClient
+      .from('applications')
+      .select('id, athlete_id, athlete_snapshot')
+      .in('id', applicationIds);
+    if (error) throw new Error(error.message);
+
+    for (const row of data ?? []) {
+      const athleteId = String(row.athlete_id ?? '');
+      if (!athleteId) continue;
+      const m = ensureMeta(athleteId);
+      const snapshot = row.athlete_snapshot;
+      const snapName = readSnapshotAthleteName(row.athlete_snapshot);
+      if (snapName && !m.athleteName) m.athleteName = snapName;
+      if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
+        const record = snapshot as Record<string, unknown>;
+        const image = typeof record.image === 'string' ? record.image.trim() : '';
+        const sport = typeof record.sport === 'string' ? record.sport.trim() : '';
+        const school = typeof record.school === 'string' ? record.school.trim() : '';
+        if (image && !m.athleteAvatarUrl) m.athleteAvatarUrl = image;
+        if (sport && sport !== '—' && !m.athleteSport) m.athleteSport = sport;
+        if (school && school !== '—' && !m.athleteSchool) m.athleteSchool = school;
+      }
+    }
+  }
+
+  const threadIds = Array.from(new Set(rows.map((r) => r.chat_thread_id).filter((id): id is string => !!id)));
+  if (threadIds.length > 0) {
+    const { data, error } = await lookupClient
+      .from('chat_participants')
+      .select('thread_id, user_id, display_name')
+      .in('thread_id', threadIds);
+    if (error) throw new Error(error.message);
+
+    for (const row of data ?? []) {
+      const athleteId = String(row.user_id ?? '');
+      if (!athleteId) continue;
+      if (!athleteIds.includes(athleteId)) continue;
+      const displayName = typeof row.display_name === 'string' ? row.display_name.trim() : '';
+      const m = ensureMeta(athleteId);
+      if (displayName && displayName !== 'Athlete' && !m.athleteName) m.athleteName = displayName;
+    }
+  }
+  return meta;
+}
+
+async function loadCampaignNamesForDeals(
+  supabase: SupabaseClient,
+  rows: DbDealRow[],
+): Promise<DealCampaignNameMap> {
+  const lookupClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceClient() : supabase;
+  const campaignIds = Array.from(new Set(rows.map((r) => r.campaign_id).filter((id): id is string => !!id)));
+  if (campaignIds.length === 0) return new Map();
+
+  const { data, error } = await lookupClient
+    .from('campaigns')
+    .select('id, name')
+    .in('id', campaignIds);
+  if (error) throw new Error(error.message);
+
+  const names = new Map<string, string>();
+  for (const row of data ?? []) {
+    const id = String(row.id ?? '');
+    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    if (id && name) names.set(id, name);
+  }
+  return names;
+}
+
+function dbDealToApi(
+  row: DbDealRow,
+  displayMeta: DealDisplayMetaMap = new Map(),
+  campaignNames: DealCampaignNameMap = new Map(),
+): ApiDealRow {
   // computeDealNextAction expects a StoredDeal-shaped object plus the related
   // child rows. In Phase 1 there are no children yet, so the contract/payment
   // branches in the computer return their unconfigured-state defaults — which
@@ -490,11 +666,17 @@ function dbDealToApi(row: DbDealRow): ApiDealRow {
     payment: null,
     deliverables: [],
   });
+  const athleteMeta = displayMeta.get(row.athlete_id);
   return {
     id: row.id,
     offerId: row.offer_id,
     brandUserId: row.brand_id,
     athleteUserId: row.athlete_id,
+    athleteName: athleteMeta?.athleteName ?? '',
+    athleteAvatarUrl: athleteMeta?.athleteAvatarUrl ?? '',
+    athleteSport: athleteMeta?.athleteSport ?? '',
+    athleteSchool: athleteMeta?.athleteSchool ?? '',
+    campaignName: row.campaign_id ? campaignNames.get(row.campaign_id) ?? null : null,
     campaignId: row.campaign_id,
     applicationId: row.application_id,
     chatThreadId: row.chat_thread_id,
@@ -526,7 +708,12 @@ export async function listDealsForCurrentUser(status?: string): Promise<ApiDealR
   }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => dbDealToApi(r as unknown as DbDealRow));
+  const rows = (data ?? []) as unknown as DbDealRow[];
+  const [displayMeta, campaignNames] = await Promise.all([
+    loadAthleteMetaForDeals(supabase, rows),
+    loadCampaignNamesForDeals(supabase, rows),
+  ]);
+  return rows.map((r) => dbDealToApi(r, displayMeta, campaignNames));
 }
 
 /**
@@ -546,6 +733,10 @@ export async function getDealDetailForCurrentUser(
   if (error) throw new Error(error.message);
   if (!data) return null;
   const dealRow = data as unknown as DbDealRow;
+  const [displayMeta, campaignNames] = await Promise.all([
+    loadAthleteMetaForDeals(supabase, [dealRow]),
+    loadCampaignNamesForDeals(supabase, [dealRow]),
+  ]);
 
   const [contractRes, paymentRes] = await Promise.all([
     supabase.from('deal_contracts').select(CONTRACT_SELECT).eq('deal_id', dealRow.id).maybeSingle(),
@@ -578,7 +769,7 @@ export async function getDealDetailForCurrentUser(
   if (activitiesErr) throw new Error(activitiesErr.message);
 
   return {
-    deal: buildApiDealRowForDetail(dealRow, contractApi, paymentApi, deliverableRows),
+    deal: buildApiDealRowForDetail(dealRow, contractApi, paymentApi, deliverableRows, displayMeta, campaignNames),
     contract: contractApi,
     payment: paymentApi,
     deliverables: deliverableRows.map((d) => dbDeliverableToApi(d)),

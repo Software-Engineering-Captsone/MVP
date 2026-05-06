@@ -21,12 +21,14 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import useSWR from 'swr';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
-import { getAthleteById, mockAthletes, type ContentItem } from '@/lib/mockData';
+import { getAthleteById, mockAthletes, type Athlete, type ContentItem } from '@/lib/mockData';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
 import { authFetch } from '@/lib/authFetch';
+import { apiFetcher } from '@/hooks/api/fetcher';
 import type { ApiCampaignRow } from '@/lib/campaigns/clientMap';
 import dynamic from 'next/dynamic';
 
@@ -76,7 +78,14 @@ function ContentCard({ item, showPlay }: { item: ContentItem; showPlay: boolean 
   );
 }
 
-const REFERRAL_ELIGIBLE_STATUSES = new Set(['Open for Applications', 'Reviewing Candidates']);
+// Aligned with deriveCampaignStatusFromSubmission: 'Active' is the published, accepting-applicants
+// state; 'Reviewing Candidates' is the draft-but-publish-ready state. Both are eligible for
+// referral invites. (Legacy 'Open for Applications' kept for backwards-compatible API rows.)
+const REFERRAL_ELIGIBLE_STATUSES = new Set([
+  'Active',
+  'Reviewing Candidates',
+  'Open for Applications',
+]);
 
 function isCampaignEligibleForReferralInvite(c: ApiCampaignRow): boolean {
   return (
@@ -646,13 +655,29 @@ export function AthleteProfile() {
   const showSaveForBrand = accountType === 'business';
   const idParam = searchParams.get('id');
 
-  const athlete = useMemo(() => {
+  // Fetch live profile when an id is present and looks like a UUID (mock ids
+  // like "1" stay on the client-side mock data). On 404/network errors we
+  // gracefully fall back to mock data — useful during dev when not every
+  // athlete has been seeded into Supabase yet.
+  const isUuid = !!idParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
+  const swrKey = isUuid ? `/api/dashboard/athlete/profile/${idParam}` : null;
+  const { data: liveData, error: liveError, isLoading: liveLoading } = useSWR<{ athlete: Athlete }>(
+    swrKey,
+    apiFetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const athlete = useMemo<Athlete>(() => {
+    if (liveData?.athlete) return liveData.athlete;
     if (idParam) {
       const found = getAthleteById(idParam);
       if (found) return found;
     }
     return mockAthletes[0];
-  }, [idParam]);
+  }, [idParam, liveData]);
+
+  const showLoadingOverlay = isUuid && liveLoading && !liveData;
+  const showLiveError = isUuid && !!liveError && !liveData;
 
   const [tab, setTab] = useState<ProfileTab>('overview');
   const [contentFilter, setContentFilter] = useState<ContentFilter>('all');
@@ -716,6 +741,18 @@ export function AthleteProfile() {
             Back
           </Link>
         </div>
+
+        {showLoadingOverlay ? (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-4 py-2 text-xs font-medium text-gray-500 shadow-sm">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Loading profile…
+          </div>
+        ) : null}
+        {showLiveError ? (
+          <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
+            Showing cached profile — couldn&rsquo;t reach the latest data.
+          </div>
+        ) : null}
 
         {/* Full hero */}
         <div ref={heroRef} className="mb-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">

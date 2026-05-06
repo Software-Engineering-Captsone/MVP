@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import {
   createBrandCampaignTemplate,
   getCampaignById,
 } from '@/lib/campaigns/repository';
 import { resolveCampaignBriefV2ForApi } from '@/lib/campaigns/campaignBriefV2Mapper';
 import { jsonError } from '@/lib/api/jsonError';
+import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 
 /**
  * POST /api/campaigns/:id/save-template
@@ -23,13 +23,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return jsonError(401, 'Unauthorized');
+  if (user.role !== 'brand') return jsonError(403, 'Forbidden');
 
   const campaign = await getCampaignById(id);
   if (!campaign) return jsonError(404, 'Campaign not found');
-  if (campaign.brandUserId !== user.id) return jsonError(403, 'Forbidden');
+  if (campaign.brandUserId !== user.userId) return jsonError(403, 'Forbidden');
 
   let body: Record<string, unknown>;
   try {
@@ -51,7 +51,7 @@ export async function POST(
 
   try {
     const tpl = await createBrandCampaignTemplate({
-      brandUserId: user.id,
+      brandUserId: user.userId,
       name,
       description,
       defaults: brief as unknown as Record<string, unknown>,

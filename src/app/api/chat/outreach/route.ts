@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getChatSessionUser } from '@/lib/chat/session';
-import { findUserById } from '@/lib/auth/localUserRepository';
 import { ensureBrandOutreachThread, insertMessage } from '@/lib/chat/service';
 import { isChatSchemaNotReadyError, mapChatInfraError } from '@/lib/chat/apiError';
 import { fallbackAppendMessage, fallbackEnsureOutreachThread } from '@/lib/chat/fallbackStore';
@@ -32,12 +31,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'athleteUserId is required' }, { status: 400 });
   }
 
-  const athlete = await findUserById(athleteUserId);
-  if (!athlete || athlete.role !== 'athlete') {
+  const { data: athlete, error: athleteError } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('id', athleteUserId)
+    .eq('role', 'athlete')
+    .not('onboarding_completed_at', 'is', null)
+    .maybeSingle<{ id: string; full_name: string | null }>();
+  if (athleteError) {
+    return NextResponse.json({ error: athleteError.message }, { status: 500 });
+  }
+  if (!athlete) {
     return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
   }
 
-  const athleteName = typeof body.athleteName === 'string' ? body.athleteName.trim() : '';
+  const athleteName =
+    typeof body.athleteName === 'string' ? body.athleteName.trim() : athlete.full_name ?? '';
   const initialMessage =
     typeof body.initialMessage === 'string' ? body.initialMessage.trim() : '';
   const campaignId = typeof body.campaignId === 'string' ? body.campaignId.trim() : '';

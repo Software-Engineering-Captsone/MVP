@@ -31,6 +31,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const athleteUserId =
     typeof body.athleteUserId === 'string' ? body.athleteUserId.trim() : '';
 
+  if (!athleteUserId) return jsonError(400, 'athleteUserId is required');
+
+  const { data: athlete, error: athleteError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', athleteUserId)
+    .eq('role', 'athlete')
+    .not('onboarding_completed_at', 'is', null)
+    .maybeSingle<{ id: string }>();
+  if (athleteError) return jsonError(500, athleteError.message);
+  if (!athlete) return jsonError(404, 'Athlete not found');
+
   const result = await createReferralApplication({
     campaignId,
     brandUserId: session.id,

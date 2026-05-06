@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import useSWR from 'swr';
 import {
   TrendingUp, Target,
-  Activity, ChevronRight,
+  Activity,
   DollarSign, BarChart3, ArrowUpRight, Instagram, Heart, Megaphone,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -14,10 +15,9 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
-import { formatCampaignRelativePosted } from '@/lib/campaigns/clientMap';
-import { useCampaignsList } from '@/hooks/api/useCampaignsList';
-import { authFetch } from '@/lib/authFetch';
-import { compensationAmountFromDealSnapshot, fetchDealsList, type ApiDeal } from '@/lib/deals/dashboardDealsClient';
+import { formatCampaignRelativePosted, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
+import { apiFetcher } from '@/hooks/api/fetcher';
+import { compensationAmountFromDealSnapshot, type ApiDeal } from '@/lib/deals/dashboardDealsClient';
 
 const TiktokIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -41,6 +41,17 @@ type ApiApplicationRow = {
   };
 };
 
+type BrandOverviewResponse = {
+  campaigns: ApiCampaignRow[];
+  applications: ApiApplicationRow[];
+  deals: ApiDeal[];
+  generatedAt: string;
+};
+
+const EMPTY_CAMPAIGNS: ApiCampaignRow[] = [];
+const EMPTY_APPLICATIONS: ApiApplicationRow[] = [];
+const EMPTY_DEALS: ApiDeal[] = [];
+
 function parseHumanCount(value: string): number {
   const raw = value.trim().toUpperCase();
   if (!raw) return 0;
@@ -62,62 +73,15 @@ function formatCompactNumber(value: number): string {
 export function BusinessOverview() {
   const router = useRouter();
   const { toggleAthlete, isAthleteSaved } = useSavedMarketplace();
-  const { campaigns, isLoading: campaignsLoading } = useCampaignsList();
+  const { data: overview, isLoading: overviewLoading } = useSWR<BrandOverviewResponse>(
+    '/api/dashboard/brand/overview',
+    apiFetcher,
+    { revalidateOnFocus: false, refreshInterval: 30000 }
+  );
+  const campaigns = overview?.campaigns ?? EMPTY_CAMPAIGNS;
   const campaignRows = campaigns.slice(0, 3);
-  const [campaignApplications, setCampaignApplications] = useState<ApiApplicationRow[]>([]);
-  const [deals, setDeals] = useState<ApiDeal[]>([]);
-  const [dealsLoaded, setDealsLoaded] = useState(false);
-  const [applicationsLoaded, setApplicationsLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setDealsLoaded(false);
-    void (async () => {
-      try {
-        const rows = await fetchDealsList();
-        if (!cancelled) setDeals(rows);
-      } catch {
-        if (!cancelled) setDeals([]);
-      } finally {
-        if (!cancelled) setDealsLoaded(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    setApplicationsLoaded(false);
-    void (async () => {
-      if (campaignsLoading) return;
-      if (campaigns.length === 0) {
-        setCampaignApplications([]);
-        setApplicationsLoaded(true);
-        return;
-      }
-      const results = await Promise.all(
-        campaigns.map(async (campaign) => {
-          try {
-            const res = await authFetch(`/api/campaigns/${encodeURIComponent(String(campaign.id))}/applications`);
-            if (!res.ok) return [] as ApiApplicationRow[];
-            const data = (await res.json()) as { applications?: ApiApplicationRow[] };
-            return Array.isArray(data.applications) ? data.applications : [];
-          } catch {
-            return [] as ApiApplicationRow[];
-          }
-        })
-      );
-      if (!cancelled) {
-        setCampaignApplications(results.flat());
-        setApplicationsLoaded(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [campaigns, campaignsLoading]);
+  const campaignApplications = overview?.applications ?? EMPTY_APPLICATIONS;
+  const deals = overview?.deals ?? EMPTY_DEALS;
 
   const recommendedAthletes = useMemo(() => {
     const map = new Map<
@@ -265,7 +229,7 @@ export function BusinessOverview() {
     campaigns.length === 0 && campaignApplications.length === 0 && deals.length === 0;
   const isWarmingUpBusiness =
     !isFirstTimeBusiness && campaigns.length > 0 && campaignApplications.length === 0 && deals.length === 0;
-  const dashboardReady = !campaignsLoading && dealsLoaded && applicationsLoaded;
+  const dashboardReady = !overviewLoading;
 
   if (!dashboardReady) {
     return (
@@ -481,10 +445,10 @@ export function BusinessOverview() {
             </Link>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white px-5">
-            {campaignsLoading && (
+            {overviewLoading && (
               <p className="py-6 text-center text-sm text-gray-400">Loading your campaigns…</p>
             )}
-            {!campaignsLoading && campaignRows.length === 0 && (
+            {!overviewLoading && campaignRows.length === 0 && (
               <div className="py-6 text-center">
                 <p className="text-sm text-gray-500 mb-3">No campaigns yet. Create one to start collecting applications.</p>
                 <Link
@@ -495,7 +459,7 @@ export function BusinessOverview() {
                 </Link>
               </div>
             )}
-            {!campaignsLoading &&
+            {!overviewLoading &&
               campaignRows.length > 0 &&
               campaignRows.map((c, i) => {
                 const posted = formatCampaignRelativePosted(c.createdAt ?? null);

@@ -12,7 +12,14 @@ export type ChatInboxItem = {
   threadId: string;
   applicationId: string | null;
   threadKind: ChatThreadKind;
-  counterpart: { userId: string; displayName: string };
+  counterpart: {
+    userId: string;
+    displayName: string;
+    avatarUrl?: string;
+    sport?: string;
+    school?: string;
+    verified?: boolean;
+  };
   lastMessage: { body: string; createdAt: string; fromUserId: string } | null;
   unreadCount: number;
   updatedAt: string;
