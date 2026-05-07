@@ -107,8 +107,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (campaign.visibility !== 'Public' && !hasApplication) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    const campaignJson = athletePublicCampaignJSON(campaign);
     return NextResponse.json({
-      campaign: athletePublicCampaignJSON(campaign),
+      ...campaignJson,
+      campaign: campaignJson,
       myApplication: mine[0] ? applicationToJSON(mine[0]) : null,
     });
   }

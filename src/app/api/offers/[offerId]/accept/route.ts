@@ -67,6 +67,22 @@ function dbOfferToTermsSource(row: DbOfferRow): OfferTermsSource {
   };
 }
 
+function responseDeadlineFromOffer(row: DbOfferRow): string | null {
+  const structured = row.structured_draft;
+  const wizard = structured?.wizard;
+  if (!wizard || typeof wizard !== 'object') return null;
+  const basics = (wizard as Record<string, unknown>).basics;
+  if (!basics || typeof basics !== 'object') return null;
+  const dueDate = (basics as Record<string, unknown>).dueDate;
+  return typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null;
+}
+
+function isPastDeadline(deadline: string | null): boolean {
+  if (!deadline) return false;
+  const ms = new Date(deadline).getTime();
+  return !Number.isNaN(ms) && ms < Date.now();
+}
+
 export async function POST(
   _request: NextRequest,
   context: { params: Promise<{ offerId: string }> }
@@ -144,6 +160,12 @@ export async function POST(
     return NextResponse.json(
       { error: `Cannot accept offer in status '${offer.status}'` },
       { status: 400 },
+    );
+  }
+  if (isPastDeadline(responseDeadlineFromOffer(offer))) {
+    return NextResponse.json(
+      { error: 'This offer deadline has passed' },
+      { status: 409 },
     );
   }
 

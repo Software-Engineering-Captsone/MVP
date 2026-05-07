@@ -121,7 +121,7 @@ export function PhotoCropModal({ file, onCancel, onConfirm }: Props) {
  * is huge) and returns a File with the same MIME type as the source.
  */
 async function getCroppedFile(src: string, area: Area, source: File): Promise<File> {
-  const img = await loadImage(src);
+  const img = await loadImageSource(source, src);
   const MAX = 1024;
   const scale = Math.min(1, MAX / area.width);
   const outW = Math.round(area.width * scale);
@@ -133,6 +133,9 @@ async function getCroppedFile(src: string, area: Area, source: File): Promise<Fi
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas not supported in this browser');
   ctx.drawImage(img, area.x, area.y, area.width, area.height, 0, 0, outW, outH);
+  if ('close' in img && typeof img.close === 'function') {
+    img.close();
+  }
 
   const mime = source.type || 'image/jpeg';
   const blob = await new Promise<Blob | null>((resolve) =>
@@ -145,10 +148,40 @@ async function getCroppedFile(src: string, area: Area, source: File): Promise<Fi
   return new File([blob], `${base || 'avatar'}.${extFromMime}`, { type: mime });
 }
 
+async function loadImageSource(source: File, fallbackSrc: string): Promise<HTMLImageElement | ImageBitmap> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(source);
+    } catch {
+      // Some browsers/codecs still need the HTMLImageElement path.
+    }
+  }
+
+  try {
+    return await loadImage(await fileToDataUrl(source));
+  } catch {
+    return loadImage(fallbackSrc);
+  }
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Could not read image file'));
+    };
+    reader.onerror = () => reject(new Error('Could not read image file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (/^https?:\/\//i.test(src)) {
+      img.crossOrigin = 'anonymous';
+    }
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Could not load image'));
     img.src = src;

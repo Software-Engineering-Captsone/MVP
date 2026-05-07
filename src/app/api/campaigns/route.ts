@@ -5,6 +5,7 @@ import {
   listApplicationsForCampaigns,
   listCampaignsForBrand,
   listOpenCampaignsForAthlete,
+  type StoredCampaign,
 } from '@/lib/campaigns/repository';
 import { deriveCampaignStatusFromSubmission } from '@/lib/campaigns/campaignStatusDerivation';
 import { campaignBriefV2ToLegacy } from '@/lib/campaigns/campaignBriefV2Mapper';
@@ -75,7 +76,91 @@ function normalizeCampaignCreatePayload(
   };
 }
 
-export async function GET() {
+function parsePositiveInt(value: string | null, fallback: number, max: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, max);
+}
+
+function parseOffsetCursor(value: string | null): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return parsed;
+}
+
+function parseMoney(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/[^0-9.,-]/g, '').replace(/,/g, '');
+  const match = normalized.match(/\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function campaignCompRange(campaign: StoredCampaign): { min: number | null; max: number | null } {
+  const budget = String(campaign.budget ?? '');
+  const values = [...budget.matchAll(/\$?\s*([\d,]+(?:\.\d+)?)/g)]
+    .map((m) => parseMoney(m[1]))
+    .filter((n): n is number => n != null);
+  if (values.length === 0) return { min: null, max: null };
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function filterAthleteCampaigns(campaigns: StoredCampaign[], searchParams: URLSearchParams): StoredCampaign[] {
+  const sport = normalizeText(searchParams.get('sport'));
+  const category = normalizeText(searchParams.get('category'));
+  const platform = normalizeText(searchParams.get('platform'));
+  const location = normalizeText(searchParams.get('location'));
+  const compMin = parseMoney(searchParams.get('compMin'));
+  const compMax = parseMoney(searchParams.get('compMax'));
+
+  return campaigns.filter((campaign) => {
+    if (sport) {
+      const campaignSport = normalizeText(campaign.sport);
+      if (campaignSport !== sport && campaignSport !== 'all sports') return false;
+    }
+
+    if (platform) {
+      const platforms = (campaign.platforms ?? []).map(normalizeText);
+      if (!platforms.some((p) => p.includes(platform))) return false;
+    }
+
+    if (location && !normalizeText(campaign.location).includes(location)) return false;
+
+    if (category) {
+      const haystack = [
+        campaign.name,
+        campaign.subtitle,
+        campaign.goal,
+        campaign.packageName,
+        campaign.brief,
+        ...(campaign.packageDetails ?? []),
+        ...(campaign.platforms ?? []),
+      ]
+        .map(normalizeText)
+        .join(' ');
+      if (!haystack.includes(category)) return false;
+    }
+
+    if (compMin != null || compMax != null) {
+      const range = campaignCompRange(campaign);
+      if (range.min == null && range.max == null) return false;
+      const max = range.max ?? range.min ?? 0;
+      const min = range.min ?? range.max ?? 0;
+      if (compMin != null && max < compMin) return false;
+      if (compMax != null && min > compMax) return false;
+    }
+
+    return true;
+  });
+}
+
+export async function GET(request: NextRequest) {
   const user = await getAuthUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -102,7 +187,16 @@ export async function GET() {
       });
     }
     const rows = await listOpenCampaignsForAthlete();
-    return NextResponse.json({ campaigns: rows.map(campaignToJSON) });
+    const filtered = filterAthleteCampaigns(rows, request.nextUrl.searchParams);
+    const limit = parsePositiveInt(request.nextUrl.searchParams.get('limit'), filtered.length || 20, 50);
+    const offset = parseOffsetCursor(request.nextUrl.searchParams.get('cursor'));
+    const page = filtered.slice(offset, offset + limit);
+    const nextOffset = offset + page.length;
+    return NextResponse.json({
+      campaigns: page.map(campaignToJSON),
+      nextCursor: nextOffset < filtered.length ? String(nextOffset) : null,
+      total: filtered.length,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

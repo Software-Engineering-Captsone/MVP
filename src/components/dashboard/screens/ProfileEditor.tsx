@@ -84,6 +84,8 @@ const AVAILABILITY: { value: OnboardingProfile['availabilityStatus']; label: str
   { value: 'busy',        label: 'Limited Availability' },
   { value: 'not_looking', label: 'Not Looking' },
 ];
+const PROFILE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 const inputClass =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-nilink-ink outline-none transition placeholder:text-gray-400 focus:border-nilink-accent-border focus:ring-1 focus:ring-nilink-accent/30';
@@ -257,6 +259,14 @@ export function ProfileEditor() {
     e.target.value = '';
     if (!file) return;
     setUploadError(null);
+    if (!PROFILE_IMAGE_TYPES.includes(file.type)) {
+      setUploadError('Unsupported image type. Use JPEG, PNG, WebP, or GIF.');
+      return;
+    }
+    if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+      setUploadError('Image must be under 5 MB.');
+      return;
+    }
     setPendingFile(file);
   };
   const handleCropConfirm = async (cropped: File) => {
@@ -278,6 +288,16 @@ export function ProfileEditor() {
     const file = e.target.files?.[0];
     if (!file) return;
     setBannerError(null);
+    if (!PROFILE_IMAGE_TYPES.includes(file.type)) {
+      setBannerError('Unsupported image type. Use JPEG, PNG, WebP, or GIF.');
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
+      return;
+    }
+    if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+      setBannerError('Image must be under 5 MB.');
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
+      return;
+    }
     setBannerUploading(true);
     try {
       const url = await uploadBanner(file);
@@ -509,8 +529,11 @@ export function ProfileEditor() {
               onClick={() => bannerInputRef.current?.click()}
             >
               {profile.profileBannerUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.profileBannerUrl} alt="Banner" className="h-full w-full object-cover" />
+                <ImageWithFallback
+                  src={profile.profileBannerUrl}
+                  alt="Banner"
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1.5 text-gray-300">
                   <ImagePlus className="h-6 w-6" />

@@ -1,13 +1,13 @@
 <claude-mem-context>
 # Memory Context
 
-# [Soft Engineering] recent context, 2026-05-07 2:38pm EDT
+# [Soft Engineering] recent context, 2026-05-07 7:29pm EDT
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (18,391t read) | 535,970t work | 97% savings
+Stats: 50 obs (18,789t read) | 841,180t work | 98% savings
 
 ### May 5, 2026
 S81 NILINK deal flow integration test — unblock git on macOS where Xcode CLT installer GUI is stalled (May 5 at 3:01 PM)
@@ -21,19 +21,6 @@ S87 Continue athlete dashboard backend audit from previous session (May 5 at 7:2
 S88 Athlete dashboard backend wiring — wire AthleteProfile.tsx to real Supabase data, fix referral eligibility bug, ensure TypeScript/lint correctness (May 6 at 2:08 AM)
 S89 Marketplace API migration — complete 3-task sprint: fix athletes schema, switch data sources to API default, smoke-test end-to-end (May 6 at 2:17 AM)
 ### May 7, 2026
-416 2:01p ✅ Session Changeset Ready to Commit — 4 Modified Files + 1 Untracked
-417 2:04p 🔵 AthleteDashboard Uses Three-State Machine and SWR API Hooks
-418 2:06p 🔵 Dashboard Route Structure — 14 Routes Including saved/page.tsx
-419 2:07p 🔵 AthleteProfile.tsx Has Runtime Mock Fallback — mockAthletes[0] Used When Athlete Not Found
-420 " ⚖️ Brand Dashboard Backend Audit Initiated
-421 " 🔵 Core Dashboard API Routes Have No Mock Fallbacks — Two New Audit Tasks Created
-422 " 🔵 Brand Dashboard: Architecture & Data Flow Fully Traced
-423 " 🔵 Offers Route Has findUserById Fallback from localUserRepository for Brand Names
-424 " 🔵 Athlete Profile Repository: Real Supabase Data with Known Field Gaps
-425 " 🔵 Service Role Client Used for Cross-User Deal Lookups
-426 " 🔵 localUserRepository Uses File-Based JSON Store — Legacy Pre-Supabase User System
-427 " 🔵 Campaigns Route Auto-Creates brand_profiles Rows on Campaign Create
-428 " 🔵 Chat Inbox Route Has CHAT_SCHEMA_NOT_READY Guard — Schema May Need Migration
 429 2:08p 🟣 Brand Overview API Enriches Application Snapshots with Live Athlete Data
 430 " 🔴 VerifiedBadge Now Conditionally Rendered Based on Real DB Field
 431 " 🔵 Chat Schema Partially Migrated — chat_participants, chat_thread_read_state, chat_thread_last_message Missing
@@ -72,6 +59,19 @@ S90 Athlete dashboard backend audit + fix brand display name gaps (3-sprint task
 463 2:26p 🔴 Fixed React Compiler Memoization Errors in AthleteProfile After Null-Athlete Refactor
 464 2:32p 🔴 campaign_brief_v2 Column Backward Compatibility Shim Added
 465 " 🔵 Deal Feature Architecture Mapped — Brand and Athlete Sides
+466 6:36p 🔴 ImageWithFallback: Replaced useEffect+setState pattern to fix lint error
+467 " 🟣 ProfileEditor: Banner image now uses ImageWithFallback + client-side validation added
+468 " 🔴 PhotoCropModal: crossOrigin only set for HTTP URLs, not blob URLs
+469 " ✅ supabase-storage-setup.sql: Added UPDATE to force buckets public after insert
+470 " 🔵 TypeScript: Only pre-existing test file errors remain; no app source errors
+471 " ⚖️ New task: Audit and implement brand-side backend features
+472 6:48p 🔵 All 20 tests pass after image upload refactoring, including live integration test
+473 6:53p 🟣 NILINK Business-Side Supabase Schema — Full Implementation
+474 " 🔴 PhotoCropModal "Could not load image" Error Fixed
+475 " 🔵 NILINK Lint Baseline: 0 Errors, 39 Warnings
+476 " 🔵 TypeScript: Only Failures Are Stale @ts-expect-error Directives in Deal Flow Test
+477 7:27p 🔵 Deal Flow Integration Test Failing: Brand Approve Returns 404
+478 " 🔵 Brand Approve 404 Confirmed Non-Transient on Second Run
 
-Access 536k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 841k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

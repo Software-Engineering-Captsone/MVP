@@ -37,12 +37,24 @@ export function campaignToJSON(c: StoredCampaign) {
 }
 
 export function applicationToJSON(a: StoredApplication) {
+  const statusHistory = [
+    { status: 'pending', at: a.createdAt },
+    ...(a.status && a.status !== 'pending' ? [{ status: a.status, at: a.updatedAt }] : []),
+  ].filter((entry) => entry.at);
+  const previousPitch =
+    typeof a.previousPitch === 'string' && a.previousPitch.trim().length > 0
+      ? a.previousPitch
+      : '';
+
   return {
     id: idOf(a),
     campaignId: a.campaignId,
     athleteUserId: a.athleteUserId,
     status: a.status,
     pitch: a.pitch ?? '',
+    withdrawnByAthlete: a.status === 'withdrawn',
+    statusHistory,
+    hasPreviousPitch: previousPitch.length > 0,
     athleteSnapshot: a.athleteSnapshot ?? {},
     messages: (Array.isArray(a.messages) ? a.messages : []).map((m) => ({
       id: m._id != null ? String(m._id) : '',

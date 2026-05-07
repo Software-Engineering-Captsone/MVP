@@ -7,6 +7,7 @@ export type ApiDeal = {
   offerId: string;
   brandUserId: string;
   athleteUserId: string;
+  brandName?: string;
   athleteName?: string;
   athleteAvatarUrl?: string;
   athleteSport?: string;

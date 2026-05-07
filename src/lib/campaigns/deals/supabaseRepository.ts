@@ -67,6 +67,7 @@ type DealDisplayMetaMap = Map<string, {
   athleteSchool: string;
 }>;
 type DealCampaignNameMap = Map<string, string>;
+type DealBrandNameMap = Map<string, string>;
 type DealChildRows = {
   contractsByDealId: Map<string, ApiContractRow>;
   paymentsByDealId: Map<string, ApiPaymentRow>;
@@ -88,6 +89,7 @@ export interface ApiDealRow {
   offerId: string;
   brandUserId: string;
   athleteUserId: string;
+  brandName: string;
   athleteName: string;
   athleteAvatarUrl: string;
   athleteSport: string;
@@ -383,6 +385,7 @@ function buildApiDealRowForDetail(
   deliverableRows: DbDeliverableRow[],
   displayMeta: DealDisplayMetaMap = new Map(),
   campaignNames: DealCampaignNameMap = new Map(),
+  brandNames: DealBrandNameMap = new Map(),
 ): ApiDealRow {
   const athleteMeta = displayMeta.get(dealRow.athlete_id);
   const dealStub: StoredDeal = {
@@ -420,6 +423,7 @@ function buildApiDealRowForDetail(
     offerId: dealRow.offer_id,
     brandUserId: dealRow.brand_id,
     athleteUserId: dealRow.athlete_id,
+    brandName: brandNames.get(dealRow.brand_id) ?? '',
     athleteName: athleteMeta?.athleteName ?? '',
     athleteAvatarUrl: athleteMeta?.athleteAvatarUrl ?? '',
     athleteSport: athleteMeta?.athleteSport ?? '',
@@ -636,17 +640,49 @@ async function loadCampaignNamesForDeals(
   return names;
 }
 
+async function loadBrandNamesForDeals(
+  supabase: SupabaseClient,
+  rows: DbDealRow[],
+): Promise<DealBrandNameMap> {
+  const lookupClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceClient() : supabase;
+  const brandIds = Array.from(new Set(rows.map((r) => r.brand_id).filter(Boolean)));
+  const names = new Map<string, string>();
+  if (brandIds.length === 0) return names;
+
+  const [brandProfileRes, profileRes] = await Promise.all([
+    lookupClient.from('brand_profiles').select('brand_id, company_name').in('brand_id', brandIds),
+    lookupClient.from('profiles').select('id, full_name').in('id', brandIds),
+  ]);
+  if (brandProfileRes.error) throw new Error(brandProfileRes.error.message);
+  if (profileRes.error) throw new Error(profileRes.error.message);
+
+  for (const row of brandProfileRes.data ?? []) {
+    const id = String(row.brand_id ?? '');
+    const name = typeof row.company_name === 'string' ? row.company_name.trim() : '';
+    if (id && name) names.set(id, name);
+  }
+  for (const row of profileRes.data ?? []) {
+    const id = String(row.id ?? '');
+    if (!id || names.has(id)) continue;
+    const name = typeof row.full_name === 'string' ? row.full_name.trim() : '';
+    if (name) names.set(id, name);
+  }
+
+  return names;
+}
+
 function dbDealToApi(
   row: DbDealRow,
   displayMeta: DealDisplayMetaMap = new Map(),
   campaignNames: DealCampaignNameMap = new Map(),
+  brandNames: DealBrandNameMap = new Map(),
   childRows?: DealChildRows,
 ): ApiDealRow {
   const contract = childRows?.contractsByDealId.get(row.id) ?? null;
   const payment = childRows?.paymentsByDealId.get(row.id) ?? null;
   const deliverables = childRows?.deliverablesByDealId.get(row.id) ?? [];
   if (childRows) {
-    return buildApiDealRowForDetail(row, contract, payment, deliverables, displayMeta, campaignNames);
+    return buildApiDealRowForDetail(row, contract, payment, deliverables, displayMeta, campaignNames, brandNames);
   }
 
   const dealStub: StoredDeal = {
@@ -681,6 +717,7 @@ function dbDealToApi(
     offerId: row.offer_id,
     brandUserId: row.brand_id,
     athleteUserId: row.athlete_id,
+    brandName: brandNames.get(row.brand_id) ?? '',
     athleteName: athleteMeta?.athleteName ?? '',
     athleteAvatarUrl: athleteMeta?.athleteAvatarUrl ?? '',
     athleteSport: athleteMeta?.athleteSport ?? '',
@@ -764,12 +801,13 @@ export async function listDealsForCurrentUser(status?: string): Promise<ApiDealR
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as DbDealRow[];
-  const [displayMeta, campaignNames, childRows] = await Promise.all([
+  const [displayMeta, campaignNames, brandNames, childRows] = await Promise.all([
     loadAthleteMetaForDeals(supabase, rows),
     loadCampaignNamesForDeals(supabase, rows),
+    loadBrandNamesForDeals(supabase, rows),
     loadDealChildrenForList(supabase, rows),
   ]);
-  return rows.map((r) => dbDealToApi(r, displayMeta, campaignNames, childRows));
+  return rows.map((r) => dbDealToApi(r, displayMeta, campaignNames, brandNames, childRows));
 }
 
 /**
@@ -789,9 +827,10 @@ export async function getDealDetailForCurrentUser(
   if (error) throw new Error(error.message);
   if (!data) return null;
   const dealRow = data as unknown as DbDealRow;
-  const [displayMeta, campaignNames] = await Promise.all([
+  const [displayMeta, campaignNames, brandNames] = await Promise.all([
     loadAthleteMetaForDeals(supabase, [dealRow]),
     loadCampaignNamesForDeals(supabase, [dealRow]),
+    loadBrandNamesForDeals(supabase, [dealRow]),
   ]);
 
   const [contractRes, paymentRes] = await Promise.all([
@@ -825,7 +864,7 @@ export async function getDealDetailForCurrentUser(
   if (activitiesErr) throw new Error(activitiesErr.message);
 
   return {
-    deal: buildApiDealRowForDetail(dealRow, contractApi, paymentApi, deliverableRows, displayMeta, campaignNames),
+    deal: buildApiDealRowForDetail(dealRow, contractApi, paymentApi, deliverableRows, displayMeta, campaignNames, brandNames),
     contract: contractApi,
     payment: paymentApi,
     deliverables: deliverableRows.map((d) => dbDeliverableToApi(d)),

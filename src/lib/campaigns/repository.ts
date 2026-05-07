@@ -49,6 +49,7 @@ export interface StoredApplication {
   athleteUserId: string;
   status: string;
   pitch?: string;
+  previousPitch?: string;
   athleteSnapshot?: Record<string, string>;
   messages?: StoredApplicationMessage[];
   createdAt: string;
@@ -118,6 +119,7 @@ interface DbApplicationRow {
   athlete_id: string;
   status: string;
   pitch: string;
+  previous_pitch?: string | null;
   athlete_snapshot: unknown;
   messages: unknown;
   created_at: string;
@@ -270,6 +272,7 @@ function dbApplicationToStored(row: DbApplicationRow): StoredApplication {
     athleteUserId: row.athlete_id,
     status: row.status,
     pitch: row.pitch ?? '',
+    previousPitch: row.previous_pitch ?? '',
     athleteSnapshot: snapshot,
     messages: normalizeMessages(row.messages),
     createdAt: row.created_at,
@@ -321,7 +324,7 @@ export async function listOpenCampaignsForAthlete(): Promise<StoredCampaign[]> {
     .select(CAMPAIGN_SELECT)
     .eq('visibility', 'Public')
     .eq('accept_applications', true)
-    .in('status', ['Active', 'Open for Applications'])
+    .in('status', ['Active', 'Open for Applications', 'Reviewing Candidates'])
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => dbCampaignToStored(r as unknown as DbCampaignRow));
@@ -556,9 +559,39 @@ export async function createApplication(
     .maybeSingle();
   if (existingErr) throw new Error(existingErr.message);
   if (existing) {
+    const existingApp = dbApplicationToStored(existing as unknown as DbApplicationRow);
+    if (existingApp.status === 'withdrawn') {
+      if (!campaign.acceptApplications || campaign.visibility !== 'Public') {
+        return { error: 'duplicate', application: existingApp };
+      }
+      if (campaign.status !== 'Open for Applications' && campaign.status !== 'Reviewing Candidates') {
+        return { error: 'duplicate', application: existingApp };
+      }
+      const snapshot =
+        input.athleteSnapshot && typeof input.athleteSnapshot === 'object'
+          ? (input.athleteSnapshot as Record<string, string>)
+          : {};
+      const { data: reopened, error: reopenErr } = await supabase
+        .from('applications')
+        .update({
+          status: 'pending',
+          pitch: String(input.pitch ?? ''),
+          athlete_snapshot: snapshot,
+          decided_at: null,
+          created_at: new Date().toISOString(),
+        })
+        .eq('id', existingApp._id)
+        .eq('athlete_id', athleteUserId)
+        .select('*')
+        .maybeSingle();
+      if (reopenErr) throw new Error(reopenErr.message);
+      if (reopened) {
+        return { application: dbApplicationToStored(reopened as unknown as DbApplicationRow) };
+      }
+    }
     return {
       error: 'duplicate',
-      application: dbApplicationToStored(existing as unknown as DbApplicationRow),
+      application: existingApp,
     };
   }
 
@@ -732,7 +765,7 @@ export async function updateApplicationPitchByAthlete(
   const supabase = await createClient();
   const { data: existing, error: readErr } = await supabase
     .from('applications')
-    .select('id, athlete_id, status')
+    .select('id, athlete_id, status, pitch')
     .eq('id', applicationId)
     .maybeSingle();
   if (readErr) throw new Error(readErr.message);
@@ -742,9 +775,54 @@ export async function updateApplicationPitchByAthlete(
     return { ok: false, status: 409, error: 'Cannot edit pitch after the application has moved past pending' };
   }
 
+  const updateWithPrevious = await supabase
+    .from('applications')
+    .update({ pitch: trimmed, previous_pitch: String(existing.pitch ?? '') })
+    .eq('id', applicationId)
+    .select('*')
+    .maybeSingle();
+  let data = updateWithPrevious.data;
+  let error = updateWithPrevious.error;
+  if (error?.code === 'PGRST204' && (error.message ?? '').includes('previous_pitch')) {
+    const retry = await supabase
+      .from('applications')
+      .update({ pitch: trimmed })
+      .eq('id', applicationId)
+      .select('*')
+      .maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
+  if (error) throw new Error(error.message);
+  if (!data) return { ok: false, status: 404, error: 'Not found' };
+  return { ok: true, application: dbApplicationToStored(data as unknown as DbApplicationRow) };
+}
+
+export async function restorePreviousApplicationPitchByAthlete(
+  applicationId: string,
+  athleteUserId: string,
+): Promise<
+  | { ok: true; application: StoredApplication }
+  | { ok: false; status: number; error: string }
+> {
+  const supabase = await createClient();
+  const { data: existing, error: readErr } = await supabase
+    .from('applications')
+    .select('id, athlete_id, status, pitch, previous_pitch')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  if (!existing) return { ok: false, status: 404, error: 'Not found' };
+  if (existing.athlete_id !== athleteUserId) return { ok: false, status: 403, error: 'Forbidden' };
+  if (existing.status !== 'pending') {
+    return { ok: false, status: 409, error: 'Cannot edit pitch after the application has moved past pending' };
+  }
+  const previousPitch = typeof existing.previous_pitch === 'string' ? existing.previous_pitch.trim() : '';
+  if (!previousPitch) return { ok: false, status: 409, error: 'No previous saved pitch is available' };
+
   const { data, error } = await supabase
     .from('applications')
-    .update({ pitch: trimmed })
+    .update({ pitch: previousPitch, previous_pitch: String(existing.pitch ?? '') })
     .eq('id', applicationId)
     .select('*')
     .maybeSingle();

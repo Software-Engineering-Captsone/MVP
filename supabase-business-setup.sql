@@ -315,6 +315,7 @@ create table if not exists public.applications (
                           'pending','shortlisted','approved','declined','withdrawn'
                         )) default 'pending',
   pitch                 text default '',
+  previous_pitch        text,
   athlete_snapshot      jsonb not null default '{}'::jsonb,
   decided_at            timestamptz,
   created_at            timestamptz default now(),
@@ -375,8 +376,6 @@ returns trigger
 language plpgsql
 set search_path = ''
 as $$
-declare
-  terminal constant text[] := array['approved','declined','withdrawn'];
 begin
   -- Immutable fields
   if old.campaign_id is distinct from new.campaign_id then
@@ -388,7 +387,12 @@ begin
 
   -- Status transitions
   if old.status is distinct from new.status then
-    if old.status = any(terminal) then
+    if old.status = 'withdrawn' and new.status = 'pending' then
+      new.decided_at := null;
+      return new;
+    end if;
+
+    if old.status in ('declined', 'withdrawn') then
       raise exception 'Cannot change status of a % application', old.status;
     end if;
     -- Auto-stamp the moment status leaves 'pending'
@@ -766,6 +770,25 @@ alter table public.saved_brands enable row level security;
 drop policy if exists "Athletes manage own saved brands" on public.saved_brands;
 create policy "Athletes manage own saved brands"
   on public.saved_brands for all
+  using ((select auth.uid()) = athlete_id)
+  with check ((select auth.uid()) = athlete_id);
+
+
+-- Athlete bookmarks for campaign opportunities in Explore.
+create table if not exists public.saved_campaigns (
+  athlete_id  uuid not null references public.profiles(id) on delete cascade,
+  campaign_id uuid not null references public.campaigns(id) on delete cascade,
+  saved_at    timestamptz not null default now(),
+  primary key (athlete_id, campaign_id)
+);
+
+alter table public.saved_campaigns enable row level security;
+
+grant select, insert, update, delete on public.saved_campaigns to authenticated;
+
+drop policy if exists "Athletes manage own saved campaigns" on public.saved_campaigns;
+create policy "Athletes manage own saved campaigns"
+  on public.saved_campaigns for all
   using ((select auth.uid()) = athlete_id)
   with check ((select auth.uid()) = athlete_id);
 

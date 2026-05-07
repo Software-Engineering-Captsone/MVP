@@ -9,7 +9,6 @@ import { authFetch } from '@/lib/authFetch';
 import {
   activitySummary,
   createDeliverableSubmission,
-  dealsUseMocks,
   fetchDealDetail,
   fetchDealsList,
   fetchSubmissionsForDeliverable,
@@ -19,9 +18,6 @@ import {
   compensationAmountFromDealSnapshot,
   parseTermsSnapshot,
   patchContractStatus,
-  getMockAthleteDealDetail,
-  getMockAthleteDeals,
-  getMockAthleteSubmissions,
   type ApiDeal,
   type ApiDealDetail,
   type ApiSubmission,
@@ -91,7 +87,9 @@ function athleteDealCardTitle(deal: ApiDeal): string {
 }
 
 function athleteDealCardSubtitle(deal: ApiDeal): string {
-  return `Brand · ${formatShortId(deal.brandUserId)}`;
+  const brand = deal.brandName?.trim() || `Brand ${formatShortId(deal.brandUserId)}`;
+  const campaign = deal.campaignName?.trim();
+  return campaign ? `${brand} · ${campaign}` : brand;
 }
 
 function urgencyMetaForDeal(deal: ApiDeal): { level: UrgencyLevel; nearestDueAt: string | null } {
@@ -220,19 +218,10 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
     setError(null);
     try {
       const rows = await fetchDealsList();
-      if (rows.length === 0 && dealsUseMocks()) {
-        setDeals(getMockAthleteDeals());
-      } else {
-        setDeals(rows);
-      }
+      setDeals(rows);
     } catch (e) {
-      if (dealsUseMocks()) {
-        setDeals(getMockAthleteDeals());
-        setError(e instanceof Error ? `${e.message} (demo deals)` : 'Using demo deals');
-      } else {
-        setDeals([]);
-        setError(e instanceof Error ? e.message : 'Failed to load deals');
-      }
+      setDeals([]);
+      setError(e instanceof Error ? e.message : 'Failed to load deals');
     } finally {
       setLoading(false);
     }
@@ -303,6 +292,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
     try {
       const d = await fetchDealDetail(dealId);
       setDetail(d);
+      setCampaignTitle(d.deal.campaignName ?? null);
       const subMap: Record<string, ApiSubmission[]> = {};
       await Promise.all(
         d.deliverables.map(async (del) => {
@@ -324,31 +314,21 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
         try {
           const cRes = await authFetch(`/api/campaigns/${d.deal.campaignId}`);
           if (cRes.ok) {
-            const cj = (await cRes.json()) as { name?: string };
-            if (typeof cj.name === 'string' && cj.name) setCampaignTitle(cj.name);
+            const cj = (await cRes.json()) as { name?: string; campaign?: { name?: string } };
+            const name =
+              (typeof cj.name === 'string' && cj.name.trim()) ||
+              (typeof cj.campaign?.name === 'string' && cj.campaign.name.trim()) ||
+              '';
+            if (name) setCampaignTitle(name);
           }
         } catch {
           /* optional */
         }
       }
     } catch (e) {
-      if (dealsUseMocks()) {
-        const mockDetail = getMockAthleteDealDetail(dealId);
-        setDetail(mockDetail);
-        if (mockDetail) {
-          const mapped: Record<string, ApiSubmission[]> = {};
-          for (const del of mockDetail.deliverables) {
-            mapped[del.id] = getMockAthleteSubmissions(del.id);
-          }
-          setSubmissionsByDeliverable(mapped);
-        } else {
-          setSubmissionsByDeliverable({});
-        }
-      } else {
-        setDetail(null);
-        setDetailError(e instanceof Error ? e.message : 'Could not load deal');
-        setSubmissionsByDeliverable({});
-      }
+      setDetail(null);
+      setDetailError(e instanceof Error ? e.message : 'Could not load deal');
+      setSubmissionsByDeliverable({});
       setSubmitErrors({});
     } finally {
       setDetailLoading(false);

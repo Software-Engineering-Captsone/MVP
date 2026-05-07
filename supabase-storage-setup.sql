@@ -9,6 +9,10 @@ insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 
+update storage.buckets
+set public = true
+where id = 'avatars';
+
 -- ─────────────────────────────────────────────────────────────────
 -- RLS policies on storage.objects
 -- File path convention: <user_id>/avatar-<ts>.<ext>
@@ -54,6 +58,10 @@ create policy "Public can read avatars"
 insert into storage.buckets (id, name, public)
 values ('banners', 'banners', true)
 on conflict (id) do nothing;
+
+update storage.buckets
+set public = true
+where id = 'banners';
 
 drop policy if exists "Users can upload own banner" on storage.objects;
 create policy "Users can upload own banner"

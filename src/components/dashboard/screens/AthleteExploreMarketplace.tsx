@@ -359,17 +359,36 @@ export function AthleteExploreMarketplace() {
   }, [loadData]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = window.localStorage.getItem('saved_campaign_ids');
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        setSavedCampaignIds(parsed.map((x) => String(x)).filter(Boolean));
+    let cancelled = false;
+    async function loadSavedCampaigns() {
+      try {
+        const res = await authFetch('/api/saved-campaigns');
+        const json = (await res.json()) as { campaignIds?: string[]; error?: string };
+        if (cancelled) return;
+        if (res.ok && Array.isArray(json.campaignIds)) {
+          setSavedCampaignIds(json.campaignIds.map((id) => String(id)).filter(Boolean));
+          return;
+        }
+      } catch {
+        // Fall through to the legacy local cache.
       }
-    } catch {
-      // ignore malformed cache
+
+      if (cancelled || typeof window === 'undefined') return;
+      try {
+        const raw = window.localStorage.getItem('saved_campaign_ids');
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setSavedCampaignIds(parsed.map((x) => String(x)).filter(Boolean));
+        }
+      } catch {
+        // ignore malformed cache
+      }
     }
+    void loadSavedCampaigns();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -541,17 +560,43 @@ export function AthleteExploreMarketplace() {
     [loadData]
   );
 
-  const toggleSaveCampaign = useCallback((campaignId: string) => {
-    setSavedCampaignIds((prev) => {
-      const next = prev.includes(campaignId)
-        ? prev.filter((id) => id !== campaignId)
-        : [...prev, campaignId];
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('saved_campaign_ids', JSON.stringify(next));
+  const toggleSaveCampaign = useCallback(async (campaignId: string) => {
+    const currentIds = savedCampaignIds.map((id) => String(id)).filter(Boolean);
+    const nextIds = currentIds.includes(campaignId)
+      ? currentIds.filter((id) => id !== campaignId)
+      : [...currentIds, campaignId];
+
+    setSavedCampaignIds(nextIds);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('saved_campaign_ids', JSON.stringify(nextIds));
+    }
+
+    try {
+      const res = await authFetch('/api/saved-campaigns', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignIds: nextIds }),
+      });
+      const json = (await res.json()) as { campaignIds?: string[]; error?: string };
+      if (!res.ok) {
+        setError(json.error || 'Could not update saved campaigns');
+        setSavedCampaignIds(currentIds);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('saved_campaign_ids', JSON.stringify(currentIds));
+        }
+        return;
       }
-      return next;
-    });
-  }, []);
+      if (Array.isArray(json.campaignIds)) {
+        setSavedCampaignIds(json.campaignIds.map((id) => String(id)).filter(Boolean));
+      }
+    } catch {
+      setError('Network error while updating saved campaigns');
+      setSavedCampaignIds(currentIds);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('saved_campaign_ids', JSON.stringify(currentIds));
+      }
+    }
+  }, [savedCampaignIds]);
 
   const selectedBrandCampaigns = useMemo(() => {
     if (!selectedBrand) return [];
@@ -851,7 +896,7 @@ export function AthleteExploreMarketplace() {
                                 state={{ isSaved, isWithdrawn }}
                                 callbacks={{
                                   onOpen: () => setSelectedCampaign(campaign),
-                                  onToggleSave: () => toggleSaveCampaign(String(campaign.id)),
+                                  onToggleSave: () => void toggleSaveCampaign(String(campaign.id)),
                                 }}
                               />
                             );
@@ -959,7 +1004,7 @@ export function AthleteExploreMarketplace() {
                       state={{ isSaved: true }}
                       callbacks={{
                         onOpen: () => setSelectedCampaign(campaign),
-                        onToggleSave: () => toggleSaveCampaign(String(campaign.id)),
+                        onToggleSave: () => void toggleSaveCampaign(String(campaign.id)),
                       }}
                     />
                   );

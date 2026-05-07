@@ -10,6 +10,7 @@ import {
   updateOfferDraftFields,
   type StoredOffer,
 } from '@/lib/campaigns/repository';
+import { normalizeStructuredDraft, type OfferWizardState } from '@/lib/campaigns/offerWizardTypes';
 import { offerToJSON } from '@/lib/campaigns/serialization';
 import { jsonError } from '@/lib/api/jsonError';
 
@@ -63,6 +64,52 @@ function compensationSummary(offer: Record<string, unknown>): string {
   return notes || 'Compensation shared in offer details';
 }
 
+function deliverablesFromWizard(wizard: OfferWizardState): Array<{ title: string; quantity?: number; platforms?: string[] }> {
+  if (wizard.basics.dealType === 'appearance') {
+    return [
+      {
+        title: wizard.appearance.eventOrSeriesName?.trim() || wizard.basics.offerName?.trim() || 'Appearance',
+        quantity: 1,
+      },
+    ];
+  }
+
+  return [
+    {
+      title: wizard.basics.offerName?.trim() || 'Content deliverables',
+      quantity: Math.max(1, Math.floor(Number(wizard.ugc.assetCount) || 1)),
+      platforms: Array.isArray(wizard.ugc.primaryPlatforms) ? wizard.ugc.primaryPlatforms : [],
+    },
+  ];
+}
+
+function buildAthleteView(offer: StoredOffer, campaignName: string | null) {
+  const structuredDraft = normalizeStructuredDraft(offer.structuredDraft);
+  const wizard = structuredDraft?.wizard ?? null;
+  const basics = wizard?.basics;
+  const fullDescription = [offer.notes, basics?.details].filter(Boolean).join('\n\n').trim();
+
+  return {
+    title: basics?.offerName?.trim() || campaignName || 'Partnership Offer',
+    shortDescription: shortDescription(offer as unknown as Record<string, unknown>),
+    fullDescription,
+    campaignName,
+    campaignContext: '',
+    timeline: { deadline: basics?.dueDate?.trim() || null },
+    expectations: {
+      brandApprovalRequired: wizard?.contentControl.brandApprovalRequired,
+      revisionRounds: wizard?.contentControl.revisionRounds ?? null,
+    },
+    deliverables: wizard ? deliverablesFromWizard(wizard) : [],
+    compensation: {
+      summary: compensationSummary(offer as unknown as Record<string, unknown>),
+      amount: basics?.amount?.trim() || null,
+    },
+    contractPreview: null,
+    createdAt: offer.createdAt,
+  };
+}
+
 async function buildReadOnlyContext(offer: StoredOffer) {
   const ctx: {
     campaignName?: string;
@@ -100,6 +147,14 @@ async function buildReadOnlyContext(offer: StoredOffer) {
 
 async function resolveBrandName(brandUserId: string): Promise<string> {
   const supabase = await createClient();
+  const { data: brandData } = await supabase
+    .from('brand_profiles')
+    .select('company_name')
+    .eq('brand_id', brandUserId)
+    .maybeSingle();
+  const fromBrandProfile = typeof brandData?.company_name === 'string' ? brandData.company_name.trim() : '';
+  if (fromBrandProfile) return fromBrandProfile;
+
   const { data } = await supabase.from('profiles').select('full_name').eq('id', brandUserId).maybeSingle();
   const fromProfile = typeof data?.full_name === 'string' ? data.full_name.trim() : '';
   if (fromProfile) return fromProfile;
@@ -138,6 +193,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         const c = await getCampaignById(offer.campaignId);
         campaignName = c?.name ?? null;
       }
+      const athleteView = buildAthleteView(offer, campaignName);
+      athleteView.campaignContext = readOnlyContext.campaignBrief ?? '';
       return NextResponse.json({
         offer: {
           ...offerToJSON(offer),
@@ -148,6 +205,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
           compensationSummary: compensationSummary(row),
           deadline: extractDeadline(row),
         },
+        athleteView,
         readOnlyContext,
       });
     }

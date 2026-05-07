@@ -39,6 +39,11 @@ begin
   end if;
 
   if old.status is distinct from new.status then
+    if old.status = 'withdrawn' and new.status = 'pending' then
+      new.decided_at := null;
+      return new;
+    end if;
+
     if old.status in ('declined', 'withdrawn', 'offer_declined') then
       raise exception 'Cannot change status of a % application', old.status;
     end if;

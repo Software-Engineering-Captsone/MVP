@@ -1,24 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Calendar, Megaphone, Loader2, Handshake } from 'lucide-react';
 import { motion } from 'framer-motion';
+import useSWR from 'swr';
 import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardMotion';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { useOffersList } from '@/hooks/api/useOffersList';
 import { useCampaignsList } from '@/hooks/api/useCampaignsList';
-import { authFetch } from '@/lib/authFetch';
-import { hydrateOnboardingDraft, loadOnboardingState } from '@/lib/onboardingHydrate';
-import type { ChatInboxItem } from '@/lib/chat/types';
-
-function parseCurrencyAmount(value: string): number {
-  const numeric = value.replace(/[^0-9.,]/g, '').replace(/,/g, '');
-  const parsed = Number.parseFloat(numeric);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+import { apiFetcher } from '@/hooks/api/fetcher';
 
 function formatCurrencyAmount(value: number): string {
   return new Intl.NumberFormat(undefined, {
@@ -35,89 +28,50 @@ function formatCompactDate(value: string | null | undefined): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+type AthleteOverviewResponse = {
+  stats?: {
+    totalEarnings?: number;
+    activeDeals?: number;
+    unreadMessages?: number;
+    profileCompletion?: number;
+  };
+  activeDeals?: Array<{
+    id: string;
+    dealId: string;
+    brand: string;
+    type: string;
+    value: string;
+    deadline: string | null;
+  }>;
+};
+
 export function AthleteDashboard() {
   const router = useRouter();
   const { user } = useDashboard();
   const { offers, isLoading: offersLoading, error: offersRawError } = useOffersList();
   const { campaigns, isLoading: campaignsLoading } = useCampaignsList();
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [profileCompletion, setProfileCompletion] = useState(0);
-  const [signalsLoaded, setSignalsLoaded] = useState(false);
+  const { data: overview, isLoading: overviewLoading } = useSWR<AthleteOverviewResponse>(
+    '/api/dashboard/athlete/overview',
+    apiFetcher,
+    { revalidateOnFocus: false }
+  );
+  const overviewStats = overview?.stats;
+  const unreadMessages = overviewStats?.unreadMessages ?? 0;
+  const profileCompletion = overviewStats?.profileCompletion ?? 0;
+  const totalEarnings = overviewStats?.totalEarnings ?? 0;
+  const activeDeals = overview?.activeDeals ?? [];
   const pendingOffers = useMemo(
     () => offers.filter((o) => o.athleteOfferStatus === 'pending'),
     [offers]
   );
   const offersError = offersRawError?.message ?? null;
 
-  const refreshDashboardSignals = useCallback(async () => {
-    setSignalsLoaded(false);
-    try {
-      const inboxRes = await authFetch('/api/chat/inbox');
-      if (inboxRes.ok) {
-        const inboxData = (await inboxRes.json()) as { items?: ChatInboxItem[] };
-        const unread = (inboxData.items ?? []).reduce((sum, item) => sum + (item.unreadCount || 0), 0);
-        setUnreadMessages(unread);
-      }
-    } catch {
-      setUnreadMessages(0);
-    }
-
-    try {
-      const state = await loadOnboardingState();
-      const draft = hydrateOnboardingDraft(state);
-      const checks = [
-        Boolean(draft.basics.fullName?.trim()),
-        draft.athletic.sports.length > 0,
-        Boolean(draft.academic.school?.trim()) && Boolean(draft.academic.schoolEmail?.trim()),
-        draft.compliance.schoolEmailVerified === true,
-        Boolean(draft.profile.bio?.trim()) || Boolean(draft.profile.profilePictureUrl?.trim()),
-      ];
-      const complete = checks.filter(Boolean).length;
-      setProfileCompletion(Math.round((complete / checks.length) * 100));
-    } catch {
-      setProfileCompletion(0);
-    } finally {
-      setSignalsLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshDashboardSignals();
-  }, [refreshDashboardSignals]);
-
-  const activeDeals = useMemo(
-    () =>
-      offers
-        .filter(
-          (o) =>
-            (o.dealId && o.dealId.trim().length > 0 && o.athleteOfferStatus !== 'declined' && o.athleteOfferStatus !== 'expired') ||
-            o.athleteOfferStatus === 'accepted'
-        )
-        .map((o) => ({
-          id: o.id,
-          brand: o.brandName || 'Brand',
-          type: o.campaignName || 'Direct collaboration',
-          value: o.compensationSummary || 'Compensation in offer',
-          deadline: formatCompactDate(o.deadline),
-          dealId: o.dealId ?? null,
-        })),
-    [offers]
-  );
-
-  const totalEarnings = useMemo(
-    () =>
-      offers
-        .filter((o) => o.athleteOfferStatus === 'accepted')
-        .reduce((sum, o) => sum + parseCurrencyAmount(o.compensationSummary || ''), 0),
-    [offers]
-  );
-
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? 'there';
   const welcomeSubtitle = `Welcome back, ${firstName}. Here is your NIL activity.`;
   const pendingOfferCount = pendingOffers.length;
   const pendingOfferPreview = useMemo(() => pendingOffers.slice(0, 3), [pendingOffers]);
   const opportunityPreview = useMemo(() => campaigns.slice(0, 3), [campaigns]);
-  const dashboardReady = signalsLoaded && !offersLoading && !campaignsLoading;
+  const dashboardReady = !overviewLoading && !offersLoading && !campaignsLoading;
 
   const athleteDashboardState = useMemo<'first_time' | 'warming_up' | 'active'>(() => {
     if (!dashboardReady) return 'first_time';
@@ -407,7 +361,7 @@ export function AthleteDashboard() {
                       <span className="w-1 h-1 rounded-full bg-gray-300" />
                       <div className="flex items-center gap-1.5 text-xs text-gray-400 font-semibold uppercase tracking-wider">
                         <Calendar className="w-3.5 h-3.5" />
-                        <span>{deal.deadline}</span>
+                        <span>{formatCompactDate(deal.deadline)}</span>
                       </div>
                     </div>
                   </div>
