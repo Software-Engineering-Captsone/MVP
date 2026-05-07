@@ -30,6 +30,7 @@ export interface StoredCampaign {
   packageDetails?: string[];
   platforms?: string[];
   image?: string;
+  campaignBriefV2?: Record<string, unknown> | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -105,6 +106,7 @@ interface DbCampaignRow {
   target_gender: string;
   target_follower_min: number;
   target_location: string;
+  campaign_brief_v2?: unknown;
   created_at: string;
   updated_at: string;
   brand?: { company_name: string | null } | null;
@@ -179,6 +181,11 @@ function toDbGender(v: unknown): string {
   return 'any';
 }
 
+function isMissingCampaignBriefColumnError(error: { code?: string; message?: string } | null): boolean {
+  const msg = error?.message ?? '';
+  return error?.code === 'PGRST204' && msg.includes('campaign_brief_v2');
+}
+
 function dbCampaignToStored(row: DbCampaignRow): StoredCampaign {
   return {
     _id: row.id,
@@ -203,6 +210,10 @@ function dbCampaignToStored(row: DbCampaignRow): StoredCampaign {
     packageDetails: row.package_details ?? [],
     platforms: row.platforms ?? [],
     image: row.image_url ?? '',
+    campaignBriefV2:
+      row.campaign_brief_v2 && typeof row.campaign_brief_v2 === 'object' && !Array.isArray(row.campaign_brief_v2)
+        ? (row.campaign_brief_v2 as Record<string, unknown>)
+        : null,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -354,13 +365,28 @@ export async function createCampaign(input: Record<string, unknown>): Promise<St
         ? input.followerMin
         : Number(input.followerMin) || 0,
     target_location: String(input.location ?? ''),
+    campaign_brief_v2:
+      input.campaignBriefV2 && typeof input.campaignBriefV2 === 'object' && !Array.isArray(input.campaignBriefV2)
+        ? input.campaignBriefV2
+        : null,
   };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('campaigns')
     .insert(supabaseRow)
     .select(CAMPAIGN_SELECT)
     .single();
+  if (isMissingCampaignBriefColumnError(error)) {
+    const { campaign_brief_v2: _campaignBriefV2, ...compatRow } = supabaseRow;
+    void _campaignBriefV2;
+    const retry = await supabase
+      .from('campaigns')
+      .insert(compatRow)
+      .select(CAMPAIGN_SELECT)
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) throw new Error(error.message);
   return dbCampaignToStored(data as unknown as DbCampaignRow);
 }
@@ -387,6 +413,7 @@ export type CampaignUpdatePatch = Partial<
     | 'packageDetails'
     | 'platforms'
     | 'image'
+    | 'campaignBriefV2'
     | 'status'
   >
 >;
@@ -403,6 +430,7 @@ export async function updateCampaign(
   if (patch.goal !== undefined) update.goal = patch.goal;
   if (patch.brief !== undefined) update.brief = patch.brief;
   if (patch.image !== undefined) update.image_url = patch.image;
+  if (patch.campaignBriefV2 !== undefined) update.campaign_brief_v2 = patch.campaignBriefV2;
   if (patch.status !== undefined) update.status = patch.status;
   if (patch.visibility !== undefined) update.visibility = patch.visibility === 'Private' ? 'Private' : 'Public';
   if (patch.acceptApplications !== undefined) update.accept_applications = patch.acceptApplications;
@@ -425,13 +453,27 @@ export async function updateCampaign(
   if (patch.location !== undefined) update.target_location = patch.location;
   if (Object.keys(update).length === 0) return getCampaignById(campaignId);
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('campaigns')
     .update(update)
     .eq('id', campaignId)
     .eq('brand_id', brandUserId)
     .select(CAMPAIGN_SELECT)
     .maybeSingle();
+  if (isMissingCampaignBriefColumnError(error)) {
+    const { campaign_brief_v2: _campaignBriefV2, ...compatUpdate } = update;
+    void _campaignBriefV2;
+    if (Object.keys(compatUpdate).length === 0) return getCampaignById(campaignId);
+    const retry = await supabase
+      .from('campaigns')
+      .update(compatUpdate)
+      .eq('id', campaignId)
+      .eq('brand_id', brandUserId)
+      .select(CAMPAIGN_SELECT)
+      .maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) throw new Error(error.message);
   return data ? dbCampaignToStored(data as unknown as DbCampaignRow) : null;
 }
@@ -459,6 +501,19 @@ export async function listApplicationsForCampaign(campaignId: string): Promise<S
     .from('applications')
     .select('*')
     .eq('campaign_id', campaignId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbApplicationToStored(r as unknown as DbApplicationRow));
+}
+
+export async function listApplicationsForCampaigns(campaignIds: string[]): Promise<StoredApplication[]> {
+  const ids = [...new Set(campaignIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .in('campaign_id', ids)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => dbApplicationToStored(r as unknown as DbApplicationRow));

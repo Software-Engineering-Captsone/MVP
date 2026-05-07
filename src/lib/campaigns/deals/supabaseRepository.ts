@@ -67,6 +67,11 @@ type DealDisplayMetaMap = Map<string, {
   athleteSchool: string;
 }>;
 type DealCampaignNameMap = Map<string, string>;
+type DealChildRows = {
+  contractsByDealId: Map<string, ApiContractRow>;
+  paymentsByDealId: Map<string, ApiPaymentRow>;
+  deliverablesByDealId: Map<string, DbDeliverableRow[]>;
+};
 
 function readSnapshotAthleteName(snapshot: unknown): string {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return '';
@@ -635,11 +640,15 @@ function dbDealToApi(
   row: DbDealRow,
   displayMeta: DealDisplayMetaMap = new Map(),
   campaignNames: DealCampaignNameMap = new Map(),
+  childRows?: DealChildRows,
 ): ApiDealRow {
-  // computeDealNextAction expects a StoredDeal-shaped object plus the related
-  // child rows. In Phase 1 there are no children yet, so the contract/payment
-  // branches in the computer return their unconfigured-state defaults — which
-  // is exactly what we want for a freshly created deal.
+  const contract = childRows?.contractsByDealId.get(row.id) ?? null;
+  const payment = childRows?.paymentsByDealId.get(row.id) ?? null;
+  const deliverables = childRows?.deliverablesByDealId.get(row.id) ?? [];
+  if (childRows) {
+    return buildApiDealRowForDetail(row, contract, payment, deliverables, displayMeta, campaignNames);
+  }
+
   const dealStub: StoredDeal = {
     _id: row.id,
     offerId: row.offer_id,
@@ -691,6 +700,52 @@ function dbDealToApi(
   };
 }
 
+async function loadDealChildrenForList(
+  supabase: SupabaseClient,
+  rows: DbDealRow[],
+): Promise<DealChildRows> {
+  const dealIds = [...new Set(rows.map((row) => row.id).filter(Boolean))];
+  const contractsByDealId = new Map<string, ApiContractRow>();
+  const paymentsByDealId = new Map<string, ApiPaymentRow>();
+  const deliverablesByDealId = new Map<string, DbDeliverableRow[]>();
+
+  if (dealIds.length === 0) {
+    return { contractsByDealId, paymentsByDealId, deliverablesByDealId };
+  }
+
+  const [contractRes, paymentRes, deliverableRes] = await Promise.all([
+    supabase.from('deal_contracts').select(CONTRACT_SELECT).in('deal_id', dealIds),
+    supabase.from('deal_payments').select(PAYMENT_SELECT).in('deal_id', dealIds),
+    supabase
+      .from('deal_deliverables')
+      .select(DELIVERABLE_SELECT)
+      .in('deal_id', dealIds)
+      .order('order_index', { ascending: true }),
+  ]);
+  if (contractRes.error) throw new Error(contractRes.error.message);
+  if (paymentRes.error) throw new Error(paymentRes.error.message);
+  if (deliverableRes.error) throw new Error(deliverableRes.error.message);
+
+  for (const row of contractRes.data ?? []) {
+    const contract = dbContractToApi(row as unknown as DbContractRow);
+    contractsByDealId.set(contract.dealId, contract);
+  }
+
+  for (const row of paymentRes.data ?? []) {
+    const payment = dbPaymentToApi(row as unknown as DbPaymentRow);
+    paymentsByDealId.set(payment.dealId, payment);
+  }
+
+  for (const row of deliverableRes.data ?? []) {
+    const deliverable = row as unknown as DbDeliverableRow;
+    const current = deliverablesByDealId.get(deliverable.deal_id) ?? [];
+    current.push(deliverable);
+    deliverablesByDealId.set(deliverable.deal_id, current);
+  }
+
+  return { contractsByDealId, paymentsByDealId, deliverablesByDealId };
+}
+
 /**
  * List deals visible to the current user. RLS scopes the result to deals
  * where the user is the brand or the athlete; no client-side role hinting
@@ -709,11 +764,12 @@ export async function listDealsForCurrentUser(status?: string): Promise<ApiDealR
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as DbDealRow[];
-  const [displayMeta, campaignNames] = await Promise.all([
+  const [displayMeta, campaignNames, childRows] = await Promise.all([
     loadAthleteMetaForDeals(supabase, rows),
     loadCampaignNamesForDeals(supabase, rows),
+    loadDealChildrenForList(supabase, rows),
   ]);
-  return rows.map((r) => dbDealToApi(r, displayMeta, campaignNames));
+  return rows.map((r) => dbDealToApi(r, displayMeta, campaignNames, childRows));
 }
 
 /**

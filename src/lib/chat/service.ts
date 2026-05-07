@@ -390,7 +390,7 @@ async function loadCounterpartMetadata(
 
   const { data: profiles, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name, avatar_url, verified')
+    .select('id, full_name, avatar_url, verified, role')
     .in('id', ids);
   if (!profileError) {
     for (const row of profiles ?? []) {
@@ -401,6 +401,21 @@ async function loadCounterpartMetadata(
         verified: row.verified === true,
       });
     }
+  }
+
+  // Brand counterparts surface as their company name (the public-facing
+  // label) rather than the registering person's full_name. This matches the
+  // /api/offers brand resolution.
+  const { data: brandRows } = await supabase
+    .from('brand_profiles')
+    .select('brand_id, company_name')
+    .in('brand_id', ids);
+  for (const row of brandRows ?? []) {
+    const id = String(row.brand_id);
+    const company = hasText(row.company_name) ? row.company_name.trim() : undefined;
+    if (!company) continue;
+    const existing = meta.get(id) ?? {};
+    meta.set(id, { ...existing, displayName: company });
   }
 
   const { data: sports } = await supabase

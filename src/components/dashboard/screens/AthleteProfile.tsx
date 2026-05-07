@@ -655,10 +655,9 @@ export function AthleteProfile() {
   const showSaveForBrand = accountType === 'business';
   const idParam = searchParams.get('id');
 
-  // Fetch live profile when an id is present and looks like a UUID (mock ids
-  // like "1" stay on the client-side mock data). On 404/network errors we
-  // gracefully fall back to mock data — useful during dev when not every
-  // athlete has been seeded into Supabase yet.
+  // Fetch live profile when an id is present and looks like a UUID. Mock ids
+  // like "1" stay on the client-side mock data for old local/demo links, but
+  // live UUID profile links must not flash demo data while the request loads.
   const isUuid = !!idParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
   const swrKey = isUuid ? `/api/dashboard/athlete/profile/${idParam}` : null;
   const { data: liveData, error: liveError, isLoading: liveLoading } = useSWR<{ athlete: Athlete }>(
@@ -667,16 +666,17 @@ export function AthleteProfile() {
     { revalidateOnFocus: false }
   );
 
-  const athlete = useMemo<Athlete>(() => {
+  const athlete = useMemo<Athlete | null>(() => {
     if (liveData?.athlete) return liveData.athlete;
+    if (isUuid) return null;
     if (idParam) {
       const found = getAthleteById(idParam);
       if (found) return found;
     }
     return mockAthletes[0];
-  }, [idParam, liveData]);
+  }, [idParam, isUuid, liveData]);
 
-  const showLoadingOverlay = isUuid && liveLoading && !liveData;
+  const showLoadingOverlay = isUuid && liveLoading && !athlete;
   const showLiveError = isUuid && !!liveError && !liveData;
 
   const [tab, setTab] = useState<ProfileTab>('overview');
@@ -705,17 +705,15 @@ export function AthleteProfile() {
       main.removeEventListener('scroll', updateCollapsed);
       window.removeEventListener('resize', updateCollapsed);
     };
-  }, [updateCollapsed, athlete.id]);
+  }, [updateCollapsed, athlete?.id]);
 
-  const images = athlete.contentItems.filter((c) => c.type === 'image');
-  const videos = athlete.contentItems.filter((c) => c.type === 'video');
-  const previewItems = athlete.contentItems.slice(0, 5);
+  const contentItems = useMemo(() => athlete?.contentItems ?? [], [athlete]);
+  const images = useMemo(() => contentItems.filter((c) => c.type === 'image'), [contentItems]);
+  const videos = useMemo(() => contentItems.filter((c) => c.type === 'video'), [contentItems]);
+  const previewItems = contentItems.slice(0, 5);
 
-  const filteredContent = useMemo(() => {
-    if (contentFilter === 'photos') return images;
-    if (contentFilter === 'videos') return videos;
-    return athlete.contentItems;
-  }, [athlete.contentItems, contentFilter, images, videos]);
+  const filteredContent =
+    contentFilter === 'photos' ? images : contentFilter === 'videos' ? videos : contentItems;
 
   const filterChips: { id: ContentFilter; label: string }[] = [
     { id: 'all', label: 'All' },
@@ -727,6 +725,42 @@ export function AthleteProfile() {
     { id: 'overview', label: 'Overview' },
     { id: 'content', label: 'Content' },
   ];
+
+  if (!athlete) {
+    return (
+      <div className="min-h-full bg-nilink-page pb-16">
+        <div className="pt-4 sm:pt-6 dash-main-gutter-x">
+          <div className="mx-auto w-full max-w-4xl">
+            <div className="mb-5">
+              <Link
+                href="/dashboard/search"
+                className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition hover:text-nilink-ink"
+              >
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                Back
+              </Link>
+            </div>
+            <div
+              role={showLiveError ? 'alert' : 'status'}
+              className="rounded-2xl border border-gray-100 bg-white p-8 text-sm text-gray-500 shadow-sm"
+            >
+              {showLiveError ? (
+                <div>
+                  <p className="font-semibold text-gray-900">Could not load this athlete profile.</p>
+                  <p className="mt-1 text-gray-500">Go back to Explore and try opening the profile again.</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-nilink-accent" aria-hidden />
+                  Loading athlete profile...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-nilink-page pb-16">

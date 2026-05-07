@@ -29,6 +29,7 @@ export function campaignToJSON(c: StoredCampaign) {
     packageDetails: c.packageDetails ?? [],
     platforms: c.platforms ?? [],
     image: c.image ?? '',
+    campaignBriefV2: c.campaignBriefV2 ?? null,
     status: c.status,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,

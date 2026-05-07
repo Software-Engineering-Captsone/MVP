@@ -38,6 +38,7 @@ type ApiApplicationRow = {
     image?: string;
     followers?: string;
     engagement?: string;
+    verified?: boolean;
   };
 };
 
@@ -96,6 +97,7 @@ export function BusinessOverview() {
         followersCount: number;
         engagementLabel: string;
         engagementPct: number;
+        verified: boolean;
         matchScore: number;
       }
     >();
@@ -131,6 +133,7 @@ export function BusinessOverview() {
           followersCount,
           engagementLabel,
           engagementPct,
+          verified: snap.verified === true,
           matchScore: score,
         });
       }
@@ -565,7 +568,7 @@ export function BusinessOverview() {
                 </div>
                 <div className="flex items-center gap-1 mb-1">
                   <span className="font-bold text-gray-900 group-hover:text-nilink-accent transition-colors">{athlete.name}</span>
-                  <VerifiedBadge />
+                  {athlete.verified ? <VerifiedBadge /> : null}
                 </div>
                 <p className="text-xs text-gray-500 mb-2 truncate">
                   {athlete.sport} | {athlete.school}

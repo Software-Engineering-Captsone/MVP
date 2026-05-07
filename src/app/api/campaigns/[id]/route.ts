@@ -14,6 +14,7 @@ import {
   athletePublicCampaignJSON,
   campaignToJSON,
 } from '@/lib/campaigns/serialization';
+import { enrichApplicationsForBrandCampaigns } from '@/lib/campaigns/applicationEnrichment';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -61,6 +62,9 @@ function normalizeCampaignPatch(body: Record<string, unknown>): CampaignUpdatePa
   if (hasOwn(merged, 'image')) {
     patch.image = typeof merged.image === 'string' && merged.image.trim() ? merged.image.trim() : '';
   }
+  if (hasOwn(body, 'campaignBriefV2')) {
+    patch.campaignBriefV2 = isRecord(body.campaignBriefV2) ? body.campaignBriefV2 : null;
+  }
   if (hasOwn(merged, 'budgetHint') || hasOwn(merged, 'budget')) {
     patch.budget = String(merged.budgetHint ?? merged.budget ?? '');
   }
@@ -89,9 +93,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   if (user.role === 'brand' && campaign.brandUserId === user.userId) {
     const applications = await listApplicationsForCampaign(id);
+    const enrichedApplications = await enrichApplicationsForBrandCampaigns(applications);
     return NextResponse.json({
       campaign: campaignToJSON(campaign),
-      applications: applications.map(applicationToJSON),
+      applications: enrichedApplications,
     });
   }
 

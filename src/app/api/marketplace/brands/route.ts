@@ -7,8 +7,11 @@ import type { Brand } from '@/lib/mockData';
  * Returns brand_profiles joined to profiles (for logo/verified), mapped to the
  * legacy `Brand` shape used by the discovery UI.
  *
- * RLS: brand_profiles allows public select; profiles allows public select
- * when onboarding_completed_at is not null.
+ * RLS: brand_profiles allows public select; profiles is gated to the
+ * `authenticated` role for completed onboardings, so this route returns rows
+ * for any signed-in caller (the dashboard surfaces are auth-gated). The FK
+ * embed is disambiguated by constraint name because multiple relationships
+ * exist between brand_profiles and profiles in the schema graph.
  */
 export async function GET() {
   const supabase = await createClient();
@@ -17,7 +20,7 @@ export async function GET() {
     .from('brand_profiles')
     .select(`
       brand_id, company_name, industry, tagline, about, hq_city, hq_state,
-      profiles!inner(avatar_url, verified)
+      profiles!brand_profiles_brand_id_fkey!inner(avatar_url, verified, onboarding_completed_at)
     `);
 
   if (error) {

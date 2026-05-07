@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { createClient } from '@/lib/supabase/server';
 import type { Athlete, ContentItem, PlatformMetrics } from '@/lib/mockData';
 
@@ -7,10 +8,25 @@ import type { Athlete, ContentItem, PlatformMetrics } from '@/lib/mockData';
  * Returns onboarded athletes with joined sports/academics/socials/achievements/content,
  * mapped to the legacy `Athlete` shape used by the discovery UI.
  *
- * RLS: every athlete_* table allows public select, so this works without a service-role key.
+ * RLS: profiles SELECT is gated to the `authenticated` role for completed
+ * onboardings; the athlete_* child tables allow public select. Discovery
+ * surfaces are auth-gated, so any signed-in caller sees the full set.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = await createClient();
+  const { searchParams } = new URL(request.url);
+  const q = (searchParams.get('q') ?? '').trim().toLowerCase();
+  const sport = (searchParams.get('sport') ?? '').trim().toLowerCase();
+  const school = (searchParams.get('school') ?? '').trim().toLowerCase();
+  const verified = searchParams.get('verified');
+  const sort = searchParams.get('sort') ?? 'popular';
+  const limit = clampNumber(searchParams.get('limit'), 1, 100, 100);
+  const offset = clampNumber(searchParams.get('offset'), 0, 10_000, 0);
 
   // Note: profiles uses `city`+`state` (no `hometown` column). Athlete content
   // (photos/videos feed) is not yet modeled in the DB, so this endpoint omits it
@@ -36,23 +52,86 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const athletes: Athlete[] = (data ?? []).map((row) => mapRowToAthlete(row as unknown as Row));
-  return NextResponse.json(athletes);
+  const allAthletes: Athlete[] = (data ?? []).map((row) => mapRowToAthlete(row as unknown as Row));
+  const filtered = allAthletes
+    .filter((athlete) => {
+      if (q) {
+        const haystack = [
+          athlete.name,
+          athlete.sport,
+          athlete.school,
+          athlete.position,
+          athlete.hometown,
+          athlete.major,
+          athlete.bio,
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      if (sport && athlete.sport.toLowerCase() !== sport) return false;
+      if (school && !athlete.school.toLowerCase().includes(school)) return false;
+      if (verified === 'true' && !athlete.verified) return false;
+      if (verified === 'false' && athlete.verified) return false;
+      return true;
+    })
+    .sort((a, b) => compareAthletes(a, b, sort));
+
+  const paged = filtered.slice(offset, offset + limit);
+  const response = NextResponse.json(paged);
+  response.headers.set('X-Total-Count', String(filtered.length));
+  response.headers.set('X-Result-Offset', String(offset));
+  response.headers.set('X-Result-Limit', String(limit));
+  return response;
 }
 
 export const dynamic = 'force-dynamic';
 
 function fmtCount(n: number | null | undefined): string {
   const v = Number(n ?? 0);
-  if (!isFinite(v) || v <= 0) return '0';
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-  return String(v);
+  if (!isFinite(v) || v <= 0) return '—';
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(Math.round(v));
 }
 
 function fmtPct(n: number | null | undefined): string {
   const v = Number(n ?? 0);
-  return `${v.toFixed(1)}%`;
+  if (!isFinite(v) || v <= 0) return '—';
+  return `${v.toFixed(1).replace(/\.0$/, '')}%`;
+}
+
+function parseHumanNumber(value: string): number {
+  const raw = value.trim().toUpperCase();
+  if (!raw || raw === '—') return 0;
+  const multiplier = raw.endsWith('M') ? 1_000_000 : raw.endsWith('K') ? 1_000 : 1;
+  const numeric = Number.parseFloat(raw.replace(/[^0-9.]/g, ''));
+  return Number.isFinite(numeric) ? numeric * multiplier : 0;
+}
+
+function parsePercent(value: string): number {
+  const numeric = Number.parseFloat(value.replace('%', ''));
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function clampNumber(raw: string | null, min: number, max: number, fallback: number): number {
+  const n = Number(raw ?? fallback);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function compareAthletes(a: Athlete, b: Athlete, sort: string): number {
+  if (sort === 'name') return a.name.localeCompare(b.name);
+  if (sort === 'school') return a.school.localeCompare(b.school) || a.name.localeCompare(b.name);
+  if (sort === 'engagement') {
+    return parsePercent(b.aggregate.engagementRate) - parsePercent(a.aggregate.engagementRate);
+  }
+  if (sort === 'newest') return b.verified === a.verified ? a.name.localeCompare(b.name) : Number(b.verified) - Number(a.verified);
+  return (
+    parseHumanNumber(b.aggregate.totalFollowers) - parseHumanNumber(a.aggregate.totalFollowers) ||
+    parsePercent(b.aggregate.engagementRate) - parsePercent(a.aggregate.engagementRate) ||
+    a.name.localeCompare(b.name)
+  );
 }
 
 type Row = {
@@ -112,6 +191,20 @@ function mapRowToAthlete(row: Row): Athlete {
   const achievements = [...(row.athlete_achievements ?? [])]
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
     .map((a) => (a.year ? `${a.year} ${a.title}` : a.title));
+  const totalFollowers = Number(socials?.total_followers ?? 0);
+  const engagementRate = Number(socials?.engagement_rate ?? 0);
+  const nilScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        Math.log10(Math.max(totalFollowers, 1)) * 12 +
+          Math.max(0, Math.min(engagementRate, 15)) * 3 +
+          (row.verified ? 10 : 0) +
+          (row.bio ? 5 : 0)
+      )
+    )
+  );
 
   return {
     id: row.id,
@@ -134,7 +227,7 @@ function mapRowToAthlete(row: Row): Athlete {
     major: academics?.major || '',
     heightWeight: '',
     jerseyNumber: primarySport?.jersey_number ? `#${primarySport.jersey_number}` : '',
-    nilScore: 0,
+    nilScore,
     socialHandles: { instagram: igHandle, tiktok: ttHandle, facebook: fbHandle },
     platformMetrics,
     aggregate: {
@@ -147,6 +240,6 @@ function mapRowToAthlete(row: Row): Athlete {
     achievements,
     contentItems,
     openToDeals: true,
-    compatibilityScore: 0,
+    compatibilityScore: nilScore,
   };
 }

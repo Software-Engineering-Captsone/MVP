@@ -72,10 +72,17 @@ export async function GET() {
   );
   const brandIds = Array.from(new Set(offers.map((o) => o.brandUserId).filter(Boolean)));
 
-  const [campaignRes, brandRes] = await Promise.all([
+  // Resolve brand display name from `brand_profiles.company_name` first
+  // (the brand account's public-facing label), falling back to
+  // `profiles.full_name` (the registering person's name) so legacy or
+  // partially-onboarded brands still surface a readable label.
+  const [campaignRes, brandProfileRes, profileRes] = await Promise.all([
     campaignIds.length
       ? supabase.from('campaigns').select('id, name, brand_id').in('id', campaignIds)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string | null; brand_id: string }> }),
+    brandIds.length
+      ? supabase.from('brand_profiles').select('brand_id, company_name').in('brand_id', brandIds)
+      : Promise.resolve({ data: [] as Array<{ brand_id: string; company_name: string | null }> }),
     brandIds.length
       ? supabase.from('profiles').select('id, full_name').in('id', brandIds)
       : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
@@ -86,10 +93,14 @@ export async function GET() {
     campaignsById.set(row.id, { name: row.name ?? null });
   }
   const brandNameById = new Map<string, string>();
-  for (const row of brandRes.data ?? []) {
-    if (row.full_name && row.full_name.trim()) {
-      brandNameById.set(row.id, row.full_name.trim());
-    }
+  for (const row of brandProfileRes.data ?? []) {
+    const company = (row.company_name ?? '').trim();
+    if (company) brandNameById.set(row.brand_id, company);
+  }
+  for (const row of profileRes.data ?? []) {
+    if (brandNameById.has(row.id)) continue;
+    const fullName = (row.full_name ?? '').trim();
+    if (fullName) brandNameById.set(row.id, fullName);
   }
 
   const rows = await Promise.all(

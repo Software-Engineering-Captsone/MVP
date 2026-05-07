@@ -6,6 +6,7 @@ import {
   listApplicationsForCampaign,
 } from '@/lib/campaigns/repository';
 import { applicationToJSON } from '@/lib/campaigns/serialization';
+import { enrichApplicationsForBrandCampaigns } from '@/lib/campaigns/applicationEnrichment';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   const applications = await listApplicationsForCampaign(id);
-  return NextResponse.json({ applications: applications.map(applicationToJSON) });
+  const enrichedApplications = await enrichApplicationsForBrandCampaigns(applications);
+  return NextResponse.json({ applications: enrichedApplications });
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {

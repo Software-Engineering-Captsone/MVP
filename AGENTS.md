@@ -1,17 +1,15 @@
 <claude-mem-context>
 # Memory Context
 
-# [Soft Engineering] recent context, 2026-05-06 2:36am EDT
+# [Soft Engineering] recent context, 2026-05-07 2:38pm EDT
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (19,710t read) | 249,324t work | 92% savings
+Stats: 50 obs (18,391t read) | 535,970t work | 97% savings
 
 ### May 5, 2026
-S79 Summary of remaining work requested by user — full status recap of integration test session before git becomes available (May 5 at 2:31 PM)
-S80 NILINK deal flow E2E integration test — review prior session state and continue toward commit/push (May 5 at 2:54 PM)
 S81 NILINK deal flow integration test — unblock git on macOS where Xcode CLT installer GUI is stalled (May 5 at 3:01 PM)
 S82 Diagnose broken git/Xcode CLT after macOS auto-update, then unblock git to continue NILINK integration test commit workflow (May 5 at 3:04 PM)
 S83 Unblock git on macOS 26.1 after CLT wipe — softwareupdate catalog not yet offering CLT for build 25B78 (May 5 at 3:11 PM)
@@ -20,57 +18,60 @@ S85 Shift focus to athlete-side backend — defer git push/pull work and priorit
 S86 Review new GitHub changes and pull if local branch is behind — Software-Engineering-Captsone/MVP repo (May 5 at 3:27 PM)
 S87 Continue athlete dashboard backend audit from previous session (May 5 at 7:23 PM)
 ### May 6, 2026
-334 2:09a 🔵 src/app/api/dashboard/ Has No Athlete Route — Only Brand Exists
-336 " 🔵 Athlete Interface Shape in mockData.ts Defines Backend Wiring Contract
-337 " ⚖️ Four-Task Plan Established for AthleteProfile Backend Wiring
-338 2:10a 🔵 Active Supabase Project Identified: "Software Engineering Project" in us-east-2
-339 " 🔵 Full Supabase Schema Inventory — All 26 Public Tables With Row Counts
-341 " 🔵 Project Uses Supabase — Next Task Involves Supabase Integration
-340 2:11a 🔵 Supabase Column Schema Audited — Field-to-Table Mapping for Athlete Profile API Route
-342 " 🔵 src/lib/auth/athleteProfile.ts Exists — Potential Reusable Auth-Layer Athlete Fetcher
-344 " 🔵 Established API Route Pattern and Supabase Helper Locations Confirmed
-343 " 🔵 Codebase Audit: Significant Mock Data and Placeholder Usage Identified
-346 " 🔵 src/lib/auth/athleteProfile.ts Is a Local Store Type — Not a Supabase Repository
-347 " 🔵 getAuthUser() and createClient() Internals Fully Documented
-345 " 🔵 BusinessMessages UI Is Fully Mock-Driven; Real Chat API Exists But Requires DB Migration
-348 " 🔵 Chat Thread Messages API Fully Implemented with Auth and Message Length Validation
-349 2:12a 🔵 Campaign Status Derivation Confirms Referral Bug — 'Open for Applications' Is Not a Valid Status
-350 " 🔵 Chat Service Layer: Full Supabase Implementation with Thread Types, Message Kinds, and Idempotent Thread Creation
-352 " 🔵 Production Athlete Profiles Have Sparse Data — All JOIN Columns Return Null for First 3 Athletes
-351 " 🔵 loadInboxItems Has N+1 Query Pattern — Calls countUnreadForThread Per Thread in a Loop
-354 " 🔴 Referral Eligibility Bug Fixed in AthleteProfile.tsx — 'Active' Added to REFERRAL_ELIGIBLE_STATUSES
-353 " 🔵 DashboardInbox.tsx Is Already a Fully-Wired Chat Component — Reference Implementation for BusinessMessages Migration
-355 2:13a 🔵 DashboardInbox Supports 'business' | 'athlete' Variant — BusinessMessages Could Be Replaced Directly
-356 " 🔵 Route /dashboard/messages Is Shared Between Business and Athlete — Navigation Links Pass ?thread= and ?application= Query Params
-357 " 🔵 DashboardShell Role Resolution and Athlete Onboarding Gate Use localStorage and Supabase Metadata
-358 2:14a 🔵 Dashboard Route Structure: messages/page.tsx and messages/preview/page.tsx Both Exist
-359 " 🔵 messages/page.tsx Already Renders DashboardInbox — BusinessMessages.tsx Is an Orphaned Component
-360 " 🟣 New Athlete Profile Repository Created at src/lib/athletes/profileRepository.ts
-361 " 🔵 DashboardInbox Hardcodes verified={false} for Chat Counterparts — Verified Badges Never Show in Real Inbox
-362 2:15a 🟣 New API Route Created: GET /api/dashboard/athlete/profile/[id]
-364 " 🔵 BusinessOverview.tsx Is the SWR Template for AthleteProfile Wiring
-363 " 🔵 DashboardInbox Shows No Real Avatars or Online Status — Both Hardcoded to Placeholder Values
-366 " 🔵 SWR Config Pattern for Dashboard Routes: apiFetcher, revalidateOnFocus: false, refreshInterval: 30s
-365 " 🟣 ChatInboxItem Counterpart Extended with avatarUrl, Sport, School, and Verified Fields
-367 " 🔵 apiFetcher Lives at src/hooks/api/fetcher.ts — Ready to Import for AthleteProfile SWR
-368 2:16a 🔵 apiFetcher Uses credentials:'include' and Attaches .status to Thrown Errors
-369 " 🟣 loadInboxItems Now Bulk-Fetches Counterpart Profiles, Sports, and School Data
-370 " 🟣 AthleteProfile.tsx Import Stage: useSWR and apiFetcher Added, Athlete Type Imported
-371 " 🟣 DashboardInbox Now Shows Real Avatars, Verified Badges, Sport/School Meta, and Sport Filter Works
-372 " 🟣 AthleteProfile.tsx Wired to Live API via SWR with UUID Detection and Mock Fallback
-373 2:17a 🔵 Lint Passes Clean (0 Errors) After Chat Enrichment Changes — 35 Pre-Existing Warnings
-374 " 🟣 AthleteProfile.tsx Loading and Error UI Added — Task 3 (SWR Wiring) Complete
-375 " 🔴 Removed Unused `variant` Prop from ConversationListRow — Fixes Lint Warning
-S88 Athlete dashboard backend wiring — wire AthleteProfile.tsx to real Supabase data, fix referral eligibility bug, ensure TypeScript/lint correctness (May 6 at 2:17 AM)
-376 2:18a 🔴 DashboardInbox Lint Warnings Fully Resolved — Warning Count Reduced from 35 to 32
-377 " 🔵 Integration Test Fails Due to No Network Access to Supabase — Pre-Existing Issue Unrelated to This Session
-378 2:19a 🔵 All 20 Tests Pass With Live Supabase — Full Deal Flow Integration Test Confirmed Working
-379 " 🔵 TypeScript Strict Check Reveals 2 Stale @ts-expect-error Directives in Integration Test
-380 2:20a 🔵 Chat Tables Not in Supabase Realtime Publication — Deals Have Realtime Hook, Chat Does Not
-381 2:21a 🔵 useDealsRealtimeRefresh Pattern Established — Chat Realtime Hook Should Follow Same Pattern
-382 2:22a 🟣 New SQL Script Created to Add Chat Tables to Supabase Realtime Publication
-383 " 🟣 DashboardInbox Gains Live Realtime Chat — Messages and Inbox Update Without Page Refresh
-384 2:23a 🔵 Realtime Subscription useEffect References loadAthleteOfferStatuses Before Its Declaration in Component Body
+S88 Athlete dashboard backend wiring — wire AthleteProfile.tsx to real Supabase data, fix referral eligibility bug, ensure TypeScript/lint correctness (May 6 at 2:08 AM)
+S89 Marketplace API migration — complete 3-task sprint: fix athletes schema, switch data sources to API default, smoke-test end-to-end (May 6 at 2:17 AM)
+### May 7, 2026
+416 2:01p ✅ Session Changeset Ready to Commit — 4 Modified Files + 1 Untracked
+417 2:04p 🔵 AthleteDashboard Uses Three-State Machine and SWR API Hooks
+418 2:06p 🔵 Dashboard Route Structure — 14 Routes Including saved/page.tsx
+419 2:07p 🔵 AthleteProfile.tsx Has Runtime Mock Fallback — mockAthletes[0] Used When Athlete Not Found
+420 " ⚖️ Brand Dashboard Backend Audit Initiated
+421 " 🔵 Core Dashboard API Routes Have No Mock Fallbacks — Two New Audit Tasks Created
+422 " 🔵 Brand Dashboard: Architecture & Data Flow Fully Traced
+423 " 🔵 Offers Route Has findUserById Fallback from localUserRepository for Brand Names
+424 " 🔵 Athlete Profile Repository: Real Supabase Data with Known Field Gaps
+425 " 🔵 Service Role Client Used for Cross-User Deal Lookups
+426 " 🔵 localUserRepository Uses File-Based JSON Store — Legacy Pre-Supabase User System
+427 " 🔵 Campaigns Route Auto-Creates brand_profiles Rows on Campaign Create
+428 " 🔵 Chat Inbox Route Has CHAT_SCHEMA_NOT_READY Guard — Schema May Need Migration
+429 2:08p 🟣 Brand Overview API Enriches Application Snapshots with Live Athlete Data
+430 " 🔴 VerifiedBadge Now Conditionally Rendered Based on Real DB Field
+431 " 🔵 Chat Schema Partially Migrated — chat_participants, chat_thread_read_state, chat_thread_last_message Missing
+432 2:09p 🔵 Chat Schema IS Fully Migrated — All 5 Tables Present
+435 " 🔵 Profile Completion Depends on get_athlete_onboarding_state Supabase RPC
+433 " 🔵 Lint: 0 Errors, 39 Warnings — No Blocking Issues
+434 " 🔵 Integration Test Fails Due to Missing Live Supabase Connection
+437 " 🔵 Full Test Suite Passes Including Live Deal Flow Integration Test
+436 " 🔵 get_athlete_onboarding_state RPC Exists; persist_athlete_onboarding Does Not
+438 " 🔵 Onboarding Persistence Uses 7+ Supabase RPCs — Most Unverified in DB
+439 2:10p 🔴 TypeScript Error Fixed in Brand Overview Route via DashboardApplicationJSON Type
+440 " 🔵 All 10 Onboarding RPCs Confirmed Present in Supabase
+442 " 🔵 offers Table Uses brand_id/athlete_id Columns; Compensation Lives in structured_draft JSONB
+441 " ✅ Brand Dashboard Backend Session: Final Change Set Summary
+443 2:12p 🔵 chat/threadAccess.ts References thread.athlete_user_id — Potential Column Name Inconsistency with offers.athlete_id
+445 " 🔵 Marketplace Explore: Real Supabase API Wired, Client-Side Categorization, Mock Toggle Available
+446 " 🔵 Remaining Mock Data Usages in Brand Dashboard Screens
+444 " 🔵 listOffersForAthlete Correctly Queries athlete_id Column and Excludes Draft Offers
+454 2:13p ⚖️ Brand Search Page (AthleteDiscovery) Queued for Backend Wiring
+447 " 🔵 Campaign Status Mismatch — DB Uses "Open for Applications" But Repository Queries for 'published'/'open'/'active'
+448 " 🔵 chat_messages Table Schema: 7 Columns Including message_kind and offer_id
+449 2:15p 🔵 Campaign Status Query Correction — Repository Uses Correct "Open for Applications" Value
+450 " 🔵 10 Public Campaigns Ready for Athletes; Brand Name Mismatch Between profiles.full_name and brand_profiles.company_name
+451 2:16p 🔴 Offers Route Fixed to Show brand_profiles.company_name Instead of profiles.full_name
+452 " 🔵 Chat Service loadCounterpartMetadata Also Uses profiles.full_name — Same Brand Name Gap as Offers Route
+453 2:17p 🔴 Chat Service loadCounterpartMetadata Fixed to Prefer brand_profiles.company_name for Brand Users
+455 " 🔵 Applications Route Uses campaign.brandDisplayName — No profiles.full_name Dependency
+456 " 🔵 campaigns Table Has No brand_display_name Column — campaign.brandDisplayName May Always Be "Brand"
+457 2:18p 🔵 Brand Search Page Investigation Begins with Profile View Lookup
+458 " 🟣 Profile View Page Routes to AthleteProfile When `?id` Param Present
+459 " 🔵 AthleteProfile Already Has SWR Live-Data Fetch with Mock Fallback
+S90 Athlete dashboard backend audit + fix brand display name gaps (3-sprint tasks 2–5) (May 7 at 2:19 PM)
+460 2:25p 🔵 Stale Demo Profile ("Kaylee") Flashing Before Real Athlete Profile Loads
+461 " 🔵 Root Cause: `mockAthletes[0]` Fallback Renders "Kaylee" During SWR Fetch
+462 " 🔴 Fixed Demo Profile Flash: Return `null` for UUID Params Until Live Data Arrives
+463 2:26p 🔴 Fixed React Compiler Memoization Errors in AthleteProfile After Null-Athlete Refactor
+464 2:32p 🔴 campaign_brief_v2 Column Backward Compatibility Shim Added
+465 " 🔵 Deal Feature Architecture Mapped — Brand and Athlete Sides
 
-Access 249k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 536k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

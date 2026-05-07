@@ -5,8 +5,9 @@ import {
   listApplicationsForCampaign,
   listCampaignsForBrand,
 } from '@/lib/campaigns/repository';
-import { applicationToJSON, campaignToJSON } from '@/lib/campaigns/serialization';
+import { campaignToJSON } from '@/lib/campaigns/serialization';
 import { listDealsForCurrentUser } from '@/lib/campaigns/deals/supabaseRepository';
+import { enrichApplicationsForBrandCampaigns } from '@/lib/campaigns/applicationEnrichment';
 
 /**
  * Brand dashboard overview aggregate.
@@ -26,10 +27,12 @@ export async function GET() {
       Promise.all(campaigns.map((campaign) => listApplicationsForCampaign(String(campaign._id)))),
       listDealsForCurrentUser(),
     ]);
+    const applications = applicationsByCampaign.flat();
+    const enrichedApplications = await enrichApplicationsForBrandCampaigns(applications);
 
     return NextResponse.json({
       campaigns: campaigns.map(campaignToJSON),
-      applications: applicationsByCampaign.flat().map(applicationToJSON),
+      applications: enrichedApplications,
       deals,
       generatedAt: new Date().toISOString(),
     });

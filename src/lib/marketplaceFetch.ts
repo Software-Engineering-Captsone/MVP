@@ -2,13 +2,16 @@ import type { Athlete, Brand } from '@/lib/mockData';
 import { mockAthletes, mockBrands } from '@/lib/mockData';
 
 /**
- * When `NEXT_PUBLIC_MARKETPLACE_DATA_SOURCE=api`, callers load marketplace rows from `/api/marketplace/*`.
- * Otherwise (default), bundled mock data is used — ideal for local development without a database.
+ * `/api/marketplace/*` is backed by Supabase (profiles + athlete_* / brand_* tables).
+ * Default to the API so discovery surfaces real onboarded users.
+ * Set `NEXT_PUBLIC_MARKETPLACE_DATA_SOURCE=mock` to fall back to bundled fixtures
+ * (useful for offline dev or design demos).
  *
- * Saved lists use the same pattern via `savedFetch.ts` + `NEXT_PUBLIC_SAVED_DATA_SOURCE=api`.
+ * Saved lists follow the same pattern via `saved/factory.ts` (opt-out with
+ * `NEXT_PUBLIC_SAVED_DATA_SOURCE=local`).
  */
 export function marketplaceUsesMockData(): boolean {
-  return process.env.NEXT_PUBLIC_MARKETPLACE_DATA_SOURCE !== 'api';
+  return process.env.NEXT_PUBLIC_MARKETPLACE_DATA_SOURCE === 'mock';
 }
 
 export async function fetchBrandsCatalog(): Promise<Brand[]> {

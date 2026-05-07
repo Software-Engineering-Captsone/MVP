@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
-import { createCampaign, listCampaignsForBrand, listOpenCampaignsForAthlete } from '@/lib/campaigns/repository';
+import {
+  createCampaign,
+  listApplicationsForCampaigns,
+  listCampaignsForBrand,
+  listOpenCampaignsForAthlete,
+} from '@/lib/campaigns/repository';
 import { deriveCampaignStatusFromSubmission } from '@/lib/campaigns/campaignStatusDerivation';
 import { campaignBriefV2ToLegacy } from '@/lib/campaigns/campaignBriefV2Mapper';
 import { campaignToJSON } from '@/lib/campaigns/serialization';
 import { createClient } from '@/lib/supabase/server';
+import { enrichApplicationsForBrandCampaigns } from '@/lib/campaigns/applicationEnrichment';
 
 /**
  * Ensure a brand_profiles row exists for this user. campaigns.brand_id has a
@@ -64,6 +70,7 @@ function normalizeCampaignCreatePayload(
     packageDetails: Array.isArray(merged.packageDetails) ? merged.packageDetails : [],
     platforms: Array.isArray(merged.platforms) ? merged.platforms : [],
     image: typeof merged.image === 'string' && merged.image.trim() ? merged.image.trim() : '',
+    campaignBriefV2: isRecord(body.campaignBriefV2) ? body.campaignBriefV2 : null,
     status: deriveCampaignStatusFromSubmission({ ...body, ...legacyFromBrief }, { intent }),
   };
 }
@@ -77,7 +84,22 @@ export async function GET() {
   try {
     if (user.role === 'brand') {
       const rows = await listCampaignsForBrand(user.userId);
-      return NextResponse.json({ campaigns: rows.map(campaignToJSON) });
+      const applications = await listApplicationsForCampaigns(rows.map((row) => row._id));
+      const enrichedApplications = await enrichApplicationsForBrandCampaigns(applications);
+      const applicationsByCampaign = enrichedApplications.reduce<Record<string, typeof enrichedApplications>>(
+        (acc, application) => {
+          const campaignId = String(application.campaignId ?? '');
+          if (!campaignId) return acc;
+          acc[campaignId] ??= [];
+          acc[campaignId].push(application);
+          return acc;
+        },
+        {},
+      );
+      return NextResponse.json({
+        campaigns: rows.map(campaignToJSON),
+        applicationsByCampaign,
+      });
     }
     const rows = await listOpenCampaignsForAthlete();
     return NextResponse.json({ campaigns: rows.map(campaignToJSON) });

@@ -314,6 +314,16 @@ export function apiCampaignToUi(
   applications: ApiApplicationRow[] = []
 ): Campaign {
   const candidates = mapApplicationsToCandidates(sortApplicationsForBrandQueue(applications));
+  const athletePreview = candidates.slice(0, 3).map((candidate) => ({
+    id: candidate.id,
+    name: candidate.name,
+    sport: candidate.sport,
+    school: candidate.school,
+    image: candidate.image,
+    contractValue: '',
+    deliverablesCompleted: 0,
+    deliverablesTotal: 0,
+  }));
   const status = normalizeUiCampaignStatus(c.status);
   return {
     id: c.id,
@@ -326,7 +336,7 @@ export function apiCampaignToUi(
     duration: c.duration || '',
     location: c.location || '',
     brief: c.brief || '',
-    athleteCount: 0,
+    athleteCount: candidates.length,
     candidateCount: candidates.length,
     image: typeof c.image === 'string' ? c.image : '',
     startDate: c.startDate || '',
@@ -338,7 +348,7 @@ export function apiCampaignToUi(
     platforms: c.platforms ?? [],
     deliverables: [],
     candidates,
-    athletes: [],
+    athletes: athletePreview,
     activity: [],
   };
 }

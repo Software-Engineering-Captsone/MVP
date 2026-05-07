@@ -790,4 +790,5 @@ create policy "Athletes manage own saved brands"
 -- Both ALTERs are idempotent so re-running the whole file is safe.
 -- ─────────────────────────────────────────────────────────────────
 alter table public.campaigns     add column if not exists budget_label text default '';
+alter table public.campaigns     add column if not exists campaign_brief_v2 jsonb;
 alter table public.applications  add column if not exists messages     jsonb not null default '[]'::jsonb;

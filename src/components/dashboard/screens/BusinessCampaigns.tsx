@@ -158,8 +158,16 @@ export function BusinessCampaigns() {
   /** Bumps when the user starts a wizard intentionally, so stale session-restore async cannot overwrite it. */
   const wizardRestoreGenerationRef = useRef(0);
   const { user } = useDashboard();
-  const { campaigns: apiCampaigns, isLoading: listLoading, mutate: mutateCampaigns } = useCampaignsList();
-  const campaigns = useMemo(() => apiCampaigns.map((c) => apiCampaignToUi(c, [])), [apiCampaigns]);
+  const {
+    campaigns: apiCampaigns,
+    applicationsByCampaign,
+    isLoading: listLoading,
+    mutate: mutateCampaigns,
+  } = useCampaignsList();
+  const campaigns = useMemo(
+    () => apiCampaigns.map((c) => apiCampaignToUi(c, applicationsByCampaign[c.id] ?? [])),
+    [apiCampaigns, applicationsByCampaign]
+  );
   const [listError, setListError] = useState<string | null>(null);
   const brandDisplayName = user?.name ?? '';
   type CampaignListFilter = 'All' | 'Drafts' | 'Active' | 'Completed';

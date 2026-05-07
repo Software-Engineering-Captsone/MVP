@@ -1,9 +1,10 @@
 import useSWR from 'swr';
-import { type ApiCampaignRow } from '@/lib/campaigns/clientMap';
+import { type ApiApplicationRow, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
 import { apiFetcher } from './fetcher';
 
 export interface CampaignsListResponse {
   campaigns: ApiCampaignRow[];
+  applicationsByCampaign?: Record<string, ApiApplicationRow[]>;
   nextCursor?: string | null;
 }
 
@@ -19,6 +20,7 @@ export function useCampaignsList(searchParams?: URLSearchParams) {
   );
   return {
     campaigns: data?.campaigns ?? [],
+    applicationsByCampaign: data?.applicationsByCampaign ?? {},
     nextCursor: data?.nextCursor ?? null,
     isLoading,
     error: error as Error | null,
