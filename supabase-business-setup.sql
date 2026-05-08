@@ -312,7 +312,8 @@ create table if not exists public.applications (
   campaign_id           uuid not null references public.campaigns(id) on delete cascade,
   athlete_id            uuid not null references public.profiles(id)  on delete cascade,
   status                text not null check (status in (
-                          'pending','shortlisted','approved','declined','withdrawn'
+                          'pending','under_review','shortlisted','approved',
+                          'offer_sent','offer_declined','declined','withdrawn'
                         )) default 'pending',
   pitch                 text default '',
   previous_pitch        text,
@@ -392,12 +393,17 @@ begin
       return new;
     end if;
 
-    if old.status in ('declined', 'withdrawn') then
+    if old.status in ('declined', 'withdrawn', 'offer_declined') then
       raise exception 'Cannot change status of a % application', old.status;
     end if;
+
+    if old.status = 'offer_sent' and new.status not in ('offer_sent', 'offer_declined') then
+      raise exception 'Invalid transition from offer_sent to %', new.status;
+    end if;
+
     -- Auto-stamp the moment status leaves 'pending'
     if old.status = 'pending' and new.status <> 'pending' then
-      new.decided_at := now();
+      new.decided_at := coalesce(new.decided_at, now());
     end if;
   end if;
 
@@ -426,6 +432,50 @@ create trigger on_application_updated
 -- ─────────────────────────────────────────────────────────────────
 alter table public.applications enable row level security;
 
+-- SECURITY DEFINER helpers keep cross-table RLS checks from recursively
+-- re-entering policies on campaigns/applications.
+create or replace function public.is_campaign_brand_owner(
+  p_campaign_id uuid,
+  p_brand_id uuid
+)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1
+    from public.campaigns c
+    where c.id = p_campaign_id
+      and c.brand_id = p_brand_id
+  );
+$$;
+
+create or replace function public.has_applied_to_campaign(
+  p_campaign_id uuid,
+  p_athlete_id uuid
+)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1
+    from public.applications a
+    where a.campaign_id = p_campaign_id
+      and a.athlete_id = p_athlete_id
+  );
+$$;
+
+-- Lock execute to authenticated users; the table owner (postgres) keeps full rights.
+revoke all on function public.is_campaign_brand_owner(uuid, uuid) from public;
+revoke all on function public.has_applied_to_campaign(uuid, uuid) from public;
+grant execute on function public.is_campaign_brand_owner(uuid, uuid) to authenticated;
+grant execute on function public.has_applied_to_campaign(uuid, uuid) to authenticated;
+
 -- Athlete: insert, read, update their own application rows.
 -- Athlete may only write status in {'pending','withdrawn'}.
 drop policy if exists "Athletes manage own applications" on public.applications;
@@ -438,35 +488,31 @@ create policy "Athletes manage own applications"
   );
 
 -- Brand: read + update applications to their own campaigns.
--- Brand may only write status in {'shortlisted','approved','declined'}
+-- Brand may only write review/offer statuses for its own campaigns
 -- (and may keep it at 'pending', e.g., a no-op update).
 drop policy if exists "Brands review applications on own campaigns" on public.applications;
 create policy "Brands review applications on own campaigns"
   on public.applications for select
   using (
-    exists (
-      select 1 from public.campaigns c
-      where c.id = campaign_id
-        and c.brand_id = (select auth.uid())
-    )
+    public.is_campaign_brand_owner(campaign_id, (select auth.uid()))
   );
 drop policy if exists "Brands update applications on own campaigns" on public.applications;
 create policy "Brands update applications on own campaigns"
   on public.applications for update
   using (
-    exists (
-      select 1 from public.campaigns c
-      where c.id = campaign_id
-        and c.brand_id = (select auth.uid())
-    )
+    public.is_campaign_brand_owner(campaign_id, (select auth.uid()))
   )
   with check (
-    exists (
-      select 1 from public.campaigns c
-      where c.id = campaign_id
-        and c.brand_id = (select auth.uid())
+    public.is_campaign_brand_owner(campaign_id, (select auth.uid()))
+    and status in (
+      'pending',
+      'under_review',
+      'shortlisted',
+      'approved',
+      'declined',
+      'offer_sent',
+      'offer_declined'
     )
-    and status in ('pending','shortlisted','approved','declined')
   );
 
 
@@ -479,11 +525,7 @@ drop policy if exists "Applicants can view their campaigns" on public.campaigns;
 create policy "Applicants can view their campaigns"
   on public.campaigns for select
   using (
-    exists (
-      select 1 from public.applications a
-      where a.campaign_id = campaigns.id
-        and a.athlete_id = (select auth.uid())
-    )
+    public.has_applied_to_campaign(campaigns.id, (select auth.uid()))
   );
 
 

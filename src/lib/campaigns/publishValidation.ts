@@ -78,13 +78,6 @@ function asStringArray(value: unknown): string[] {
   return value.map((t) => String(t)).filter((s) => s.length > 0);
 }
 
-function isUsefulBudget(budget: unknown): boolean {
-  if (!hasText(budget)) return false;
-  const s = String(budget).trim();
-  if (/^\$\s*0\s*[–-]\s*\$\s*0$/i.test(s) || /^\$\s*0\s*[–-]\s*0$/i.test(s)) return false;
-  return true;
-}
-
 function getBriefV2(input: CampaignPublishInput): CampaignBriefV2 | null {
   const v = input.campaignBriefV2;
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
@@ -158,182 +151,14 @@ function presetStepComplete(input: CampaignPublishInput): boolean {
   return false;
 }
 
-function validatePresets(input: CampaignPublishInput, issues: CampaignPublishValidationIssue[]) {
-  if (!presetStepComplete(input)) {
-    issues.push({
-      step: 'presets',
-      v2Section: 'contentDeliverables',
-      message:
-        'Choose a preset package, or continue with a custom campaign (scratch path) before publishing.',
-    });
-    return;
-  }
-  const src = input.workflowPresetSource;
-  if (
-    src === 'template' &&
-    !hasText(input.packageId) &&
-    !hasText(input.packageName) &&
-    !v2PinnedTemplateComplete(input)
-  ) {
-    issues.push({
-      step: 'presets',
-      v2Section: 'contentDeliverables',
-      message: 'Template campaigns must include a package id or package name.',
-    });
-  }
-}
-
-function validateBasics(input: CampaignPublishInput, issues: CampaignPublishValidationIssue[]) {
-  if (!hasText(input.name)) {
-    issues.push({
-      step: 'basics',
-      v2Section: 'strategy',
-      message: 'Campaign name is required for publish.',
-    });
-  }
-  if (!hasText(input.goal)) {
-    issues.push({
-      step: 'basics',
-      v2Section: 'strategy',
-      message: 'Opportunity goal is required for publish.',
-    });
-  }
-  if (!hasText(input.opportunityContext)) {
-    issues.push({
-      step: 'basics',
-      v2Section: 'strategy',
-      message: 'Opportunity details (context) are required for publish.',
-    });
-  }
-  if (!hasText(input.brief)) {
-    issues.push({
-      step: 'basics',
-      v2Section: 'strategy',
-      message: 'Campaign brief is required for publish.',
-    });
-  }
-  if (!isUsefulBudget(input.budget)) {
-    issues.push({
-      step: 'basics',
-      v2Section: 'budgetRights',
-      message: 'A meaningful budget range is required for publish.',
-    });
-  }
-  if (!hasText(input.startDate) || !hasText(input.endDate)) {
-    issues.push({
-      step: 'basics',
-      v2Section: 'budgetRights',
-      message: 'Opportunity duration (start and end dates) is required for publish.',
-    });
-  }
-
-  const start = String(input.startDate ?? '');
-  const end = String(input.endDate ?? '');
-  if (start && end) {
-    const startTs = Date.parse(start);
-    const endTs = Date.parse(end);
-    if (!Number.isNaN(startTs) && !Number.isNaN(endTs) && endTs < startTs) {
-      issues.push({
-        step: 'basics',
-        v2Section: 'budgetRights',
-        message: 'End date must be after start date.',
-      });
-    }
-  }
-}
-
-function validateAudienceSocial(input: CampaignPublishInput, issues: CampaignPublishValidationIssue[]) {
-  if (!hasText(input.sport)) {
-    issues.push({
-      step: 'audience_social',
-      v2Section: 'audienceCreatorFit',
-      message: 'Sport / category filter is required for publish.',
-    });
-  }
-  if (!hasText(input.genderFilter)) {
-    issues.push({
-      step: 'audience_social',
-      v2Section: 'audienceCreatorFit',
-      message: 'Audience identity filter is required for publish.',
-    });
-  }
-  const followerMin = input.followerMin;
-  if (typeof followerMin !== 'number' || Number.isNaN(followerMin) || followerMin < 0) {
-    issues.push({
-      step: 'audience_social',
-      v2Section: 'audienceCreatorFit',
-      message: 'Follower minimum must be a valid number (0 or greater) for publish.',
-    });
-  }
-  const engagementMinPct = input.engagementMinPct;
-  if (typeof engagementMinPct !== 'number' || Number.isNaN(engagementMinPct)) {
-    issues.push({
-      step: 'audience_social',
-      v2Section: 'audienceCreatorFit',
-      message: 'Engagement floor must be a valid percentage for publish.',
-    });
-  } else if (engagementMinPct < 0 || engagementMinPct > 100) {
-    issues.push({
-      step: 'audience_social',
-      v2Section: 'audienceCreatorFit',
-      message: 'Engagement floor must be between 0 and 100.',
-    });
-  }
-}
-
-function validateBrandFit(input: CampaignPublishInput, issues: CampaignPublishValidationIssue[]) {
-  const tags = asStringArray(input.brandFitTags);
-  const brief = getBriefV2(input);
-  const pillars = brief?.contentDeliverables?.messagePillars ?? [];
-  const pillarText = Array.isArray(pillars) ? pillars.map((t) => String(t)).filter((s) => s.trim().length > 0) : [];
-  if (tags.length === 0 && pillarText.length === 0) {
-    issues.push({
-      step: 'brand_fit',
-      v2Section: 'audienceCreatorFit',
-      message: 'Select at least one brand-fit tag or add message pillars before publishing.',
-    });
-  }
-}
-
-function validateSourcing(input: CampaignPublishInput, issues: CampaignPublishValidationIssue[]) {
-  if (input.visibility !== 'Public' && input.visibility !== 'Private') {
-    issues.push({
-      step: 'sourcing',
-      v2Section: 'sourcingVisibility',
-      message: 'Visibility must be Public or Private before publish.',
-    });
-  }
-  if (typeof input.acceptApplications !== 'boolean') {
-    issues.push({
-      step: 'sourcing',
-      v2Section: 'sourcingVisibility',
-      message: 'Application acceptance (open/closed) must be set before publish.',
-    });
-  }
-}
-
-function validateLocation(input: CampaignPublishInput, issues: CampaignPublishValidationIssue[]) {
-  const brief = getBriefV2(input);
-  const region = brief?.strategy?.marketRegion;
-  if (typeof region === 'string' && region.trim().length > 0) return;
-  if (!hasText(input.location)) {
-    issues.push({
-      step: 'location',
-      v2Section: 'audienceCreatorFit',
-      message: 'Location or geographic focus is required for publish.',
-    });
-  }
-}
-
-function validateReview(input: CampaignPublishInput, issues: CampaignPublishValidationIssue[]) {
-  if (input.workflowPublishReviewConfirmed !== true) {
-    issues.push({
-      step: 'review',
-      v2Section: 'reviewLaunch',
-      message: 'Confirm the review step (workflowPublishReviewConfirmed) before publishing.',
-    });
-  }
-}
+/**
+ * Legacy v1 step-by-step validators (validatePresets / validateBasics /
+ * validateAudienceSocial / validateBrandFit / validateSourcing /
+ * validateLocation / validateReview) lived here previously and were
+ * superseded by `collectV2WizardBlockingIssues` below — which validates
+ * the V2 brief sections directly. Removed 2026-05-07 to keep one source
+ * of truth for publish-blocking rules.
+ */
 
 /** Pinned org/system templates satisfy presets; otherwise reuse legacy preset / scratch rules. */
 function v2WizardPresetComplete(input: CampaignPublishInput, brief: CampaignBriefV2): boolean {

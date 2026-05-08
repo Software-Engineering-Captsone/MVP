@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import {
   createOfferDraftsFromApplications,
-  getCampaignById,
+  getCampaignByIdForBrand,
   listOffersForCampaign,
 } from '@/lib/campaigns/repository';
 import { jsonError } from '@/lib/api/jsonError';
@@ -17,8 +17,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   if (user.role !== 'brand') return jsonError(403, 'Forbidden');
 
   const { id: campaignId } = await context.params;
-  const campaign = await getCampaignById(campaignId);
-  if (!campaign || campaign.brandUserId !== user.userId) {
+  const campaign = await getCampaignByIdForBrand(campaignId, user.userId);
+  if (!campaign) {
     return jsonError(404, 'Not found');
   }
 
@@ -43,8 +43,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (user.role !== 'brand') return jsonError(403, 'Forbidden');
 
   const { id: campaignId } = await context.params;
-  const campaign = await getCampaignById(campaignId);
-  if (!campaign || campaign.brandUserId !== user.userId) {
+  const campaign = await getCampaignByIdForBrand(campaignId, user.userId);
+  if (!campaign) {
     return jsonError(404, 'Not found');
   }
 

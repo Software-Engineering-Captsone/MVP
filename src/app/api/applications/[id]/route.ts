@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import {
   getApplicationById,
   getCampaignById,
+  getCampaignByIdForBrand,
   restorePreviousApplicationPitchByAthlete,
   updateApplicationPitchByAthlete,
   updateApplicationStatus,
@@ -79,7 +80,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // and drop a one-time system notice. Chat failure must not fail approval.
     if (status === 'approved') {
       try {
-        const campaign = await getCampaignById(String(updated.campaignId));
+        const campaign = await getCampaignByIdForBrand(String(updated.campaignId), user.userId);
         if (campaign) {
           const supabase = await createClient();
           // Repository types are structurally compatible with the chat

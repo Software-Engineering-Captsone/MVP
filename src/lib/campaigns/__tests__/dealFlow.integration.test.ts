@@ -21,7 +21,6 @@ let campaignId = '';
 let applicationId = '';
 
 async function createConfirmedUser(email: string): Promise<string> {
-  // @ts-expect-error admin namespace exists on service-role client at runtime
   const { data, error } = await adminClient.auth.admin.createUser({
     email,
     password: PASSWORD,
@@ -32,7 +31,6 @@ async function createConfirmedUser(email: string): Promise<string> {
 }
 
 async function deleteUser(userId: string) {
-  // @ts-expect-error admin namespace
   await adminClient.auth.admin.deleteUser(userId).catch(() => undefined);
 }
 
@@ -133,6 +131,10 @@ describe('deal flow integration: brand approve → offer send → athlete accept
       }) as never,
       { params: Promise.resolve({ id: applicationId }) },
     );
+    if (approveRes.status !== 200) {
+      const errBody = await approveRes.clone().json().catch(() => ({}));
+      throw new Error(`application approval PATCH got ${approveRes.status}: ${JSON.stringify(errBody)}`);
+    }
     expect(approveRes.status).toBe(200);
 
     const { POST: postCampaignOffers } = await import('@/app/api/campaigns/[id]/offers/route');
@@ -163,6 +165,10 @@ describe('deal flow integration: brand approve → offer send → athlete accept
       new Request('http://test/api/offers/' + offerId + '/send', { method: 'POST' }) as never,
       { params: Promise.resolve({ offerId }) },
     );
+    if (sendRes.status !== 200) {
+      const errBody = await sendRes.clone().json().catch(() => ({}));
+      throw new Error(`offer send POST got ${sendRes.status}: ${JSON.stringify(errBody)}`);
+    }
     expect(sendRes.status).toBe(200);
 
     ctx.client = athleteClient;
