@@ -779,8 +779,15 @@ export function DashboardInbox({
 
             <div className="relative flex min-h-0 flex-1 flex-col bg-white">
               {selectedThreadId && messagesLoading ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 pb-28 text-gray-500">
-                  <p className="text-sm">Loading messages…</p>
+                <div className="flex-1 animate-pulse space-y-4 overflow-y-auto p-6 pb-28">
+                  {[false, true, false, true, false].map((isSent, i) => (
+                    <div key={i} className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-xs rounded-2xl p-3 ${isSent ? 'bg-gray-200' : 'bg-gray-100'}`}>
+                        <div className={`h-3 w-44 rounded ${isSent ? 'bg-gray-400' : 'bg-gray-200'}`} />
+                        <div className={`mt-1.5 h-3 w-32 rounded ${isSent ? 'bg-gray-400' : 'bg-gray-200'}`} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : selectedThreadId && messages.length > 0 ? (
                 <div ref={messagesScrollRef} className="scrollbar-hide flex-1 space-y-4 overflow-y-auto p-6 pb-28">

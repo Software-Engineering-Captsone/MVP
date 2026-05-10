@@ -508,9 +508,23 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-2 py-12 text-sm text-gray-500">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Loading…
+          <div className="animate-pulse space-y-3">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="h-4 w-48 rounded bg-gray-200" />
+                    <div className="h-3 w-32 rounded bg-gray-200" />
+                  </div>
+                  <div className="h-6 w-20 shrink-0 rounded-full bg-gray-200" />
+                </div>
+                <div className="mt-3 flex gap-2">
+                  {[0, 1, 2].map((j) => (
+                    <div key={j} className="h-5 w-5 rounded-full bg-gray-200" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : deals.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm">

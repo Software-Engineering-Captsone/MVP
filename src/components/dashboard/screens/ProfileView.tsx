@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BadgeCheck,
   CheckCircle2,
-  Loader2,
   MapPin,
   Pencil,
 } from 'lucide-react';
@@ -91,8 +90,27 @@ export function ProfileView() {
 
   if (loading) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-nilink-page">
-        <Loader2 className="h-7 w-7 animate-spin text-nilink-accent" />
+      <div className="min-h-full animate-pulse bg-nilink-page pb-16 font-sans text-nilink-ink">
+        <div className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="h-4 w-28 rounded bg-gray-200" />
+            <div className="h-8 w-28 rounded-lg bg-gray-200" />
+          </div>
+          <div className="mb-4 h-9 rounded-xl bg-gray-100" />
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="h-36 w-full bg-gray-200 sm:h-44" />
+            <div className="px-6 pb-8 pt-4">
+              <div className="-mt-10 h-20 w-20 rounded-full border-4 border-white bg-gray-300 shadow-sm" />
+              <div className="mt-3 h-6 w-44 rounded bg-gray-200" />
+              <div className="mt-2 h-4 w-32 rounded bg-gray-200" />
+              <div className="mt-6 space-y-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-10 rounded-xl bg-gray-100" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

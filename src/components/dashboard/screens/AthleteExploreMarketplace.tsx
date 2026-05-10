@@ -818,9 +818,10 @@ export function AthleteExploreMarketplace() {
         ) : null}
 
         {loading ? (
-          <div className="flex items-center gap-2.5 text-sm text-gray-500">
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-nilink-accent" aria-hidden />
-            <span>Loading marketplace…</span>
+          <div className="grid gap-4 pb-8 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <OpportunityExploreCardPlaceholder key={i} />
+            ))}
           </div>
         ) : null}
 

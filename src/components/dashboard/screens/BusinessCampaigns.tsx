@@ -818,7 +818,36 @@ export function BusinessCampaigns() {
           )}
 
           {listLoading && (
-            <p className="py-12 text-center text-sm text-gray-400">Loading campaigns…</p>
+            <table className="w-full animate-pulse text-sm text-left">
+              <thead className="sticky top-0 z-10 bg-gray-50 text-[11px] font-bold uppercase text-gray-500">
+                <tr>
+                  <th className="rounded-l-xl px-5 py-3">Name</th>
+                  <th className="px-5 py-3">Goal</th>
+                  <th className="px-5 py-3">Athletes</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="w-10 rounded-r-xl px-5 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="border-b border-gray-50">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 shrink-0 rounded-lg bg-gray-200" />
+                        <div className="space-y-1.5">
+                          <div className="h-4 w-36 rounded bg-gray-200" />
+                          <div className="h-3 w-24 rounded bg-gray-200" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4"><div className="h-4 w-24 rounded bg-gray-200" /></td>
+                    <td className="px-5 py-4"><div className="h-6 w-16 rounded-full bg-gray-200" /></td>
+                    <td className="px-5 py-4"><div className="h-5 w-20 rounded-full bg-gray-200" /></td>
+                    <td className="px-5 py-4"><div className="ml-auto h-4 w-4 rounded bg-gray-200" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
           {!listLoading && filteredCampaigns.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-center">

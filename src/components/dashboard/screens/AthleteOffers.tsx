@@ -206,8 +206,19 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
           </div>
           <div className="scrollbar-hide h-full overflow-y-auto">
             {loading ? (
-              <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading offers...
+              <div className="animate-pulse divide-y divide-gray-100">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="px-4 py-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-2">
+                        <div className="h-4 w-32 rounded bg-gray-200" />
+                        <div className="h-3 w-24 rounded bg-gray-200" />
+                      </div>
+                      <div className="h-5 w-16 shrink-0 rounded-full bg-gray-200" />
+                    </div>
+                    <div className="mt-2 h-3 w-full rounded bg-gray-100" />
+                  </div>
+                ))}
               </div>
             ) : offers.length === 0 ? (
               <div className="p-6 text-center text-sm text-gray-500">No offers yet.</div>

@@ -244,9 +244,39 @@ export function BusinessOverview() {
             animate
           />
         </div>
-        <div className="dash-main-gutter-x">
-          <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
-            <p className="text-sm text-gray-500">Loading your dashboard...</p>
+        <div className="animate-pulse relative z-20 w-full flex-1 space-y-8 pb-8 dash-main-gutter-x">
+          {/* KPI strip */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="rounded-xl border border-gray-100 bg-gray-50 p-5">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="h-3 w-20 rounded bg-gray-200" />
+                  <div className="h-4 w-4 rounded bg-gray-200" />
+                </div>
+                <div className="mb-2 h-10 w-16 rounded bg-gray-200" />
+                <div className="h-3 w-24 rounded bg-gray-200" />
+              </div>
+            ))}
+          </div>
+          {/* Content rows */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div className="rounded-xl border border-gray-200 bg-white p-6 lg:col-span-2">
+              <div className="h-3 w-20 rounded bg-gray-200" />
+              <div className="mt-2 h-8 w-56 rounded bg-gray-200" />
+              <div className="mt-2 h-4 w-full max-w-sm rounded bg-gray-100" />
+              <div className="mt-5 flex gap-3">
+                <div className="h-9 w-32 rounded-xl bg-gray-200" />
+                <div className="h-9 w-28 rounded-xl bg-gray-200" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-xl border border-gray-100 bg-white p-4">
+                  <div className="h-4 w-32 rounded bg-gray-200" />
+                  <div className="mt-2 h-3 w-24 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -449,7 +479,18 @@ export function BusinessOverview() {
           </div>
           <div className="rounded-xl border border-gray-200 bg-white px-5">
             {overviewLoading && (
-              <p className="py-6 text-center text-sm text-gray-400">Loading your campaigns…</p>
+              <div className="animate-pulse divide-y divide-gray-100 py-1">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3 py-3">
+                    <div className="h-8 w-8 shrink-0 rounded-lg bg-gray-200" />
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="h-3.5 w-40 rounded bg-gray-200" />
+                      <div className="h-3 w-24 rounded bg-gray-200" />
+                    </div>
+                    <div className="h-5 w-16 shrink-0 rounded-full bg-gray-200" />
+                  </div>
+                ))}
+              </div>
             )}
             {!overviewLoading && campaignRows.length === 0 && (
               <div className="py-6 text-center">

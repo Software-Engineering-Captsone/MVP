@@ -318,10 +318,6 @@ export function AthleteDiscovery() {
       <div className="flex min-w-0 flex-1 overflow-hidden">
         {/* Main Grid Area */}
         <div className={`min-w-0 flex-1 overflow-y-auto py-6 scrollbar-hide dash-main-gutter-x ${hasSelection ? 'max-w-[50%]' : ''}`}>
-          {loading && (
-            <div className="mb-4 text-xs text-gray-400">Loading marketplace…</div>
-          )}
-
           {businessExploreTab === 'saved' ? (
             savedAthleteIds.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-200/90 bg-gray-50/80 px-5 py-12 text-center sm:py-14">
@@ -491,7 +487,35 @@ export function AthleteDiscovery() {
                 </div>
               </>
             );
-          })() : (
+          })() : loading ? (
+            // Skeleton — same 3-section, 4-card layout as real content, no empty headers
+            <div className="space-y-10 pb-10">
+              {(isAthleteView
+                ? ['Popular Brands', 'Aligned Brands', 'Brands Near You']
+                : ['Popular Athletes', 'Aligned Athletes', 'Athletes Near You']
+              ).map((title) => (
+                <div key={title}>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="h-7 w-44 animate-pulse rounded bg-gray-200" />
+                    <div className="h-6 w-16 animate-pulse rounded-md bg-gray-200" />
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="relative mb-3 aspect-[4/3] overflow-hidden rounded-xl bg-gray-200" />
+                        <div className="mb-1 h-5 w-3/4 rounded bg-gray-200" />
+                        <div className="mb-2 h-3 w-1/2 rounded bg-gray-200" />
+                        <div className="flex gap-3">
+                          <div className="h-3 w-12 rounded bg-gray-200" />
+                          <div className="h-3 w-12 rounded bg-gray-200" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
             // Default View - All Categories
             <div className="space-y-10 pb-10">
               {categories.map(cat => (
@@ -506,11 +530,11 @@ export function AthleteDiscovery() {
                       See all
                     </button>
                   </div>
-                  
+
                   <div className="grid grid-cols-4 gap-4">
                     {cat.items.slice(0, 4).map((item, i: number) => (
-                      <div 
-                        key={`${item.id}_${cat.id}_${i}`} 
+                      <div
+                        key={`${item.id}_${cat.id}_${i}`}
                         onClick={() => handleItemClick(item, cat.id)}
                         className="group cursor-pointer"
                       >

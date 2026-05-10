@@ -2,23 +2,16 @@
 
 import dynamic from 'next/dynamic';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-
-function PageSpinner() {
-  return (
-    <div className="flex h-full items-center justify-center bg-nilink-surface">
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-nilink-accent" />
-    </div>
-  );
-}
+import { ProfileSkeleton } from '@/components/dashboard/skeletons/ProfileSkeleton';
 
 const ProfileEditor = dynamic(
   () => import('@/components/dashboard/screens/ProfileEditor').then((m) => m.ProfileEditor),
-  { ssr: false, loading: () => <PageSpinner /> }
+  { ssr: false, loading: () => <ProfileSkeleton /> }
 );
 
 const BusinessProfile = dynamic(
   () => import('@/components/dashboard/screens/BusinessProfile').then((m) => m.BusinessProfile),
-  { ssr: false, loading: () => <PageSpinner /> }
+  { ssr: false, loading: () => <ProfileSkeleton /> }
 );
 
 export default function ProfilePage() {

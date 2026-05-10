@@ -290,9 +290,23 @@ export function BusinessDeals() {
           ) : null}
 
           {listLoading ? (
-            <div className="flex items-center gap-2 py-12 text-sm text-gray-500">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Loading deals…
+            <div className="animate-pulse overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="flex gap-6 border-b border-gray-200 bg-gray-50/90 px-4 py-3">
+                {[80, 72, 160, 56, 52].map((w, i) => (
+                  <div key={i} className={`h-3 rounded bg-gray-200`} style={{ width: w }} />
+                ))}
+              </div>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-6 border-b border-gray-100 px-4 py-3">
+                  <div className="space-y-1.5">
+                    <div className="h-4 w-32 rounded bg-gray-200" />
+                    <div className="h-3 w-20 rounded bg-gray-200" />
+                  </div>
+                  <div className="h-5 w-20 rounded-full bg-gray-200" />
+                  <div className="h-4 w-44 rounded bg-gray-200" />
+                  <div className="ml-auto h-3 w-16 rounded bg-gray-200" />
+                </div>
+              ))}
             </div>
           ) : filteredDeals.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm">

@@ -84,16 +84,37 @@ export function AthleteDashboard() {
   if (!dashboardReady) {
     return (
       <div className="dash-main-gutter-x min-h-full bg-nilink-page pb-8 pt-5 font-sans text-nilink-ink md:pb-10 md:pt-6">
-        <DashboardPageHeader
-          title="Dashboard"
-          subtitle={welcomeSubtitle}
-          className="mb-8"
-          animate
-        />
-        <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading your dashboard...
+        <DashboardPageHeader title="Dashboard" subtitle={welcomeSubtitle} className="mb-8" animate />
+        <div className="animate-pulse">
+          <div className="mb-16 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="relative overflow-hidden rounded-2xl bg-nilink-sidebar p-8 shadow-2xl">
+              <div className="h-10 w-12 rounded bg-gray-500" />
+              <div className="mt-3 h-3 w-28 rounded bg-gray-500" />
+            </div>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
+                <div className="h-10 w-14 rounded bg-gray-200" />
+                <div className="mt-3 h-3 w-28 rounded bg-gray-200" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                  <div className="h-4 w-48 rounded bg-gray-200" />
+                  <div className="mt-2 h-3 w-32 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
+            <div className="space-y-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                  <div className="h-4 w-40 rounded bg-gray-200" />
+                  <div className="mt-2 h-3 w-24 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { DashboardInbox } from '@/components/dashboard/screens/DashboardInbox';
+import { InboxSkeleton } from '@/components/dashboard/skeletons/InboxSkeleton';
 
 function MessagesInbox() {
   const { accountType } = useDashboard();
@@ -22,13 +23,7 @@ function MessagesInbox() {
 
 export default function MessagesPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-full items-center justify-center bg-nilink-surface text-sm text-gray-500">
-          Loading inbox…
-        </div>
-      }
-    >
+    <Suspense fallback={<InboxSkeleton />}>
       <MessagesInbox />
     </Suspense>
   );

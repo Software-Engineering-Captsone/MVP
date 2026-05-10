@@ -484,14 +484,11 @@ function SendOfferButton({
                       accepting applications are listed.
                     </p>
                     {campaignsLoading ? (
-                      <p
-                        className="mt-3 flex items-center gap-2 text-sm text-gray-500"
-                        role="status"
-                        aria-live="polite"
-                      >
-                        <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                        Loading campaigns…
-                      </p>
+                      <div className="mt-3 animate-pulse space-y-2" role="status" aria-live="polite">
+                        {[0, 1, 2].map((i) => (
+                          <div key={i} className="h-9 rounded-lg bg-gray-200" />
+                        ))}
+                      </div>
                     ) : campaignsError ? (
                       <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                         <p role="alert">{campaignsError}</p>

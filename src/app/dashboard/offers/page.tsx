@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { AthleteOffers } from '@/components/dashboard/screens/AthleteOffers';
+import { OffersSkeleton } from '@/components/dashboard/skeletons/OffersSkeleton';
 
 function OffersContent() {
   const { accountType } = useDashboard();
@@ -23,15 +24,8 @@ function OffersContent() {
 
 export default function OffersPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-full items-center justify-center bg-nilink-surface text-sm text-gray-500">
-          Loading offers...
-        </div>
-      }
-    >
+    <Suspense fallback={<OffersSkeleton />}>
       <OffersContent />
     </Suspense>
   );
 }
-

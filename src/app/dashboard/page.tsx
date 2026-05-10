@@ -2,23 +2,17 @@
 
 import dynamic from 'next/dynamic';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-
-function PageSpinner() {
-  return (
-    <div className="flex h-full items-center justify-center bg-nilink-surface">
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-nilink-accent" />
-    </div>
-  );
-}
+import { AthleteDashboardSkeleton } from '@/components/dashboard/skeletons/AthleteDashboardSkeleton';
+import { BusinessOverviewSkeleton } from '@/components/dashboard/skeletons/BusinessOverviewSkeleton';
 
 const AthleteDashboard = dynamic(
   () => import('@/components/dashboard/screens/AthleteDashboard').then((m) => m.AthleteDashboard),
-  { ssr: false, loading: () => <PageSpinner /> }
+  { ssr: false, loading: () => <AthleteDashboardSkeleton /> }
 );
 
 const BusinessOverview = dynamic(
   () => import('@/components/dashboard/screens/BusinessOverview').then((m) => m.BusinessOverview),
-  { ssr: false, loading: () => <PageSpinner /> }
+  { ssr: false, loading: () => <BusinessOverviewSkeleton /> }
 );
 
 export default function DashboardPage() {

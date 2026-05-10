@@ -458,9 +458,22 @@ export function ProfileEditor() {
 
   if (loading) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-nilink-page py-20 font-sans text-nilink-ink">
-        <Loader2 className="h-8 w-8 animate-spin text-nilink-accent" aria-hidden />
-        <p className="text-sm text-gray-500">Loading profile…</p>
+      <div className="flex min-h-full flex-col bg-nilink-page font-sans text-nilink-ink">
+        <div className="animate-pulse shrink-0 border-b border-gray-100 bg-white py-8 dash-main-gutter-x">
+          <div className="h-8 w-40 rounded bg-gray-200" />
+          <div className="mt-2 h-4 w-64 rounded bg-gray-200" />
+        </div>
+        <div className="animate-pulse flex-1 space-y-6 py-8 dash-main-gutter-x md:py-10">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div className="h-5 w-36 rounded bg-gray-200" />
+              <div className="mt-4 space-y-3">
+                <div className="h-10 rounded-lg bg-gray-100" />
+                <div className="h-10 rounded-lg bg-gray-100" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
