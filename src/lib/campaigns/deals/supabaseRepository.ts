@@ -495,6 +495,25 @@ async function assertProfileIsDealAthlete(
   }
 }
 
+async function assertActorIsDealParticipant(
+  supabase: SupabaseClient,
+  dealId: string,
+  actor: DealMutationActor,
+): Promise<{ isBrand: boolean; isAthlete: boolean }> {
+  const { data: deal, error } = await supabase
+    .from('deals')
+    .select('brand_id, athlete_id')
+    .eq('id', dealId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!deal) throw new Error('Deal not found');
+  const d = deal as { brand_id: string; athlete_id: string };
+  const isBrand = actor.role === 'brand' && d.brand_id === actor.userId;
+  const isAthlete = actor.role === 'athlete' && d.athlete_id === actor.userId;
+  if (!isBrand && !isAthlete) throw new Error('Forbidden');
+  return { isBrand, isAthlete };
+}
+
 async function transitionDealStatusForWorkflow(
   supabase: SupabaseClient,
   dealId: string,
@@ -1436,7 +1455,22 @@ export async function updateDeliverable(
   if (!current) throw new Error('Deliverable not found');
 
   const row = current as unknown as DbDeliverableRow;
-  await assertActorIsDealBrand(supabase, row.deal_id, actor);
+  const hasBrandManagedPatch =
+    typeof patch.title === 'string' ||
+    typeof patch.description === 'string' ||
+    (Boolean(patch.status) && patch.status !== 'published');
+  if (hasBrandManagedPatch) {
+    await assertActorIsDealBrand(supabase, row.deal_id, actor);
+  }
+  if (patch.status === 'published') {
+    const { isAthlete } = await assertActorIsDealParticipant(supabase, row.deal_id, actor);
+    if (!isAthlete) {
+      throw new Error('Only the athlete on this deal can mark content as published');
+    }
+    if (!row.publish_required) {
+      throw new Error('This deliverable does not require publication');
+    }
+  }
 
   const updatePatch: Record<string, unknown> = {};
   if (typeof patch.title === 'string') {
@@ -1464,6 +1498,37 @@ export async function updateDeliverable(
     throw new Error(updateErr?.message ?? 'Could not update deliverable');
   }
   const api = dbDeliverableToApi(updated as unknown as DbDeliverableRow);
+  if (patch.status === 'published') {
+    const { error: completeErr } = await supabase
+      .from('deal_deliverables')
+      .update({ status: 'completed' })
+      .eq('id', deliverableId);
+    if (!completeErr) {
+      api.status = 'completed';
+      const { data: allDels } = await supabase
+        .from('deal_deliverables')
+        .select('status')
+        .eq('deal_id', row.deal_id);
+      const rows = (allDels ?? []) as { status: string }[];
+      if (rows.length > 0 && rows.every((d) => d.status === 'completed')) {
+        try {
+          await transitionDealStatusForWorkflow(supabase, row.deal_id, 'approved_completed');
+        } catch {
+          /* deal may not be in a state that allows this transition yet */
+        }
+      }
+    }
+    await recordDealActivity({
+      dealId: row.deal_id,
+      entityType: 'deliverable',
+      entityId: deliverableId,
+      eventType: 'deliverable_completed',
+      actorType: roleToActorType(actor.role),
+      actorId: actor.userId,
+      metadata: {},
+    });
+    notifyDealPlaceholder('deliverable_completed', { dealId: row.deal_id, deliverableId });
+  }
   if (patch.status === 'completed') {
     await recordDealActivity({
       dealId: row.deal_id,
@@ -1623,4 +1688,114 @@ export async function updateSubmission(
   }
 
   return apiOut;
+}
+
+export async function requestDealCancellation(
+  dealId: string,
+  reason: string,
+  actor: DealMutationActor,
+): Promise<ApiDealRow> {
+  const supabase = await createClient();
+
+  const { data: current, error: getErr } = await supabase
+    .from('deals')
+    .select(DEAL_SELECT)
+    .eq('id', dealId)
+    .maybeSingle();
+  if (getErr) throw new Error(getErr.message);
+  if (!current) throw new Error('Deal not found');
+  const currentRow = current as unknown as DbDealRow;
+
+  await assertActorIsDealParticipant(supabase, dealId, actor);
+
+  const from = currentRow.status as DealStatus;
+  const preContract = from === 'created' || from === 'contract_pending';
+
+  const to: DealStatus = preContract ? 'cancelled' : 'cancellation_requested';
+  assertDealStatusTransition(from, to);
+
+  const { data: updated, error: updateErr } = await supabase
+    .from('deals')
+    .update({ status: to })
+    .eq('id', dealId)
+    .select(DEAL_SELECT)
+    .single();
+  if (updateErr || !updated) throw new Error(updateErr?.message ?? 'Could not update deal');
+
+  await recordDealActivity({
+    dealId,
+    entityType: 'deal',
+    entityId: dealId,
+    eventType: 'cancellation_requested',
+    actorType: roleToActorType(actor.role),
+    actorId: actor.userId,
+    metadata: { reason: reason.trim(), requestedByRole: actor.role, resolvedTo: to },
+  });
+
+  notifyDealPlaceholder('deal_status_changed', { dealId, from, to, reason });
+  return dbDealToApi(updated as unknown as DbDealRow);
+}
+
+export async function respondToCancellationRequest(
+  dealId: string,
+  response: 'accept' | 'dispute',
+  actor: DealMutationActor,
+): Promise<ApiDealRow> {
+  const supabase = await createClient();
+
+  const { data: current, error: getErr } = await supabase
+    .from('deals')
+    .select(DEAL_SELECT)
+    .eq('id', dealId)
+    .maybeSingle();
+  if (getErr) throw new Error(getErr.message);
+  if (!current) throw new Error('Deal not found');
+  const currentRow = current as unknown as DbDealRow;
+
+  if (currentRow.status !== 'cancellation_requested') {
+    throw new Error('Deal is not in cancellation_requested status');
+  }
+
+  const { isBrand, isAthlete } = await assertActorIsDealParticipant(supabase, dealId, actor);
+
+  const { data: activities } = await supabase
+    .from('deal_activities')
+    .select('actor_type, metadata')
+    .eq('deal_id', dealId)
+    .eq('event_type', 'cancellation_requested')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const latestRequest = (activities ?? [])[0] as { actor_type?: string; metadata?: Record<string, unknown> } | undefined;
+  const requesterRole = latestRequest?.metadata?.requestedByRole ?? latestRequest?.actor_type;
+
+  if (requesterRole === 'brand' && isBrand) {
+    throw new Error('You cannot respond to your own cancellation request');
+  }
+  if (requesterRole === 'athlete' && isAthlete) {
+    throw new Error('You cannot respond to your own cancellation request');
+  }
+
+  const to: DealStatus = response === 'accept' ? 'cancelled' : 'disputed';
+  assertDealStatusTransition('cancellation_requested', to);
+
+  const { data: updated, error: updateErr } = await supabase
+    .from('deals')
+    .update({ status: to })
+    .eq('id', dealId)
+    .select(DEAL_SELECT)
+    .single();
+  if (updateErr || !updated) throw new Error(updateErr?.message ?? 'Could not update deal');
+
+  await recordDealActivity({
+    dealId,
+    entityType: 'deal',
+    entityId: dealId,
+    eventType: 'cancellation_requested',
+    actorType: roleToActorType(actor.role),
+    actorId: actor.userId,
+    metadata: { response, resolvedTo: to },
+  });
+
+  notifyDealPlaceholder('deal_status_changed', { dealId, to, response });
+  return dbDealToApi(updated as unknown as DbDealRow);
 }

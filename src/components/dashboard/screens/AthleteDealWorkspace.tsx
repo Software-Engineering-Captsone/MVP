@@ -6,12 +6,16 @@ import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import {
   activitySummary,
+  compensationAmountFromDealSnapshot,
   createDeliverableSubmission,
   fetchDealDetail,
   fetchSubmissionsForDeliverable,
   formatIsoDate,
   parseTermsSnapshot,
   patchContractStatus,
+  patchDeliverable,
+  requestDealCancellation,
+  respondToDealCancellation,
   type ApiDealDetail,
   type ApiSubmission,
 } from '@/lib/deals/dashboardDealsClient';
@@ -25,14 +29,14 @@ import {
 } from '@/lib/deals/stageProjection';
 import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
 
-type SubmitForm = { tier: 'draft' | 'final'; url: string; body: string; notes: string };
+type SubmitForm = { url: string; body: string; notes: string };
 
 function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
   const map: Record<(typeof STAGE_ORDER)[number], string> = {
     agreement: 'Agreement',
     work_in_progress: 'Work',
     review_revisions: 'Review',
-    completed: 'Payout',
+    completed: 'Complete',
     payment: 'Payout',
     closed: 'Done',
   };
@@ -69,10 +73,15 @@ function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] })
   );
 }
 
-function submissionTierLabel(notes: string): string {
-  if (notes.startsWith('[Draft]')) return 'Draft';
-  if (notes.startsWith('[Final]')) return 'Final';
-  return 'Submission';
+function athleteNextActionCopy(detail: ApiDealDetail, stageProjection: ReturnType<typeof buildDealStageProjection> | null): string {
+  const owner = detail.deal.nextActionOwner;
+  if (owner === 'athlete') {
+    return detail.deal.nextActionLabel || (stageProjection?.primaryAction?.owner === 'athlete' ? stageProjection.primaryAction.label : 'Your next step is ready.');
+  }
+  if (owner === 'brand') return 'Waiting for the brand to take the next step.';
+  if (owner === 'system') return detail.deal.nextActionLabel || stageProjection?.statusLine || 'System update in progress.';
+  if (stageProjection?.primaryAction?.owner === 'athlete') return stageProjection.primaryAction.label;
+  return detail.deal.nextActionLabel || 'No further action';
 }
 
 export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
@@ -107,7 +116,7 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
       setSubmissionsByDeliverable(subMap);
       const forms: Record<string, SubmitForm> = {};
       for (const deliverable of d.deliverables) {
-        forms[deliverable.id] = { tier: 'draft', url: '', body: '', notes: '' };
+        forms[deliverable.id] = { url: '', body: '', notes: '' };
       }
       setSubmitForms(forms);
       setSubmitErrors({});
@@ -160,13 +169,26 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
     return filterMainTimelineActivities(detail.activities).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [detail]);
 
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
+  const cancellationRequester = useMemo(() => {
+    if (!detail || detail.deal.status !== 'cancellation_requested') return null;
+    const act = [...(detail.activities ?? [])]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .find((a) => a.eventType === 'cancellation_requested');
+    return (act?.metadata?.requestedByRole as string | undefined) ?? (act?.actorType ?? null);
+  }, [detail]);
+
   const terms = detail ? parseTermsSnapshot(detail.deal.termsSnapshot) : null;
   const title = terms?.compensationLine || detail?.deal.campaignName || 'NIL partnership';
   const brandName = detail?.deal.brandName?.trim() || 'Brand';
-  const submitTemplates = {
-    draft: 'Draft for brand review. Happy to revise based on feedback.',
-    final: 'Final submission ready for approval and payout processing.',
-  } as const;
+  const compensationAmount = detail ? compensationAmountFromDealSnapshot(detail.deal.termsSnapshot) : 0;
+  const compensationLine =
+    terms?.compensationLine ||
+    (compensationAmount > 0 ? `USD ${compensationAmount.toLocaleString()}` : 'Compensation per agreed offer');
+  const deliverableCount = terms?.frozenDeliverables.length || detail?.deliverables.length || 0;
+  const deliverableCountLine = `${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}`;
 
   if (detailLoading && !detail) {
     return (
@@ -225,12 +247,14 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-nilink-ink">{stageProjection.stageLabel}</h2>
-                  <p className="mt-1 max-w-3xl text-sm leading-relaxed text-gray-600">{stageProjection.stageDescription}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{stageProjection.statusLine}</p>
+                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">{stageProjection.stageDescription}</p>
                   <p className="mt-3 text-sm font-semibold text-nilink-accent">
-                    {detail.deal.nextActionLabel || stageProjection.primaryAction?.label || 'No further action'}
+                    {athleteNextActionCopy(detail, stageProjection)}
                   </p>
                 </div>
-                {stageProjection.primaryAction?.enabled && stageProjection.primaryAction.key === 'submit_work' ? (
+                {stageProjection.primaryAction?.enabled &&
+                (stageProjection.primaryAction.key === 'submit_work' || stageProjection.primaryAction.key === 'mark_published') ? (
                   <button
                     type="button"
                     onClick={() => deliverablesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -247,6 +271,30 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
           ) : null}
 
           <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-sm font-bold text-nilink-ink">Deal terms</h2>
+            <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Brand</dt>
+                <dd className="mt-1 font-semibold text-nilink-ink">{brandName}</dd>
+              </div>
+              {detail.deal.campaignName ? (
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Campaign</dt>
+                  <dd className="mt-1 font-semibold text-nilink-ink">{detail.deal.campaignName}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Compensation</dt>
+                <dd className="mt-1 font-semibold text-nilink-ink">{compensationLine}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Deliverables</dt>
+                <dd className="mt-1 font-semibold text-nilink-ink">{deliverableCountLine}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-sm font-bold text-nilink-ink">Next action</h2>
             <p className="mt-2 text-sm text-gray-600">
               {stageProjection?.primaryAction?.enabled
@@ -255,7 +303,7 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
             </p>
             {detail.contract?.status === 'sent_for_signature' ? (
               <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                {detail.contract.fileUrl ? (
+                {detail.contract.fileUrl?.trim() ? (
                   <a
                     href={detail.contract.fileUrl}
                     target="_blank"
@@ -264,11 +312,16 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                   >
                     Open contract
                   </a>
-                ) : null}
-                <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
+                ) : (
+                  <p className="text-sm font-semibold text-amber-900">
+                    Contract document is not yet available - contact the brand.
+                  </p>
+                )}
+                <label className={`mt-3 flex items-start gap-2 text-sm ${detail.contract.fileUrl?.trim() ? 'text-gray-700' : 'text-gray-400'}`}>
                   <input
                     type="checkbox"
                     checked={contractAgreementChecked}
+                    disabled={!detail.contract.fileUrl?.trim()}
                     onChange={(e) => setContractAgreementChecked(e.target.checked)}
                     className="mt-1"
                   />
@@ -276,9 +329,10 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                 </label>
                 <button
                   type="button"
-                  disabled={pendingKey === 'sign' || !contractAgreementChecked}
+                  disabled={pendingKey === 'sign' || !contractAgreementChecked || !detail.contract.fileUrl?.trim()}
                   onClick={() =>
                     void run('sign', async () => {
+                      if (!detail.contract?.fileUrl?.trim()) return;
                       await patchContractStatus(detail.contract!.id, 'signed');
                     })
                   }
@@ -286,6 +340,80 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                 >
                   Sign contract
                 </button>
+              </div>
+            ) : null}
+            {detail.deal.status === 'cancellation_requested' ? (
+              cancellationRequester === 'athlete' ? (
+                <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                  <p className="text-sm font-medium text-yellow-800">Cancellation Requested</p>
+                  <p className="mt-1 text-sm text-yellow-700">Awaiting the brand&apos;s response.</p>
+                </div>
+              ) : (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-bold text-red-800">Cancellation Requested</p>
+                <p className="mt-1 text-sm text-red-700">The brand has requested to cancel this deal. Accept to close it or dispute to escalate.</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={pendingKey === 'cancel-accept'}
+                    onClick={() =>
+                      void run('cancel-accept', async () => {
+                        await respondToDealCancellation(detail.deal.id, 'accept');
+                      })
+                    }
+                    className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Accept Cancellation
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pendingKey === 'cancel-dispute'}
+                    onClick={() =>
+                      void run('cancel-dispute', async () => {
+                        await respondToDealCancellation(detail.deal.id, 'dispute');
+                      })
+                    }
+                    className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-800 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Dispute
+                  </button>
+                </div>
+              </div>
+              )
+            ) : !['cancelled', 'closed', 'disputed', 'paid', 'created', 'contract_pending'].includes(detail.deal.status) && showCancelModal ? (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-bold text-red-800">Request Cancellation</p>
+                <p className="mt-1 text-sm text-red-700">The brand will need to accept your cancellation request before the deal is closed.</p>
+                <textarea
+                  className="mt-3 w-full rounded-xl border border-red-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                  rows={2}
+                  placeholder="Reason for requesting cancellation…"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                />
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={pendingKey === 'cancel-request' || !cancelReason.trim()}
+                    onClick={() =>
+                      void run('cancel-request', async () => {
+                        await requestDealCancellation(detail.deal.id, cancelReason.trim());
+                        setShowCancelModal(false);
+                        setCancelReason('');
+                      })
+                    }
+                    className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Send Request
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCancelModal(false); setCancelReason(''); }}
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                </div>
               </div>
             ) : null}
           </section>
@@ -296,7 +424,7 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
               <div className="space-y-4">
                 {detail.deliverables.map((deliverable) => {
                   const submissions = (submissionsByDeliverable[deliverable.id] ?? []).slice().sort((a, b) => a.version - b.version);
-                  const form = submitForms[deliverable.id] ?? { tier: 'draft', url: '', body: '', notes: '' };
+                  const form = submitForms[deliverable.id] ?? { url: '', body: '', notes: '' };
                   const projection = buildDeliverableProjection({
                     actor: 'athlete',
                     deliverable,
@@ -337,7 +465,7 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                               <li key={submission.id} className="rounded-lg bg-gray-50 p-2 text-sm">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <span className="font-semibold text-nilink-ink">
-                                    v{submission.version} · {submissionTierLabel(submission.notes)}
+                                    v{submission.version}
                                   </span>
                                   <span className="text-xs text-gray-400">{formatIsoDate(submission.submittedAt)}</span>
                                 </div>
@@ -351,35 +479,17 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                       {projection.primaryAction?.key === 'submit_work' ? (
                         <div className="mt-4 rounded-xl border border-dashed border-gray-200 p-3">
                           <p className="text-xs font-bold uppercase text-gray-500">{projection.primaryAction.label}</p>
-                          <div className="mt-2 flex gap-3 text-sm">
-                            {(['draft', 'final'] as const).map((tier) => (
-                              <label key={tier} className="flex items-center gap-2">
-                                <input
-                                  type="radio"
-                                  name={`tier-${deliverable.id}`}
-                                  checked={form.tier === tier}
-                                  onChange={() =>
-                                    setSubmitForms((prev) => ({
-                                      ...prev,
-                                      [deliverable.id]: { ...form, tier },
-                                    }))
-                                  }
-                                />
-                                {tier === 'draft' ? 'Draft' : 'Final'}
-                              </label>
-                            ))}
-                          </div>
                           <button
                             type="button"
                             onClick={() =>
                               setSubmitForms((prev) => ({
                                 ...prev,
-                                [deliverable.id]: { ...form, notes: submitTemplates[form.tier] },
+                                [deliverable.id]: { ...form, body: 'Submitting work as described in the deal terms.' },
                               }))
                             }
                             className="mt-2 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
                           >
-                            Use {form.tier === 'final' ? 'final' : 'draft'} template
+                            Use template
                           </button>
                           <input
                             className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
@@ -397,7 +507,7 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                               submitErrors[deliverable.id] ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
                             }`}
                             rows={3}
-                            placeholder={form.tier === 'final' ? 'Describe the final content...' : 'Describe what you are submitting...'}
+                            placeholder="Describe what you are submitting..."
                             value={form.body}
                             onChange={(e) =>
                               setSubmitForms((prev) => ({
@@ -436,10 +546,9 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                                   return;
                                 }
                                 setSubmitErrors((prev) => ({ ...prev, [deliverable.id]: null }));
-                                const prefix = form.tier === 'draft' ? '[Draft] ' : '[Final] ';
                                 await createDeliverableSubmission(deliverable.id, {
                                   body: bodyText,
-                                  notes: `${prefix}${form.notes}`.trim(),
+                                  notes: form.notes,
                                   artifacts: urlText ? [{ kind: 'url', ref: urlText }] : undefined,
                                 });
                               })
@@ -447,6 +556,25 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                             className="mt-3 w-full rounded-xl bg-nilink-ink py-2.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
                           >
                             Send submission
+                          </button>
+                        </div>
+                      ) : projection.primaryAction?.key === 'mark_published' ? (
+                        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                          <p className="text-xs font-bold uppercase text-emerald-800">Content approved — publish it</p>
+                          <p className="mt-1 text-xs text-emerald-700">
+                            Post your content on the agreed platform, then mark it as published to complete this deliverable.
+                          </p>
+                          <button
+                            type="button"
+                            disabled={pendingKey === `pub-${deliverable.id}`}
+                            onClick={() =>
+                              void run(`pub-${deliverable.id}`, async () => {
+                                await patchDeliverable(deliverable.id, { status: 'published' });
+                              })
+                            }
+                            className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            Mark as Published
                           </button>
                         </div>
                       ) : (
@@ -466,7 +594,7 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
                 {detail.payment.currency} {detail.payment.amount.toLocaleString()} · {paymentStatusCopy(detail.payment.status)}
               </p>
               <p className="mt-1 text-xs text-emerald-800/90">
-                {detail.payment.paidAt ? `Paid ${formatIsoDate(detail.payment.paidAt)}` : 'Payment will update once the brand marks it paid.'}
+                {detail.payment.paidAt ? `Paid ${formatIsoDate(detail.payment.paidAt)}` : 'Payout will update once the brand marks it paid.'}
               </p>
             </section>
           ) : null}
@@ -483,6 +611,19 @@ export function AthleteDealWorkspace({ dealId }: { dealId: string }) {
               {timelineRows.length === 0 ? <li className="text-sm text-gray-400">No major updates yet.</li> : null}
             </ul>
           </section>
+
+          {/* Request cancellation — only shown for post-contract, non-terminal states */}
+          {!['created', 'contract_pending', 'cancelled', 'closed', 'disputed', 'paid', 'cancellation_requested'].includes(detail.deal.status) && (
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Request cancellation…
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

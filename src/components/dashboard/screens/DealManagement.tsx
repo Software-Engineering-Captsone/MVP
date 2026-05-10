@@ -1,32 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Calendar, ChevronRight, Handshake, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, Calendar, ChevronRight, Handshake, RefreshCw, Sparkles } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
-import { authFetch } from '@/lib/authFetch';
 import {
-  activitySummary,
-  createDeliverableSubmission,
-  fetchDealDetail,
   fetchDealsList,
-  fetchSubmissionsForDeliverable,
   formatIsoDate,
   formatShortId,
   humanizeDealStatus,
   compensationAmountFromDealSnapshot,
   parseTermsSnapshot,
-  patchContractStatus,
   type ApiDeal,
-  type ApiDealDetail,
-  type ApiSubmission,
 } from '@/lib/deals/dashboardDealsClient';
 import {
-  buildDealStageProjection,
-  buildDeliverableProjection,
-  contractStatusCopy,
-  filterMainTimelineActivities,
   stageProgress,
   STAGE_ORDER,
 } from '@/lib/deals/stageProjection';
@@ -166,8 +155,8 @@ function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
     agreement: 'AGREEMENT',
     work_in_progress: 'WORK IN PROGRESS',
     review_revisions: 'REVIEW REVISIONS',
-    completed: 'COMPLETED',
-    payment: 'PAYMENT',
+    completed: 'DELIVERABLES DONE',
+    payment: 'PAYOUT',
     closed: 'CLOSED',
   };
   return map[step];
@@ -204,26 +193,11 @@ function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] })
 }
 
 export function DealManagement({ initialDealId = null }: { initialDealId?: string | null }) {
+  const router = useRouter();
   const [deals, setDeals] = useState<ApiDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [detailError, setDetailError] = useState<string | null>(null);
   const [tab, setTab] = useState<ListTab>('open');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ApiDealDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [submissionsByDeliverable, setSubmissionsByDeliverable] = useState<Record<string, ApiSubmission[]>>({});
-  const [campaignTitle, setCampaignTitle] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const [contractAgreementChecked, setContractAgreementChecked] = useState(false);
-  const [openIntent, setOpenIntent] = useState<'default' | 'feedback'>('default');
-  const [highlightFeedbackSection, setHighlightFeedbackSection] = useState(false);
-  const deliverablesSectionRef = useRef<HTMLElement | null>(null);
-  const [submitForms, setSubmitForms] = useState<
-    Record<string, { tier: 'draft' | 'final'; url: string; body: string; notes: string }>
-  >({});
-  const [submitErrors, setSubmitErrors] = useState<Record<string, string | null>>({});
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -296,146 +270,17 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
     [deals]
   );
 
-  const loadDetail = useCallback(async (dealId: string) => {
-    setDetailLoading(true);
-    setDetailError(null);
-    setActionError(null);
-    setCampaignTitle(null);
-    try {
-      const d = await fetchDealDetail(dealId);
-      setDetail(d);
-      setCampaignTitle(d.deal.campaignName ?? null);
-      const subMap: Record<string, ApiSubmission[]> = {};
-      await Promise.all(
-        d.deliverables.map(async (del) => {
-          try {
-            subMap[del.id] = await fetchSubmissionsForDeliverable(del.id);
-          } catch {
-            subMap[del.id] = [];
-          }
-        }),
-      );
-      setSubmissionsByDeliverable(subMap);
-      const initForms: Record<string, { tier: 'draft' | 'final'; url: string; body: string; notes: string }> = {};
-      for (const del of d.deliverables) {
-        initForms[del.id] = { tier: 'draft', url: '', body: '', notes: '' };
-      }
-      setSubmitForms(initForms);
-      setSubmitErrors({});
-      if (d.deal.campaignId) {
-        try {
-          const cRes = await authFetch(`/api/campaigns/${d.deal.campaignId}`);
-          if (cRes.ok) {
-            const cj = (await cRes.json()) as { name?: string; campaign?: { name?: string } };
-            const name =
-              (typeof cj.name === 'string' && cj.name.trim()) ||
-              (typeof cj.campaign?.name === 'string' && cj.campaign.name.trim()) ||
-              '';
-            if (name) setCampaignTitle(name);
-          }
-        } catch {
-          /* optional */
-        }
-      }
-    } catch (e) {
-      setDetail(null);
-      setDetailError(e instanceof Error ? e.message : 'Could not load deal');
-      setSubmissionsByDeliverable({});
-      setSubmitErrors({});
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
-  const submitTemplates = useMemo(
-    () => ({
-      draft: 'Draft for brand review. Happy to revise based on feedback.',
-      final: 'Final submission ready for approval and payout processing.',
-    }),
-    []
-  );
-
-  useEffect(() => {
-    if (selectedId) void loadDetail(selectedId);
-    else {
-      setDetail(null);
-      setDetailError(null);
-      setSubmissionsByDeliverable({});
-      setOpenIntent('default');
-    }
-  }, [selectedId, loadDetail]);
-
   const refreshFromRealtime = useCallback(() => {
     void loadList();
-    if (selectedId) void loadDetail(selectedId);
-  }, [loadList, loadDetail, selectedId]);
-  useDealsRealtimeRefresh({ enabled: true, dealId: selectedId, onInvalidate: refreshFromRealtime });
+  }, [loadList]);
+  useDealsRealtimeRefresh({ enabled: true, dealId: null, onInvalidate: refreshFromRealtime });
 
   useEffect(() => {
     if (!initialDealId) return;
-    setSelectedId(initialDealId);
-  }, [initialDealId]);
-
-  useEffect(() => {
-    setContractAgreementChecked(false);
-  }, [selectedId, detail?.contract?.id, detail?.contract?.status]);
-
-  useEffect(() => {
-    if (openIntent !== 'feedback' || !detail) return;
-    deliverablesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setHighlightFeedbackSection(true);
-    const t = window.setTimeout(() => setHighlightFeedbackSection(false), 2200);
-    return () => window.clearTimeout(t);
-  }, [openIntent, detail]);
-
-  const run = async (key: string, fn: () => Promise<void>) => {
-    setPendingKey(key);
-    setActionError(null);
-    try {
-      await fn();
-      if (selectedId) await loadDetail(selectedId);
-      await loadList();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Something went wrong');
-    } finally {
-      setPendingKey(null);
-    }
-  };
+    router.push('/dashboard/deals/' + initialDealId);
+  }, [initialDealId, router]);
 
   const yourTurn = (d: ApiDeal) => d.nextActionOwner === 'athlete';
-  const stageProjection = useMemo(() => {
-    if (!detail) return null;
-    return buildDealStageProjection({
-      actor: 'athlete',
-      deal: detail.deal,
-      contract: detail.contract,
-      payment: detail.payment,
-      deliverables: detail.deliverables,
-      submissionsByDeliverable,
-    });
-  }, [detail, submissionsByDeliverable]);
-  const timelineRows = useMemo(() => {
-    if (!detail) return [];
-    return filterMainTimelineActivities(detail.activities).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [detail]);
-  const stageId = stageProjection?.stageId ?? null;
-  const showDeliverablesSection = stageId !== 'agreement' && (detail?.deliverables.length ?? 0) > 0;
-  const showTimelineSection = stageId !== 'agreement';
-  const showPayoutSection = stageId === 'completed' || stageId === 'payment' || stageId === 'closed';
-  const showAdditionalDetails = stageId === 'agreement' || stageId === 'payment' || stageId === 'closed';
-  const timelineStartsCollapsed = stageId === 'work_in_progress' || stageId === 'review_revisions';
-  const nextActionHint =
-    stageId === 'agreement'
-      ? 'Handle contract setup and signature to unlock execution.'
-      : stageId === 'work_in_progress'
-        ? 'Focus on creating and submitting pending deliverables.'
-        : stageId === 'review_revisions'
-          ? 'Review brand notes and resubmit any requested changes.'
-          : stageId === 'completed'
-            ? 'Deliverables are complete. Keep an eye on payout progress.'
-            : stageId === 'payment'
-              ? 'Payout is being processed through the agreed release flow.'
-              : 'No additional work is required for this deal.';
 
   return (
     <div className="flex h-full min-h-full flex-col bg-nilink-page font-sans text-nilink-ink">
@@ -577,7 +422,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                   key={deal.id}
                   layout
                   className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:border-gray-200 hover:shadow-md"
-                  onClick={() => setSelectedId(deal.id)}
+                  onClick={() => router.push('/dashboard/deals/' + deal.id)}
                   whileHover={{ y: -2 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 >
@@ -642,7 +487,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                           key={deal.id}
                           layout
                           className="cursor-pointer rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:border-gray-200 hover:shadow-md sm:p-6"
-                          onClick={() => setSelectedId(deal.id)}
+                          onClick={() => router.push('/dashboard/deals/' + deal.id)}
                           whileHover={{ y: -2 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                         >
@@ -705,8 +550,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                    setOpenIntent(ctaLabel === 'View feedback' ? 'feedback' : 'default');
-                                  setSelectedId(deal.id);
+                                  router.push('/dashboard/deals/' + deal.id);
                                 }}
                                 className="inline-flex items-center rounded-lg bg-nilink-accent px-3 py-2 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-nilink-accent-hover"
                               >
@@ -740,398 +584,6 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
         )}
       </div>
 
-      {selectedId && (
-        <div
-          className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/50 p-4 sm:p-8"
-          onClick={() => setSelectedId(null)}
-          role="dialog"
-          aria-modal
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-2xl cursor-auto overflow-auto rounded-2xl border border-gray-100 bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {detailLoading ? (
-              <div className="flex items-center gap-2 p-8 text-xs font-bold uppercase tracking-wide text-gray-500">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                LOADING DEAL…
-              </div>
-            ) : detailError || !detail ? (
-              <div className="space-y-4 p-8">
-                <p className="text-sm text-red-600">{detailError || 'Deal not found'}</p>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(null)}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-nilink-ink hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="border-b border-gray-100 bg-nilink-sidebar px-6 py-5 text-white">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Deal overview</p>
-                  <p className="mt-1 text-lg font-semibold">Collaboration with this brand</p>
-                  <p className="mt-1 text-xs text-white/85">
-                    {campaignTitle ? `Campaign: ${campaignTitle}` : 'Direct collaboration'}
-                  </p>
-                  <p className="mt-1 text-xs text-white/85">
-                    {stageProjection?.stageLabel ?? 'Deal'} · {stageProjection?.statusLine ?? detail.deal.nextActionLabel}
-                  </p>
-                </div>
-
-                <div className="space-y-5 p-5">
-                  {actionError ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      {actionError}
-                    </div>
-                  ) : null}
-
-                  {stageProjection ? (
-                    <section className="rounded-xl border border-gray-100 bg-nilink-page p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <h3 className="text-sm font-bold text-nilink-ink">{stageProjection.stageLabel}</h3>
-                          <p className="text-xs text-gray-600">{stageProjection.stageDescription}</p>
-                        </div>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-700">
-                          {stageProjection.statusLine}
-                        </span>
-                      </div>
-                      {stageProjection.isDisputed ? (
-                        <p className="mt-2 text-xs font-semibold text-amber-700">This deal is currently in dispute.</p>
-                      ) : null}
-                      <div className="mt-3">
-                        <ProgressTracker stageId={stageProjection.stageId} />
-                      </div>
-                    </section>
-                  ) : null}
-
-                  <section className="rounded-xl border border-gray-100 bg-white p-4">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Next Action</h3>
-                    <p className="mt-2 text-sm font-semibold text-nilink-ink">
-                      {stageProjection?.primaryAction?.label ?? 'Continue With Current Deal Workflow'}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-600">
-                      {stageProjection?.primaryAction?.enabled
-                        ? 'Complete this step now to keep the deal moving.'
-                        : stageProjection?.primaryAction?.reason ?? nextActionHint}
-                    </p>
-                    {detail.contract?.status === 'sent_for_signature' ? (
-                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                        <label className="flex items-start gap-2 text-xs text-gray-700">
-                          <input
-                            type="checkbox"
-                            checked={contractAgreementChecked}
-                            onChange={(e) => setContractAgreementChecked(e.target.checked)}
-                            className="mt-0.5"
-                          />
-                          I have reviewed this contract and agree to proceed with this deal.
-                        </label>
-                        <button
-                          type="button"
-                          disabled={pendingKey === 'sign' || !contractAgreementChecked}
-                          onClick={() =>
-                            void run('sign', async () => {
-                              await patchContractStatus(detail.contract!.id, 'signed');
-                            })
-                          }
-                          className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          Sign contract
-                        </button>
-                      </div>
-                    ) : null}
-                    {stageProjection?.remaining.length ? (
-                      <ul className="mt-3 space-y-1 text-xs text-gray-600">
-                        {stageProjection.remaining.map((item) => (
-                          <li key={item}>- {item}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </section>
-
-                  {showDeliverablesSection ? (
-                    <section
-                      ref={deliverablesSectionRef}
-                      className={`rounded-xl transition-all ${highlightFeedbackSection ? 'ring-2 ring-amber-300/80 ring-offset-2 ring-offset-white' : ''}`}
-                    >
-                      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">
-                        {stageId === 'review_revisions' ? 'Revisions & Feedback' : 'Deliverables'}
-                      </h3>
-                      <div className="space-y-4">
-                        {detail.deliverables.map((del) => {
-                          const subs = (submissionsByDeliverable[del.id] ?? []).slice().sort((a, b) => a.version - b.version);
-                          const form = submitForms[del.id] ?? { tier: 'draft', url: '', body: '', notes: '' };
-                          const projection = buildDeliverableProjection({
-                            actor: 'athlete',
-                            deliverable: del,
-                            submissionsByDeliverable,
-                          });
-                          const postExecutionStage = stageProjection?.stageId === 'payment' || stageProjection?.stageId === 'closed';
-                          const displayStatusLabel = postExecutionStage
-                            ? del.status === 'completed'
-                              ? 'Completed'
-                              : 'In payout phase'
-                            : projection.statusLabel;
-                          return (
-                            <div key={del.id} className="rounded-2xl border border-gray-100 bg-white p-3.5">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div>
-                                <p className="font-semibold text-nilink-ink">{del.title}</p>
-                                <p className="text-xs text-gray-500">
-                                  Due {del.dueAt ? formatIsoDate(del.dueAt) : 'TBD'} · Revisions {del.revisionCountUsed}/{del.revisionLimit}
-                                </p>
-                              </div>
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-700">
-                                  {displayStatusLabel}
-                                </span>
-                            </div>
-                            <p className="mt-2 text-sm text-gray-600">{del.instructions}</p>
-                            <p className="mt-2 text-xs text-gray-500">
-                              Latest: {projection.latestSubmissionLabel}
-                              {projection.latestSubmissionAt ? ` · ${formatIsoDate(projection.latestSubmissionAt)}` : ''}
-                            </p>
-                            {projection.feedback ? (
-                              <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
-                                Brand feedback: {projection.feedback}
-                              </p>
-                            ) : null}
-
-                            {subs.length > 1 ? (
-                              <details className="mt-3">
-                                <summary className="cursor-pointer text-[11px] font-bold uppercase text-gray-500">
-                                  View submission history ({subs.length})
-                                </summary>
-                                <ul className="mt-2 space-y-2">
-                                  {subs.map((s) => (
-                                    <li key={s.id} className="rounded-lg bg-gray-50 p-2 text-sm">
-                                      <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <span className="font-semibold text-nilink-ink">
-                                          v{s.version} · {submissionTierLabel(s.notes)}
-                                        </span>
-                                        <span className="text-xs text-gray-400">{formatIsoDate(s.submittedAt)}</span>
-                                      </div>
-                                      {s.notes ? <p className="mt-1 text-xs text-gray-600">{s.notes}</p> : null}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </details>
-                            ) : null}
-
-                            {projection.primaryAction?.key === 'submit_work' ? (
-                              <div className="mt-4 rounded-xl border border-dashed border-gray-200 p-3">
-                                <p className="text-xs font-bold uppercase text-gray-500">{projection.primaryAction.label}</p>
-                                <div className="mt-2 flex gap-3 text-sm">
-                                  <label className="flex items-center gap-2">
-                                    <input
-                                      type="radio"
-                                      name={`tier-${del.id}`}
-                                      checked={form.tier === 'draft'}
-                                      onChange={() =>
-                                        setSubmitForms((prev) => ({
-                                          ...prev,
-                                          [del.id]: { ...form, tier: 'draft' },
-                                        }))
-                                      }
-                                    />
-                                    Draft
-                                  </label>
-                                  <label className="flex items-center gap-2">
-                                    <input
-                                      type="radio"
-                                      name={`tier-${del.id}`}
-                                      checked={form.tier === 'final'}
-                                      onChange={() =>
-                                        setSubmitForms((prev) => ({
-                                          ...prev,
-                                          [del.id]: { ...form, tier: 'final' },
-                                        }))
-                                      }
-                                    />
-                                    Final
-                                  </label>
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setSubmitForms((prev) => ({
-                                        ...prev,
-                                        [del.id]: { ...form, notes: submitTemplates[form.tier] },
-                                      }))
-                                    }
-                                    className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
-                                  >
-                                    Use {form.tier === 'final' ? 'Final' : 'Draft'} Template
-                                  </button>
-                                  <p className="text-[11px] text-gray-500">
-                                    {form.tier === 'final'
-                                      ? 'Final submissions should include completed work context.'
-                                      : 'Drafts can be rough cuts for early feedback.'}
-                                  </p>
-                                </div>
-                                <input
-                                  className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                  placeholder="Link (optional)"
-                                  value={form.url}
-                                  onChange={(e) =>
-                                    setSubmitForms((prev) => ({
-                                      ...prev,
-                                      [del.id]: { ...form, url: e.target.value },
-                                    }))
-                                  }
-                                />
-                                <textarea
-                                  className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm ${
-                                    submitErrors[del.id] ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
-                                  }`}
-                                  rows={3}
-                                  placeholder={form.tier === 'final' ? 'Describe the final approved content...' : 'Describe what you are submitting...'}
-                                  value={form.body}
-                                  onChange={(e) =>
-                                    setSubmitForms((prev) => ({
-                                      ...prev,
-                                      [del.id]: { ...form, body: e.target.value },
-                                    }))
-                                  }
-                                />
-                                <textarea
-                                  className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                                  rows={2}
-                                  placeholder="Optional note to the brand"
-                                  value={form.notes}
-                                  onChange={(e) =>
-                                    setSubmitForms((prev) => ({
-                                      ...prev,
-                                      [del.id]: { ...form, notes: e.target.value },
-                                    }))
-                                  }
-                                />
-                                {submitErrors[del.id] ? (
-                                  <p className="mt-2 text-xs font-semibold text-red-700">{submitErrors[del.id]}</p>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  disabled={pendingKey === `sub-${del.id}`}
-                                  onClick={() =>
-                                    void run(`sub-${del.id}`, async () => {
-                                      const bodyText = form.body.trim();
-                                      const urlText = form.url.trim();
-                                      if (!bodyText) {
-                                        setSubmitErrors((prev) => ({
-                                          ...prev,
-                                          [del.id]: 'Add a short summary of what you are submitting.',
-                                        }));
-                                        return;
-                                      }
-                                      if (form.tier === 'final' && bodyText.length < 20 && !urlText) {
-                                        setSubmitErrors((prev) => ({
-                                          ...prev,
-                                          [del.id]:
-                                            'Final submission needs enough context (or attach a link) so the brand can approve quickly.',
-                                        }));
-                                        return;
-                                      }
-                                      setSubmitErrors((prev) => ({ ...prev, [del.id]: null }));
-                                      const prefix = form.tier === 'draft' ? '[Draft] ' : '[Final] ';
-                                      const notes = [prefix, form.notes].filter(Boolean).join(' ').trim();
-                                      await createDeliverableSubmission(del.id, {
-                                        body: bodyText,
-                                        notes,
-                                        artifacts: urlText ? [{ kind: 'url', ref: urlText }] : undefined,
-                                      });
-                                      setSubmitForms((prev) => ({
-                                        ...prev,
-                                        [del.id]: { tier: 'draft', url: '', body: '', notes: '' },
-                                      }));
-                                      setSubmitErrors((prev) => ({ ...prev, [del.id]: null }));
-                                    })
-                                  }
-                                  className="mt-3 w-full rounded-xl bg-nilink-ink py-2.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
-                                >
-                                  {pendingKey === `sub-${del.id}` ? 'Sending...' : 'Send submission'}
-                                </button>
-                              </div>
-                            ) : (
-                              <p className="mt-3 text-xs text-gray-400">No Athlete Action Needed For This Deliverable Right Now.</p>
-                            )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ) : null}
-
-                  {showPayoutSection && detail.payment ? (
-                    <section className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800">Payout Status</h3>
-                      <p className="mt-2 text-sm font-semibold text-emerald-900">
-                        {detail.payment.currency} {detail.payment.amount.toLocaleString()} ·{' '}
-                        <span className="font-bold uppercase tracking-wide">{detail.payment.status.replace(/_/g, ' ')}</span>
-                      </p>
-                      <p className="mt-1 text-xs text-emerald-800/90">
-                        {detail.payment.paidAt ? `Paid ${formatIsoDate(detail.payment.paidAt)}` : 'Payment will update once release conditions are met.'}
-                      </p>
-                    </section>
-                  ) : null}
-
-                  {showAdditionalDetails ? (
-                    <details className="rounded-xl border border-gray-200 bg-nilink-page p-4">
-                      <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-gray-500">
-                        Additional Details
-                      </summary>
-                      <div className="mt-3 space-y-2 text-sm text-gray-600">
-                        <p>Contract: {detail.contract ? contractStatusCopy(detail.contract.status) : 'No contract yet'}</p>
-                        <p>
-                          Payment:{' '}
-                          {detail.payment
-                            ? `${detail.payment.currency} ${detail.payment.amount.toLocaleString()}`
-                            : 'No payment record yet'}
-                        </p>
-                        {parseTermsSnapshot(detail.deal.termsSnapshot)?.notes ? (
-                          <p>Notes: {parseTermsSnapshot(detail.deal.termsSnapshot)!.notes}</p>
-                        ) : null}
-                      </div>
-                    </details>
-                  ) : null}
-
-                  {showTimelineSection ? (
-                    <details
-                      className="rounded-xl border border-gray-100 bg-white p-4"
-                      open={!timelineStartsCollapsed}
-                    >
-                      <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-gray-500">
-                        Timeline
-                      </summary>
-                      <ul className="mt-3 space-y-2">
-                        {timelineRows.map((a) => (
-                          <li key={a.id} className="text-sm text-gray-700">
-                            <span className="font-semibold">{activitySummary(a)}</span>
-                            <span className="ml-2 text-xs text-gray-400">{formatIsoDate(a.createdAt)}</span>
-                          </li>
-                        ))}
-                        {timelineRows.length === 0 ? <li className="text-sm text-gray-400">No major updates yet.</li> : null}
-                      </ul>
-                    </details>
-                  ) : null}
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(null)}
-                      className="flex-1 rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-bold uppercase tracking-wide text-nilink-ink hover:bg-gray-50"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

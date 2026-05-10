@@ -13,8 +13,13 @@ function allDeliverablesTerminal(rows: StoredDeliverable[]): boolean {
 
 function anyDeliverableNeedsAthlete(rows: StoredDeliverable[]): boolean {
   return rows.some((d) =>
-    ['not_started', 'revision_requested'].includes(d.status)
+    ['not_started', 'revision_requested'].includes(d.status) ||
+    (d.status === 'approved' && d.publishRequired)
   );
+}
+
+function anyDeliverableNeedsPublication(rows: StoredDeliverable[]): boolean {
+  return rows.some((d) => d.status === 'approved' && d.publishRequired);
 }
 
 function anyDeliverableInReview(rows: StoredDeliverable[]): boolean {
@@ -49,36 +54,47 @@ export function computeDealNextAction(args: {
       }
       return { nextActionOwner: 'brand', nextActionLabel: 'Finalize and start deal' };
     case 'active':
+      if (deliverables.length === 0) {
+        return { nextActionOwner: 'brand', nextActionLabel: 'Add deliverables to begin work' };
+      }
       if (anyDeliverableNeedsAthlete(deliverables)) {
-        return { nextActionOwner: 'athlete', nextActionLabel: 'Work on deliverables' };
+        return {
+          nextActionOwner: 'athlete',
+          nextActionLabel: anyDeliverableNeedsPublication(deliverables) ? 'Publish approved content' : 'Work on deliverables',
+        };
       }
       return { nextActionOwner: 'athlete', nextActionLabel: 'Submit draft for review' };
     case 'submission_in_progress':
+      if (anyDeliverableNeedsPublication(deliverables)) {
+        return { nextActionOwner: 'athlete', nextActionLabel: 'Publish approved content' };
+      }
       return { nextActionOwner: 'athlete', nextActionLabel: 'Finish and submit for review' };
     case 'under_review':
       return { nextActionOwner: 'brand', nextActionLabel: 'Review latest submission' };
     case 'revision_requested':
       return { nextActionOwner: 'athlete', nextActionLabel: 'Apply revision feedback' };
     case 'approved_completed':
-      return { nextActionOwner: 'brand', nextActionLabel: 'Confirm payment readiness' };
+      return { nextActionOwner: 'brand', nextActionLabel: 'Confirm payout readiness' };
     case 'payment_pending':
       if (p === 'paid') {
         return { nextActionOwner: 'brand', nextActionLabel: 'Archive and close deal' };
       }
       if (p === 'ready_to_release') {
-        return { nextActionOwner: 'brand', nextActionLabel: 'Release payment' };
+        return { nextActionOwner: 'brand', nextActionLabel: 'Release payout' };
       }
       if (p === 'manual' || p === 'pending' || p === 'awaiting_setup' || p === 'not_configured') {
-        return { nextActionOwner: 'brand', nextActionLabel: 'Record manual payment' };
+        return { nextActionOwner: 'brand', nextActionLabel: 'Record payout' };
       }
       if (p === 'failed') {
-        return { nextActionOwner: 'brand', nextActionLabel: 'Resolve payment failure' };
+        return { nextActionOwner: 'brand', nextActionLabel: 'Resolve payout issue' };
       }
-      return { nextActionOwner: 'system', nextActionLabel: 'Complete payment setup' };
+      return { nextActionOwner: 'system', nextActionLabel: 'Complete payout setup' };
     case 'paid':
       return { nextActionOwner: 'brand', nextActionLabel: 'Archive and close deal' };
     case 'closed':
       return { nextActionOwner: null, nextActionLabel: 'No further actions' };
+    case 'cancellation_requested':
+      return { nextActionOwner: 'system', nextActionLabel: 'Cancellation pending — awaiting response' };
     case 'cancelled':
       return { nextActionOwner: null, nextActionLabel: 'Deal cancelled' };
     case 'disputed':
@@ -101,7 +117,7 @@ export function refineNextActionWithDeliverables(
     return { nextActionOwner: 'brand', nextActionLabel: 'Review submitted deliverables' };
   }
   if (deal.status === 'approved_completed' && allDeliverablesTerminal(deliverables)) {
-    return { nextActionOwner: 'brand', nextActionLabel: 'Move to payment' };
+    return { nextActionOwner: 'brand', nextActionLabel: 'Move to payout' };
   }
   return base;
 }

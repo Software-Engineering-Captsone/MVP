@@ -4,27 +4,17 @@ import type { ContractStatus, DealStatus } from './types';
 export const DEAL_ALLOWED_TRANSITIONS: Readonly<Record<DealStatus, ReadonlySet<DealStatus>>> = {
   created: new Set<DealStatus>(['contract_pending', 'cancelled', 'disputed']),
   contract_pending: new Set<DealStatus>(['active', 'cancelled', 'disputed']),
-  active: new Set<DealStatus>([
-    'submission_in_progress',
-    'under_review',
-    'cancelled',
-    'disputed',
-  ]),
+  active: new Set<DealStatus>(['submission_in_progress', 'under_review', 'cancelled', 'disputed', 'cancellation_requested']),
   /** `approved_completed` allowed only when all deliverables are `completed` (enforced in repository). */
-  submission_in_progress: new Set<DealStatus>(['under_review', 'approved_completed', 'cancelled', 'disputed']),
-  under_review: new Set<DealStatus>([
-    'submission_in_progress',
-    'revision_requested',
-    'approved_completed',
-    'cancelled',
-    'disputed',
-  ]),
-  revision_requested: new Set<DealStatus>(['submission_in_progress', 'under_review', 'approved_completed', 'cancelled', 'disputed']),
-  approved_completed: new Set<DealStatus>(['payment_pending', 'closed', 'cancelled', 'disputed']),
-  payment_pending: new Set<DealStatus>(['paid', 'cancelled', 'disputed']),
+  submission_in_progress: new Set<DealStatus>(['under_review', 'approved_completed', 'cancelled', 'disputed', 'cancellation_requested']),
+  under_review: new Set<DealStatus>(['submission_in_progress', 'revision_requested', 'approved_completed', 'cancelled', 'disputed', 'cancellation_requested']),
+  revision_requested: new Set<DealStatus>(['submission_in_progress', 'under_review', 'approved_completed', 'cancelled', 'disputed', 'cancellation_requested']),
+  approved_completed: new Set<DealStatus>(['payment_pending', 'closed', 'cancelled', 'disputed', 'cancellation_requested']),
+  payment_pending: new Set<DealStatus>(['paid', 'cancelled', 'disputed', 'cancellation_requested']),
   paid: new Set<DealStatus>(['closed', 'disputed']),
   closed: new Set<DealStatus>(),
   cancelled: new Set<DealStatus>(),
+  cancellation_requested: new Set<DealStatus>(['cancelled', 'disputed']),
   disputed: new Set<DealStatus>(['active', 'cancelled', 'closed']),
 };
 

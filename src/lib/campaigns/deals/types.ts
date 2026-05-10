@@ -11,6 +11,7 @@ export const DEAL_STATUSES = [
   'paid',
   'closed',
   'cancelled',
+  'cancellation_requested',
   'disputed',
 ] as const;
 export type DealStatus = (typeof DEAL_STATUSES)[number];
@@ -77,6 +78,7 @@ export const DEAL_ACTIVITY_EVENT_TYPES = [
   'payment_pending',
   'payment_paid',
   'deal_revision_blocked',
+  'cancellation_requested',
 ] as const;
 export type DealActivityEventType = (typeof DEAL_ACTIVITY_EVENT_TYPES)[number];
 

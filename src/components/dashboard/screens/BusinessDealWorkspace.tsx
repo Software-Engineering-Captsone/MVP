@@ -4,18 +4,17 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft, ChevronLeft, Loader2 } from 'lucide-react';
-import { authFetch } from '@/lib/authFetch';
 import {
   fetchDealDetail,
   fetchSubmissionsForDeliverable,
   formatIsoDate,
-  formatShortId,
-  humanizeDealStatus,
   patchContractStatus,
   patchDealStatus,
   patchPaymentStatus,
   patchSubmission,
   postDealContract,
+  requestDealCancellation,
+  respondToDealCancellation,
   uploadDealContractFromFile,
   type ApiDeal,
   type ApiDealDetail,
@@ -23,44 +22,14 @@ import {
   type ApiPayment,
   type ApiSubmission,
 } from '@/lib/deals/dashboardDealsClient';
-import { CONTRACT_STATUSES, PAYMENT_STATUSES } from '@/lib/campaigns/deals/types';
 import {
   buildDealStageProjection,
   buildDeliverableProjection,
-  contractStatusCopy,
-  paymentStatusCopy,
   stageProgress,
   STAGE_ORDER,
 } from '@/lib/deals/stageProjection';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
-
-function DealStatusBadge({ status, surface = 'light' }: { status: string; surface?: 'light' | 'dark' }) {
-  const onLight =
-    status === 'paid' || status === 'closed'
-      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-      : status === 'cancelled' || status === 'disputed'
-        ? 'bg-red-50 text-red-700 border-red-200'
-        : status === 'under_review' || status === 'submission_in_progress'
-          ? 'bg-amber-50 text-amber-800 border-amber-200'
-          : 'bg-gray-50 text-gray-700 border-gray-200';
-  const onDark =
-    status === 'paid' || status === 'closed'
-      ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100'
-      : status === 'cancelled' || status === 'disputed'
-        ? 'border-red-400/40 bg-red-500/20 text-red-100'
-        : status === 'under_review' || status === 'submission_in_progress'
-          ? 'border-amber-400/40 bg-amber-500/20 text-amber-100'
-          : 'border-white/25 bg-white/10 text-white/90';
-  const soft = surface === 'dark' ? onDark : onLight;
-  return (
-    <span
-      className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${soft}`}
-    >
-      {humanizeDealStatus(status)}
-    </span>
-  );
-}
 
 function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
   const map: Record<(typeof STAGE_ORDER)[number], string> = {
@@ -68,7 +37,7 @@ function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
     work_in_progress: 'WORK IN PROGRESS',
     review_revisions: 'REVIEW REVISIONS',
     completed: 'DELIVERABLES DONE',
-    payment: 'PAYMENT',
+    payment: 'PAYOUT',
     closed: 'CLOSED',
   };
   return map[step];
@@ -123,7 +92,7 @@ function nextTurnHeadline(owner: ApiDeal['nextActionOwner']): { label: string; c
   }
   if (owner === 'system') {
     return {
-      label: 'System / payment',
+      label: 'System / payout',
       className: 'border-amber-400/30 bg-amber-500/10 text-amber-100',
     };
   }
@@ -149,23 +118,20 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [submissionsByDeliverable, setSubmissionsByDeliverable] = useState<Record<string, ApiSubmission[]>>({});
-  const [campaignTitle, setCampaignTitle] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [contractUrlInput, setContractUrlInput] = useState('');
   const [contractFile, setContractFile] = useState<File | null>(null);
   const contractFilePrimaryRef = useRef<HTMLInputElement>(null);
-  const contractFileAdvancedRef = useRef<HTMLInputElement>(null);
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
-  const [contractStatusDraft, setContractStatusDraft] = useState<string>('');
-  const [paymentStatusDraft, setPaymentStatusDraft] = useState<string>('');
   const [paymentReference, setPaymentReference] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
     setDetailError(null);
     setActionError(null);
-    setCampaignTitle(null);
     try {
       const d = await fetchDealDetail(id);
       setDetail(d);
@@ -180,17 +146,6 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
         })
       );
       setSubmissionsByDeliverable(subMap);
-      if (d.deal.campaignId) {
-        try {
-          const cRes = await authFetch(`/api/campaigns/${d.deal.campaignId}`);
-          if (cRes.ok) {
-            const cj = (await cRes.json()) as { name?: string };
-            if (typeof cj.name === 'string' && cj.name) setCampaignTitle(cj.name);
-          }
-        } catch {
-          /* optional */
-        }
-      }
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Failed to load deal');
       setDetail(null);
@@ -208,14 +163,6 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
     void loadDetail(dealId);
   }, [dealId, loadDetail]);
   useDealsRealtimeRefresh({ enabled: true, dealId, onInvalidate: refreshFromRealtime });
-
-  useEffect(() => {
-    if (detail?.contract) setContractStatusDraft(detail.contract.status);
-  }, [detail?.contract?.id, detail?.contract?.status]);
-
-  useEffect(() => {
-    if (detail?.payment) setPaymentStatusDraft(detail.payment.status);
-  }, [detail?.payment?.id, detail?.payment?.status]);
 
   const pendingReviews = useMemo(() => {
     if (!detail) return [];
@@ -242,6 +189,14 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
     });
   }, [detail, submissionsByDeliverable]);
 
+  const cancellationRequester = useMemo(() => {
+    if (!detail || detail.deal.status !== 'cancellation_requested') return null;
+    const act = [...(detail.activities ?? [])]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .find((a) => a.eventType === 'cancellation_requested');
+    return (act?.metadata?.requestedByRole as string | undefined) ?? (act?.actorType ?? null);
+  }, [detail]);
+
   const primaryReviewTarget = pendingReviews[0] ?? null;
 
   const runAction = async (key: string, fn: () => Promise<void>) => {
@@ -259,7 +214,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
 
   /** One-line page purpose for the dashboard header (not raw IDs). */
   const dealPageDescription =
-    'Manage contract, deliverables, reviews, and payment for this athlete collaboration.';
+    'Manage contract, deliverables, reviews, and payout for this athlete collaboration.';
 
   if (detailLoading && !detail) {
     return (
@@ -286,8 +241,6 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
   }
 
   const turn = nextTurnHeadline(detail.deal.nextActionOwner);
-  const contractDirty = detail.contract && contractStatusDraft !== detail.contract.status;
-  const paymentDirty = detail.payment && paymentStatusDraft !== detail.payment.status;
 
   return (
     <div className="flex min-h-full flex-col bg-nilink-page font-sans text-nilink-ink">
@@ -356,6 +309,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1">
                     <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">{stageProjection.stageLabel}</h2>
+                    <p className="mt-1 text-xs font-bold uppercase tracking-wide text-white/55">{stageProjection.statusLine}</p>
                     <p className="mt-2 max-w-3xl text-sm leading-relaxed text-white/80">{stageProjection.stageDescription}</p>
                   </div>
                   <div className="shrink-0 rounded-xl border px-3 py-2 text-center sm:text-left lg:max-w-xs">
@@ -494,7 +448,6 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                                   await uploadDealContractFromFile(detail.deal.id, contractFile);
                                   setContractFile(null);
                                   if (contractFilePrimaryRef.current) contractFilePrimaryRef.current.value = '';
-                                  if (contractFileAdvancedRef.current) contractFileAdvancedRef.current.value = '';
                                 })
                               }
                               className="cursor-pointer rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-nilink-ink hover:bg-white/90 disabled:opacity-50"
@@ -547,14 +500,14 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                         }
                         className="mt-3 cursor-pointer rounded-lg bg-nilink-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-nilink-accent-hover disabled:opacity-50"
                       >
-                        Move To Payment
+                        Move To Payout
                       </button>
                     ) : null}
                     {stageProjection?.primaryAction?.key === 'mark_payment_paid' && detail.payment ? (
                       <div className="mt-3 space-y-2">
                         <input
                           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nilink-accent/30"
-                          placeholder="Payment reference or note"
+                          placeholder="Payout reference or note"
                           value={paymentReference}
                           onChange={(e) => setPaymentReference(e.target.value)}
                         />
@@ -605,6 +558,90 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    ) : null}
+                    {detail.deal.status === 'cancellation_requested' ? (
+                      cancellationRequester === 'brand' ? (
+                        <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                          <p className="text-xs font-medium text-yellow-800">Cancellation Requested</p>
+                          <p className="mt-1 text-xs text-yellow-700">Awaiting the athlete&apos;s response.</p>
+                        </div>
+                      ) : (
+                      <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-red-800">Cancellation Requested</p>
+                        <p className="mt-1 text-xs text-red-700">The athlete has requested to cancel this deal. Accept to close it or dispute to escalate.</p>
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={pendingAction === 'cancel-accept'}
+                            onClick={() =>
+                              void runAction('cancel-accept', async () => {
+                                await respondToDealCancellation(detail.deal.id, 'accept');
+                              })
+                            }
+                            className="cursor-pointer rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            Accept Cancellation
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pendingAction === 'cancel-dispute'}
+                            onClick={() =>
+                              void runAction('cancel-dispute', async () => {
+                                await respondToDealCancellation(detail.deal.id, 'dispute');
+                              })
+                            }
+                            className="cursor-pointer rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            Dispute
+                          </button>
+                        </div>
+                      </div>
+                      )
+                    ) : !['cancelled', 'closed', 'disputed', 'paid'].includes(detail.deal.status) && showCancelModal ? (
+                      <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-red-800">
+                          {detail.deal.status === 'created' || detail.deal.status === 'contract_pending'
+                            ? 'Cancel this deal?'
+                            : 'Request Cancellation'}
+                        </p>
+                        <p className="mt-1 text-xs text-red-700">
+                          {detail.deal.status === 'created' || detail.deal.status === 'contract_pending'
+                            ? 'This will immediately cancel the deal. This cannot be undone.'
+                            : 'Post-contract cancellation requires the athlete to accept. Provide a reason.'}
+                        </p>
+                        <textarea
+                          className="mt-2 w-full rounded-lg border border-red-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                          rows={2}
+                          placeholder="Reason for cancellation…"
+                          value={cancelReason}
+                          onChange={(e) => setCancelReason(e.target.value)}
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={pendingAction === 'cancel-request' || !cancelReason.trim()}
+                            onClick={() =>
+                              void runAction('cancel-request', async () => {
+                                await requestDealCancellation(detail.deal.id, cancelReason.trim());
+                                setShowCancelModal(false);
+                                setCancelReason('');
+                              })
+                            }
+                            className="cursor-pointer rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {detail.deal.status === 'created' || detail.deal.status === 'contract_pending'
+                              ? 'Confirm Cancel'
+                              : 'Send Request'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowCancelModal(false); setCancelReason(''); }}
+                            className="cursor-pointer rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                          >
+                            Back
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -690,22 +727,6 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                               >
                                 Approve Submission
                               </button>
-                              <button
-                                type="button"
-                                disabled={pendingAction === `rv-${latest.id}`}
-                                onClick={() =>
-                                  void runAction(`rv-${latest.id}`, async () => {
-                                    const fb = revisionFeedback[latest.id]?.trim();
-                                    await patchSubmission(latest.id, {
-                                      status: 'revision_requested',
-                                      ...(fb ? { feedback: fb } : {}),
-                                    });
-                                  })
-                                }
-                                className="cursor-pointer rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                              >
-                                Request Revision
-                              </button>
                             </div>
                           )
                         ) : (
@@ -719,183 +740,18 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
             </div>
           </div>
 
-          <details
-            id={SECTION_IDS.contractPayment}
-            className="group scroll-mt-24 rounded-2xl border border-gray-200 bg-white shadow-sm open:ring-1 open:ring-nilink-accent/15"
-          >
-            <summary className="cursor-pointer list-none px-4 py-3.5 sm:px-5 sm:py-4 [&::-webkit-details-marker]:hidden">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-sm font-bold text-nilink-ink">Contract &amp; payment</h2>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    Update document link or status when something changes outside the normal flow.
-                  </p>
-                </div>
-                <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-600 group-open:bg-nilink-accent-soft group-open:text-nilink-accent">
-                  Advanced
-                </span>
-              </div>
-            </summary>
-            <div className="border-t border-gray-100 px-4 py-5 sm:px-5">
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="rounded-xl border border-gray-100 bg-nilink-page p-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Contract</h3>
-                  {detail.contract ? (
-                    <>
-                      <p className="mt-2 text-sm text-nilink-ink">
-                        <span className="text-gray-500">Current status:</span>{' '}
-                        <span className="font-semibold">{contractStatusCopy(detail.contract.status)}</span>
-                      </p>
-                      {detail.contract.fileUrl ? (
-                        <a
-                          href={detail.contract.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-block cursor-pointer text-sm font-semibold text-nilink-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent/40 rounded"
-                        >
-                          Open contract file
-                        </a>
-                      ) : (
-                        <p className="mt-2 text-xs text-gray-500">No file link on record.</p>
-                      )}
-                      <label htmlFor="contract-url-advanced" className="mt-4 block text-xs font-semibold text-gray-600">
-                        Document URL
-                      </label>
-                      <div className="mt-1 space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <input
-                            id="contract-url-advanced"
-                            className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nilink-accent/30"
-                            placeholder="https://…"
-                            value={contractUrlInput}
-                            onChange={(e) => setContractUrlInput(e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            disabled={pendingAction === 'contract-post'}
-                            onClick={() =>
-                              void runAction('contract-post', async () => {
-                                await postDealContract(detail.deal.id, contractUrlInput.trim() || undefined);
-                                setContractUrlInput('');
-                              })
-                            }
-                            className="shrink-0 cursor-pointer rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
-                          >
-                            Save URL
-                          </button>
-                        </div>
-                        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2">
-                          <p className="text-[11px] text-gray-600">Or upload PDF / Word.</p>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <input
-                              ref={contractFileAdvancedRef}
-                              type="file"
-                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                              className="max-w-full text-xs text-gray-700 file:mr-2 file:rounded-md file:border file:border-gray-200 file:bg-white file:px-2 file:py-1"
-                              onChange={(e) => setContractFile(e.target.files?.[0] ?? null)}
-                            />
-                            <button
-                              type="button"
-                              disabled={pendingAction === 'contract-file' || !contractFile}
-                              onClick={() =>
-                                void runAction('contract-file', async () => {
-                                  if (!contractFile) return;
-                                  await uploadDealContractFromFile(detail.deal.id, contractFile);
-                                  setContractFile(null);
-                                  if (contractFilePrimaryRef.current) contractFilePrimaryRef.current.value = '';
-                                  if (contractFileAdvancedRef.current) contractFileAdvancedRef.current.value = '';
-                                })
-                              }
-                              className="cursor-pointer rounded-lg bg-nilink-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
-                            >
-                              Upload file
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      <label htmlFor="contract-status-select" className="mt-4 block text-xs font-semibold text-gray-600">
-                        Set status
-                      </label>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <select
-                          id="contract-status-select"
-                          value={contractStatusDraft}
-                          onChange={(e) => setContractStatusDraft(e.target.value)}
-                          className="min-w-[200px] flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nilink-accent/30"
-                        >
-                          {CONTRACT_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {contractStatusCopy(s)}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={!contractDirty || pendingAction === 'contract-status-apply'}
-                          onClick={() =>
-                            void runAction('contract-status-apply', async () => {
-                              await patchContractStatus(detail.contract!.id, contractStatusDraft);
-                            })
-                          }
-                          className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-nilink-ink hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          Apply status
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="mt-2 text-sm text-gray-500">No contract record.</p>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-gray-100 bg-nilink-page p-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Payment</h3>
-                  {detail.payment ? (
-                    <>
-                      <p className="mt-2 text-sm text-nilink-ink">
-                        <span className="font-semibold">
-                          {detail.payment.currency} {detail.payment.amount.toLocaleString()}
-                        </span>
-                        <span className="text-gray-500"> · </span>
-                        <span className="font-bold uppercase tracking-wide">{paymentStatusCopy(detail.payment.status)}</span>
-                      </p>
-                      <label htmlFor="payment-status-select" className="mt-4 block text-xs font-semibold text-gray-600">
-                        Set payment status
-                      </label>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <select
-                          id="payment-status-select"
-                          value={paymentStatusDraft}
-                          onChange={(e) => setPaymentStatusDraft(e.target.value)}
-                          className="min-w-[200px] flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nilink-accent/30"
-                        >
-                          {PAYMENT_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {paymentStatusCopy(s).toUpperCase()}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={!paymentDirty || pendingAction === 'payment-status-apply'}
-                          onClick={() =>
-                            void runAction('payment-status-apply', async () => {
-                              await patchPaymentStatus((detail.payment as ApiPayment).id, paymentStatusDraft);
-                            })
-                          }
-                          className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-nilink-ink hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          Apply status
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="mt-2 text-sm text-gray-500">No payment record.</p>
-                  )}
-                </div>
-              </div>
+          {/* Cancel deal — only shown for non-terminal states */}
+          {!['cancelled', 'closed', 'disputed', 'paid', 'cancellation_requested'].includes(detail.deal.status) && (
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(true)}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Cancel this deal…
+              </button>
             </div>
-          </details>
+          )}
         </div>
       </div>
     </div>

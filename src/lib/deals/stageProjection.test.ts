@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDealStageProjection, buildDeliverableProjection } from './stageProjection';
+import { buildDealStageProjection, buildDeliverableProjection, paymentStatusCopy } from './stageProjection';
 import type { ApiContract, ApiDeal, ApiDeliverable, ApiPayment } from './dashboardDealsClient';
 
 const baseDeal: ApiDeal = {
@@ -45,6 +45,10 @@ function payment(status: string): ApiPayment {
 }
 
 describe('buildDealStageProjection agreement actions', () => {
+  it('uses presentation-safe payout copy for unconfigured payments', () => {
+    expect(paymentStatusCopy('not_configured')).toBe('Payout pending');
+  });
+
   it('lets the brand send an uploaded contract for signature', () => {
     const projection = buildDealStageProjection({
       actor: 'brand',
@@ -113,7 +117,7 @@ describe('buildDealStageProjection agreement actions', () => {
     });
   });
 
-  it('lets the brand move a completed deal into payment', () => {
+  it('lets the brand move a completed deal into payout', () => {
     const projection = buildDealStageProjection({
       actor: 'brand',
       deal: { ...baseDeal, status: 'approved_completed' },
@@ -130,7 +134,7 @@ describe('buildDealStageProjection agreement actions', () => {
     });
   });
 
-  it('lets the brand record manual payment during payment stage', () => {
+  it('lets the brand record payout during payout stage', () => {
     const projection = buildDealStageProjection({
       actor: 'brand',
       deal: { ...baseDeal, status: 'payment_pending' },
@@ -143,6 +147,53 @@ describe('buildDealStageProjection agreement actions', () => {
     expect(projection.primaryAction).toMatchObject({
       key: 'mark_payment_paid',
       owner: 'brand',
+      enabled: true,
+    });
+  });
+
+  it('shows publication handoff after brand approval of publish-required work', () => {
+    const deliverable: ApiDeliverable = {
+      id: 'deliverable-1',
+      dealId: 'deal-1',
+      title: 'Sample',
+      type: 'custom',
+      instructions: 'Publish the content.',
+      dueAt: null,
+      draftRequired: true,
+      publishRequired: true,
+      proofRequired: true,
+      disclosureRequired: true,
+      revisionLimit: 2,
+      revisionCountUsed: 0,
+      status: 'approved',
+    };
+
+    const brandProjection = buildDealStageProjection({
+      actor: 'brand',
+      deal: { ...baseDeal, status: 'submission_in_progress' },
+      contract: contract('signed'),
+      payment: null,
+      deliverables: [deliverable],
+      submissionsByDeliverable: {},
+    });
+    expect(brandProjection.primaryAction).toMatchObject({
+      key: 'await_athlete_publication',
+      owner: 'athlete',
+      enabled: false,
+      reason: 'Waiting on athlete publication',
+    });
+
+    const athleteProjection = buildDealStageProjection({
+      actor: 'athlete',
+      deal: { ...baseDeal, status: 'submission_in_progress' },
+      contract: contract('signed'),
+      payment: null,
+      deliverables: [deliverable],
+      submissionsByDeliverable: {},
+    });
+    expect(athleteProjection.primaryAction).toMatchObject({
+      key: 'mark_published',
+      owner: 'athlete',
       enabled: true,
     });
   });

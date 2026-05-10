@@ -62,7 +62,7 @@ create table if not exists public.deals (
                         'submission_in_progress','under_review',
                         'revision_requested','approved_completed',
                         'payment_pending','paid','closed',
-                        'cancelled','disputed'
+                        'cancelled','cancellation_requested','disputed'
                       )) default 'created',
 
   -- Pointers to 1:1 child rows that haven't been modeled yet (Phase 4).

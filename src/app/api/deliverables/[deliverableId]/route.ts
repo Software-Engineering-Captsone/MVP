@@ -45,7 +45,7 @@ export async function PATCH(
     const statusCode =
       msg === 'Deliverable not found'
         ? 404
-        : msg === 'Forbidden' || msg.startsWith('Only the brand')
+        : msg === 'Forbidden' || msg.startsWith('Only the brand') || msg.startsWith('Only the athlete')
           ? 403
           : 400;
     return NextResponse.json({ error: msg }, { status: statusCode });

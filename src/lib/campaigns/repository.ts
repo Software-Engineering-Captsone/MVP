@@ -7,6 +7,7 @@ import {
   normalizeApplicationStatus,
   normalizeCampaignStatus,
 } from '@/lib/campaigns/status';
+import { buildTermsSnapshotFromOffer, getFrozenDeliverableSpecs } from './deals/termsSnapshot';
 
 /* ─────────────────────────────────────────────────────────────────
  * API shape types
@@ -1207,7 +1208,16 @@ export async function createOfferDraftsFromApplications(input: {
       .update({ status: 'offer_drafted' })
       .in('id', handoffApplicationIds)
       .in('status', ['pending', 'under_review', 'shortlisted', 'approved', 'offer_drafted']);
-    if (statusErr) throw new Error(statusErr.message);
+    if (statusErr) {
+      const isLegacyStatusConstraint =
+        statusErr.code === '23514' ||
+        /applications_status_check/i.test(statusErr.message);
+      if (!isLegacyStatusConstraint) throw new Error(statusErr.message);
+      console.warn(
+        '[createOfferDraftsFromApplications] offer draft created, but application status sync was rejected by the database constraint',
+        statusErr,
+      );
+    }
   }
 
   return [...existing, ...insertedOffers];
@@ -1268,6 +1278,12 @@ export async function sendOfferDraftByBrand(
   if (!current) return null;
   if (current.status !== 'draft') {
     throw new Error(`Cannot send offer in status '${current.status}'`);
+  }
+
+  const termsSnapshot = buildTermsSnapshotFromOffer(current as unknown as Record<string, unknown>);
+  const frozenDeliverables = getFrozenDeliverableSpecs(termsSnapshot);
+  if (frozenDeliverables.length === 0) {
+    throw new Error('Offer must include at least one deliverable before it can be sent');
   }
 
   const { data, error } = await supabase

@@ -491,6 +491,33 @@ export async function patchDealStatus(dealId: string, status: string): Promise<A
   return j.deal;
 }
 
+export async function requestDealCancellation(dealId: string, reason: string): Promise<ApiDeal> {
+  const res = await authFetch(`/api/deals/${dealId}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) throw new Error(await readApiError(res));
+  const j = (await res.json()) as { deal?: ApiDeal };
+  if (!j.deal) throw new Error('Invalid deal response');
+  return j.deal;
+}
+
+export async function respondToDealCancellation(
+  dealId: string,
+  response: 'accept' | 'dispute',
+): Promise<ApiDeal> {
+  const res = await authFetch(`/api/deals/${dealId}/cancel`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ response }),
+  });
+  if (!res.ok) throw new Error(await readApiError(res));
+  const j = (await res.json()) as { deal?: ApiDeal };
+  if (!j.deal) throw new Error('Invalid deal response');
+  return j.deal;
+}
+
 /** List-only bucket; detail view can refine using submissions. */
 export function businessSectionForDeal(deal: ApiDeal): BusinessDealSection {
   const s = deal.status;
@@ -601,7 +628,7 @@ export function activitySummary(a: ApiActivity): string {
     case 'payment_status_changed':
     case 'payment_pending':
     case 'payment_paid':
-      return 'Payment Update';
+      return 'Payout Update';
     default:
       return humanizeDealStatus(a.eventType);
   }

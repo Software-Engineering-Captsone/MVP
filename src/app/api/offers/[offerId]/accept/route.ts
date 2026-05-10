@@ -122,6 +122,13 @@ export async function POST(
   const frozenDeliverables = getFrozenDeliverableSpecs(termsSnapshot);
   const { amount, currency } = paymentDefaultsFromTermsSnapshot(termsSnapshot);
 
+  if (frozenDeliverables.length === 0) {
+    return NextResponse.json(
+      { error: 'This offer has no deliverables. The brand must update the offer before it can be accepted.' },
+      { status: 400 },
+    );
+  }
+
   /** Idempotent success when the athlete retries after a partial accept. */
   if (offer.status === 'accepted') {
     const { data: existingForOffer, error: exErr } = await supabase

@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { adminClient, ctx, makeUserClient } from '../../../../tests/integration/setup';
+import {
+  applyPresetToWizard,
+  emptyOfferWizardState,
+  OFFER_STRUCTURED_DRAFT_VERSION,
+} from '../offerWizardTypes';
 
 // Route handlers call createClient() per request. We intercept the module so
 // every call returns whichever client the test currently impersonates.
@@ -160,6 +165,36 @@ describe('deal flow integration: brand approve → offer send → athlete accept
     expect(draftJson.offers).toHaveLength(1);
     const offerId = draftJson.offers[0].id;
 
+    const wizardBase = applyPresetToWizard(emptyOfferWizardState(), 'ugc_social_bundle');
+    const submittedAt = new Date().toISOString();
+    const { error: offerTermsErr } = await adminClient
+      .from('offers')
+      .update({
+        notes: 'Integration test deliverables and compensation.',
+        structured_draft: {
+          version: OFFER_STRUCTURED_DRAFT_VERSION,
+          wizard: {
+            ...wizardBase,
+            basics: {
+              ...wizardBase.basics,
+              offerName: 'Integration test social bundle',
+              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              details: 'Create and publish campaign content for the integration test deal flow.',
+              amount: '$500',
+            },
+            ugc: {
+              ...wizardBase.ugc,
+              primaryPlatforms: ['Instagram'],
+              assetCount: 1,
+              hookOrTalkingPoints: 'Show the product in a natural training-day setting.',
+            },
+          },
+          meta: { submitted: true, submittedAt },
+        },
+      })
+      .eq('id', offerId);
+    if (offerTermsErr) throw new Error(`offer terms update failed: ${offerTermsErr.message}`);
+
     const { data: draftedApp } = await adminClient
       .from('applications')
       .select('status')
@@ -209,6 +244,43 @@ describe('deal flow integration: brand approve → offer send → athlete accept
       .single();
     expect(pay?.deal_id).toBe(acceptJson.dealId);
 
+    const { data: seededDeliverable } = await adminClient
+      .from('deal_deliverables')
+      .select('id')
+      .eq('deal_id', acceptJson.dealId)
+      .single();
+    expect(seededDeliverable?.id).toBeTruthy();
+
+    await adminClient.from('deals').update({ status: 'submission_in_progress' }).eq('id', acceptJson.dealId);
+    await adminClient
+      .from('deal_deliverables')
+      .update({ status: 'approved' })
+      .eq('id', seededDeliverable!.id);
+
+    ctx.client = athleteClient;
+    const { PATCH: patchDeliverable } = await import('@/app/api/deliverables/[deliverableId]/route');
+    const publishRes = await patchDeliverable(
+      new Request('http://test/api/deliverables/' + seededDeliverable!.id, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'published' }),
+      }) as never,
+      { params: Promise.resolve({ deliverableId: seededDeliverable!.id as string }) },
+    );
+    if (publishRes.status !== 200) {
+      const errBody = await publishRes.clone().json().catch(() => ({}));
+      throw new Error(`deliverable publish PATCH got ${publishRes.status}: ${JSON.stringify(errBody)}`);
+    }
+    const publishJson = (await publishRes.json()) as { deliverable?: { status?: string } };
+    expect(publishJson.deliverable?.status).toBe('completed');
+
+    const { data: completedDeal } = await adminClient
+      .from('deals')
+      .select('status')
+      .eq('id', acceptJson.dealId)
+      .single();
+    expect(completedDeal?.status).toBe('approved_completed');
+
     const { data: offer } = await adminClient
       .from('offers')
       .select('status, deal_id')
@@ -216,5 +288,5 @@ describe('deal flow integration: brand approve → offer send → athlete accept
       .single();
     expect(offer?.status).toBe('accepted');
     expect(offer?.deal_id).toBe(acceptJson.dealId);
-  }, 60_000);
+  }, 120_000);
 });
