@@ -17,16 +17,6 @@ import { NilinkLogoMark, NilinkLogoText } from '@/components/brand/NilinkLogo';
 import { createClient } from '@/lib/supabase/client';
 import { userAvatarDataUrl } from '@/lib/userAvatar';
 import { resolveSupabaseRole } from '@/lib/auth/supabaseRole';
-import { AthleteDashboardSkeleton } from '@/components/dashboard/skeletons/AthleteDashboardSkeleton';
-import { BusinessOverviewSkeleton } from '@/components/dashboard/skeletons/BusinessOverviewSkeleton';
-import { ApplicationsSkeleton } from '@/components/dashboard/skeletons/ApplicationsSkeleton';
-import { OffersSkeleton } from '@/components/dashboard/skeletons/OffersSkeleton';
-import { CampaignsSkeleton } from '@/components/dashboard/skeletons/CampaignsSkeleton';
-import { DealsSkeleton } from '@/components/dashboard/skeletons/DealsSkeleton';
-import { DiscoverySkeleton } from '@/components/dashboard/skeletons/DiscoverySkeleton';
-import { InboxSkeleton } from '@/components/dashboard/skeletons/InboxSkeleton';
-import { ProfileSkeleton } from '@/components/dashboard/skeletons/ProfileSkeleton';
-import { AnalyticsSkeleton } from '@/components/dashboard/skeletons/AnalyticsSkeleton';
 
 export type AccountType = 'athlete' | 'business';
 
@@ -75,19 +65,17 @@ const businessNavigation: NavItem[] = [
   { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
 ];
 
-function getNavigationSkeleton(path: string, accountType: AccountType): React.ReactNode {
-  if (path === '/dashboard')
-    return accountType === 'business' ? <BusinessOverviewSkeleton /> : <AthleteDashboardSkeleton />;
-  if (path.startsWith('/dashboard/search'))       return <DiscoverySkeleton />;
-  if (path.startsWith('/dashboard/applications')) return <ApplicationsSkeleton />;
-  if (path.startsWith('/dashboard/offers'))       return <OffersSkeleton />;
-  if (path.startsWith('/dashboard/campaigns'))    return <CampaignsSkeleton />;
-  if (path.startsWith('/dashboard/deals'))        return <DealsSkeleton />;
-  if (path.startsWith('/dashboard/analytics'))    return <AnalyticsSkeleton />;
-  if (path.startsWith('/dashboard/messages'))     return <InboxSkeleton />;
-  if (path.startsWith('/dashboard/profile'))      return <ProfileSkeleton />;
-  return null;
-}
+const dashboardPrefetchPaths = [
+  '/dashboard',
+  '/dashboard/search',
+  '/dashboard/applications',
+  '/dashboard/offers',
+  '/dashboard/campaigns',
+  '/dashboard/deals',
+  '/dashboard/analytics',
+  '/dashboard/messages',
+  '/dashboard/profile',
+];
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -95,7 +83,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<DashboardUser | null>(null);
   const [booting, setBooting] = useState(true);
-  const [pendingPath, setPendingPath] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -182,6 +169,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     };
   }, [supabase, router, mapSupabaseUser, hydrateAvatarFromProfile]);
 
+  useEffect(() => {
+    if (booting || !sessionUser) return;
+    dashboardPrefetchPaths.forEach((path) => router.prefetch(path));
+  }, [booting, sessionUser, router]);
+
   /* ── Onboarding gate for athletes ── */
   useEffect(() => {
     if (booting || !sessionUser) return;
@@ -200,17 +192,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       router.replace('/onboarding');
     }
   }, [booting, sessionUser, pathname, router]);
-
-  useEffect(() => {
-    setPendingPath(null);
-  }, [pathname]);
-
-  // Safety valve: clear stuck skeleton if navigation never resolves
-  useEffect(() => {
-    if (!pendingPath) return;
-    const timer = setTimeout(() => setPendingPath(null), 5000);
-    return () => clearTimeout(timer);
-  }, [pendingPath]);
 
   const offersKey = sessionUser?.role === 'athlete' ? '/api/offers' : null;
   const { data: offersData } = useSWR<OffersListResponse>(offersKey, apiFetcher, {
@@ -282,11 +263,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <nav className="mt-6 min-h-0 flex-1 overflow-x-hidden overflow-y-auto border-t border-nilink-sidebar-muted px-3 py-4 scrollbar-hide">
             <ul className="mt-4 space-y-1.5">
               {navigation.map((item) => {
-                const activePath = pendingPath ?? pathname;
                 const isActive =
                   item.href === '/dashboard'
-                    ? activePath === '/dashboard'
-                    : activePath.startsWith(item.href);
+                    ? pathname === '/dashboard'
+                    : pathname.startsWith(item.href);
                 const badge =
                   accountType === 'athlete' && item.href === '/dashboard/offers'
                     ? pendingOfferCount > 0
@@ -300,7 +280,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   <li key={item.href + item.label}>
                     <Link
                       href={item.href}
-                      onClick={() => { if (item.href !== pathname) setPendingPath(item.href); }}
+                      onMouseEnter={() => router.prefetch(item.href)}
+                      onFocus={() => router.prefetch(item.href)}
                       className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
                     >
                       <motion.div
@@ -394,9 +375,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                         role="menuitem"
                         className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                         onClick={() => {
-                          if (pathname !== '/dashboard/profile') setPendingPath('/dashboard/profile');
                           setIsProfileMenuOpen(false);
                         }}
+                        onMouseEnter={() => router.prefetch('/dashboard/profile')}
+                        onFocus={() => router.prefetch('/dashboard/profile')}
                       >
                         Edit profile
                       </Link>
@@ -418,9 +400,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-nilink-surface">
           <div className="flex min-h-full w-full min-w-0 flex-1 flex-col">
-            {pendingPath !== null && pendingPath !== pathname
-              ? (getNavigationSkeleton(pendingPath, accountType) ?? children)
-              : children}
+            {children}
           </div>
         </main>
       </div>

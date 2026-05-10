@@ -13,6 +13,7 @@ import {
   humanizeDealStatus,
   parseTermsSnapshot,
   patchContractStatus,
+  patchDealStatus,
   patchPaymentStatus,
   patchSubmission,
   postDealContract,
@@ -58,6 +59,18 @@ function DealStatusBadge({ status }: { status: string }) {
   );
 }
 
+function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
+  const map: Record<(typeof STAGE_ORDER)[number], string> = {
+    agreement: 'AGREEMENT',
+    work_in_progress: 'WORK IN PROGRESS',
+    review_revisions: 'REVIEW REVISIONS',
+    completed: 'COMPLETED',
+    payment: 'PAYMENT',
+    closed: 'CLOSED',
+  };
+  return map[step];
+}
+
 function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] }) {
   const index = stageProgress(stageId);
   return (
@@ -78,8 +91,8 @@ function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] })
             >
               {done ? '✓' : i + 1}
             </span>
-            <span className={`text-[11px] font-semibold ${current ? 'text-nilink-ink' : done ? 'text-emerald-700' : 'text-gray-500'}`}>
-              {step.replace(/_/g, ' ')}
+            <span className={`text-[11px] font-bold uppercase leading-tight tracking-wide ${current ? 'text-nilink-ink' : done ? 'text-emerald-700' : 'text-gray-500'}`}>
+              {stageStepLabel(step)}
             </span>
           </li>
         );
@@ -106,6 +119,7 @@ export function BusinessDeals() {
   const [contractFile, setContractFile] = useState<File | null>(null);
   const contractFilePrimaryRef = useRef<HTMLInputElement>(null);
   const contractFileAdvancedRef = useRef<HTMLInputElement>(null);
+  const [paymentReference, setPaymentReference] = useState('');
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
 
   const loadList = useCallback(async () => {
@@ -265,7 +279,7 @@ export function BusinessDeals() {
                 <option value="">All statuses</option>
                 {DEAL_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {humanizeDealStatus(s)}
+                    {humanizeDealStatus(s).toUpperCase()}
                   </option>
                 ))}
               </select>
@@ -402,9 +416,9 @@ export function BusinessDeals() {
           >
             <div className="max-h-[92vh] overflow-y-auto">
               {detailLoading ? (
-                <div className="flex items-center gap-2 p-8 text-sm text-gray-500">
+                <div className="flex items-center gap-2 p-8 text-xs font-bold uppercase tracking-wide text-gray-500">
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Loading deal…
+                  LOADING DEAL…
                 </div>
               ) : detailError || !detail ? (
                 <div className="p-8 text-sm text-red-600">{detailError || 'Deal not found'}</div>
@@ -436,7 +450,7 @@ export function BusinessDeals() {
                             <h3 className="text-sm font-bold text-nilink-ink">{stageProjection.stageLabel}</h3>
                             <p className="text-xs text-gray-600">{stageProjection.stageDescription}</p>
                           </div>
-                          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700">
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-700">
                             {stageProjection.statusLine}
                           </span>
                         </div>
@@ -477,7 +491,7 @@ export function BusinessDeals() {
                               }
                               className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                             >
-                              Approve submission
+                              Approve Submission
                             </button>
                             <button
                               type="button"
@@ -493,16 +507,16 @@ export function BusinessDeals() {
                               }
                               className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
                             >
-                              Request revision
+                              Request Revision
                             </button>
                           </div>
                         </>
                       ) : (
                         <>
                           <p className="mt-2 text-sm font-semibold text-nilink-ink">
-                            {stageProjection?.primaryAction?.label ?? 'No immediate brand action required'}
+                            {stageProjection?.primaryAction?.label ?? 'No Immediate Brand Action Required'}
                           </p>
-                          <p className="mt-1 text-xs text-gray-600">Keep the workflow focused on the current stage.</p>
+                          <p className="mt-1 text-xs text-gray-600">Keep The Workflow Focused On The Current Stage.</p>
                           {!stageProjection?.primaryAction?.enabled ? (
                             <p className="text-xs text-gray-500">
                               {stageProjection?.primaryAction?.reason ?? 'Waiting on athlete/system progression.'}
@@ -561,6 +575,91 @@ export function BusinessDeals() {
                               </div>
                             </div>
                           ) : null}
+                          {stageProjection?.primaryAction?.key === 'send_for_signature' && detail.contract ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'contract-send'}
+                              onClick={() =>
+                                void runAction('contract-send', async () => {
+                                  await patchContractStatus(detail.contract!.id, 'sent_for_signature');
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                            >
+                              Send For Signature
+                            </button>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'activate_deal' ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'deal-active'}
+                              onClick={() =>
+                                void runAction('deal-active', async () => {
+                                  await patchDealStatus(detail.deal.id, 'active');
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Finalize And Start Deal
+                            </button>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'move_to_payment' ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'deal-payment'}
+                              onClick={() =>
+                                void runAction('deal-payment', async () => {
+                                  await patchDealStatus(detail.deal.id, 'payment_pending');
+                                  if (detail.payment) {
+                                    await patchPaymentStatus((detail.payment as ApiPayment).id, 'manual', { provider: 'manual' });
+                                  }
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-nilink-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-nilink-accent-hover disabled:opacity-50"
+                            >
+                              Move To Payment
+                            </button>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'mark_payment_paid' && detail.payment ? (
+                            <div className="mt-3 space-y-2">
+                              <input
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                placeholder="Payment reference or note"
+                                value={paymentReference}
+                                onChange={(e) => setPaymentReference(e.target.value)}
+                              />
+                              <button
+                                type="button"
+                                disabled={pendingAction === 'payment-paid'}
+                                onClick={() =>
+                                  void runAction('payment-paid', async () => {
+                                    await patchPaymentStatus((detail.payment as ApiPayment).id, 'paid', {
+                                      provider: 'manual',
+                                      providerReference: paymentReference.trim(),
+                                    });
+                                    setPaymentReference('');
+                                  })
+                                }
+                                className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                Mark As Paid
+                              </button>
+                            </div>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'close_deal' ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'deal-close'}
+                              onClick={() =>
+                                void runAction('deal-close', async () => {
+                                  await patchDealStatus(detail.deal.id, 'closed');
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                            >
+                              Close Deal
+                            </button>
+                          ) : null}
                         </>
                       )}
                       {stageProjection?.remaining.length ? (
@@ -598,7 +697,7 @@ export function BusinessDeals() {
                                     Due {del.dueAt ? formatIsoDate(del.dueAt) : '—'} · Revisions {del.revisionCountUsed}/{del.revisionLimit}
                                   </p>
                                 </div>
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase text-gray-700">
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-700">
                                   {displayStatusLabel}
                                 </span>
                               </div>
@@ -625,7 +724,7 @@ export function BusinessDeals() {
                                     }
                                     className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                                   >
-                                    Approve submission
+                                    Approve Submission
                                   </button>
                                   <button
                                     type="button"
@@ -641,11 +740,11 @@ export function BusinessDeals() {
                                     }
                                     className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
                                   >
-                                    Request revision
+                                    Request Revision
                                   </button>
                                 </div>
                               ) : (
-                                <p className="mt-3 text-xs text-gray-400">No brand action needed on this deliverable right now.</p>
+                                <p className="mt-3 text-xs text-gray-400">No Brand Action Needed On This Deliverable Right Now.</p>
                               )}
                             </li>
                           );
@@ -751,7 +850,7 @@ export function BusinessDeals() {
                                     }
                                     className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-gray-50 disabled:opacity-50"
                                   >
-                                    Set {s.replace(/_/g, ' ')}
+                                    SET {s.replace(/_/g, ' ').toUpperCase()}
                                   </button>
                                 ))}
                               </div>
@@ -766,7 +865,8 @@ export function BusinessDeals() {
                           {detail.payment ? (
                             <>
                               <p className="text-sm text-gray-600">
-                                {detail.payment.currency} {detail.payment.amount.toLocaleString()} · {paymentStatusCopy(detail.payment.status)}
+                                {detail.payment.currency} {detail.payment.amount.toLocaleString()} ·{' '}
+                                <span className="font-bold uppercase tracking-wide">{paymentStatusCopy(detail.payment.status)}</span>
                               </p>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {PAYMENT_STATUSES.map((s) => (
@@ -781,7 +881,7 @@ export function BusinessDeals() {
                                     }
                                     className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-gray-50 disabled:opacity-50"
                                   >
-                                    {s.replace(/_/g, ' ')}
+                                    {s.replace(/_/g, ' ').toUpperCase()}
                                   </button>
                                 ))}
                               </div>
@@ -797,7 +897,7 @@ export function BusinessDeals() {
                       {selectedId ? (
                         <Link
                           href={`/dashboard/deals/${selectedId}`}
-                          className="flex-1 rounded-xl bg-nilink-ink py-3 text-center text-sm font-bold text-white transition hover:bg-gray-800"
+                          className="flex-1 rounded-xl border border-nilink-accent bg-white py-3 text-center text-sm font-bold text-nilink-accent transition hover:bg-nilink-accent-soft"
                           onClick={() => setSelectedId(null)}
                         >
                           Open full workspace

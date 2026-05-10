@@ -17,6 +17,7 @@ export function getAuthHeaders(): HeadersInit {
 export async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   return fetch(input, {
     ...init,
+    cache: init?.cache ?? 'no-store',
     headers: {
       ...(init?.headers as Record<string, string>),
     },

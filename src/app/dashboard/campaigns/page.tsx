@@ -1,18 +1,8 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-import { CampaignsSkeleton } from '@/components/dashboard/skeletons/CampaignsSkeleton';
-
-const AthleteCampaigns = dynamic(
-  () => import('@/components/dashboard/screens/AthleteCampaigns').then((m) => m.AthleteCampaigns),
-  { ssr: false, loading: () => <CampaignsSkeleton /> }
-);
-
-const BusinessCampaigns = dynamic(
-  () => import('@/components/dashboard/screens/BusinessCampaigns').then((m) => m.BusinessCampaigns),
-  { ssr: false, loading: () => <CampaignsSkeleton /> }
-);
+import { AthleteCampaigns } from '@/components/dashboard/screens/AthleteCampaigns';
+import { BusinessCampaigns } from '@/components/dashboard/screens/BusinessCampaigns';
 
 export default function CampaignsPage() {
   const { accountType } = useDashboard();

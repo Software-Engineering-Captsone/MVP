@@ -12,6 +12,7 @@ import {
   formatShortId,
   humanizeDealStatus,
   patchContractStatus,
+  patchDealStatus,
   patchPaymentStatus,
   patchSubmission,
   postDealContract,
@@ -63,12 +64,12 @@ function DealStatusBadge({ status, surface = 'light' }: { status: string; surfac
 
 function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
   const map: Record<(typeof STAGE_ORDER)[number], string> = {
-    agreement: 'Agreement',
-    work_in_progress: 'Work in progress',
-    review_revisions: 'Review & revisions',
-    completed: 'Deliverables done',
-    payment: 'Payment',
-    closed: 'Closed',
+    agreement: 'AGREEMENT',
+    work_in_progress: 'WORK IN PROGRESS',
+    review_revisions: 'REVIEW REVISIONS',
+    completed: 'DELIVERABLES DONE',
+    payment: 'PAYMENT',
+    closed: 'CLOSED',
   };
   return map[step];
 }
@@ -94,7 +95,7 @@ function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] })
               {done ? '✓' : i + 1}
             </span>
             <span
-              className={`min-w-0 truncate text-[11px] font-semibold leading-tight ${
+              className={`min-w-0 truncate text-[11px] font-bold uppercase leading-tight tracking-wide ${
                 current ? 'text-white' : done ? 'text-emerald-200' : 'text-white/60'
               }`}
             >
@@ -158,6 +159,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
   const [contractStatusDraft, setContractStatusDraft] = useState<string>('');
   const [paymentStatusDraft, setPaymentStatusDraft] = useState<string>('');
+  const [paymentReference, setPaymentReference] = useState('');
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
@@ -261,9 +263,9 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
 
   if (detailLoading && !detail) {
     return (
-      <div className="flex min-h-[40vh] items-center gap-2 dash-main-gutter-x py-12 text-sm text-gray-500">
+      <div className="flex min-h-[40vh] items-center gap-2 dash-main-gutter-x py-12 text-xs font-bold uppercase tracking-wide text-gray-500">
         <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
-        Loading deal…
+        LOADING DEAL…
       </div>
     );
   }
@@ -328,9 +330,9 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
 
       <div className="flex-1 overflow-auto pb-10 dash-main-gutter-x pt-6">
         {detailLoading ? (
-          <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+          <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-gray-500">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Refreshing…
+            REFRESHING…
           </div>
         ) : null}
 
@@ -415,7 +417,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                         }
                         className="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
-                        Approve submission
+                        Approve Submission
                       </button>
                       <button
                         type="button"
@@ -431,14 +433,14 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                         }
                         className="cursor-pointer rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
                       >
-                        Request revision
+                        Request Revision
                       </button>
                     </div>
                       </>
                     ) : (
                       <>
                     <p className="mt-2 text-sm font-semibold text-nilink-ink">
-                      {stageProjection?.primaryAction?.label ?? 'No immediate action required from you'}
+                      {stageProjection?.primaryAction?.label ?? 'No Immediate Action Required From You'}
                     </p>
                     <p className="mt-1 text-xs text-gray-600">When something needs your attention, it will show up here.</p>
                     {!stageProjection?.primaryAction?.enabled ? (
@@ -503,6 +505,91 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                         </div>
                       </div>
                     ) : null}
+                    {stageProjection?.primaryAction?.key === 'send_for_signature' && detail.contract ? (
+                      <button
+                        type="button"
+                        disabled={pendingAction === 'contract-send'}
+                        onClick={() =>
+                          void runAction('contract-send', async () => {
+                            await patchContractStatus(detail.contract!.id, 'sent_for_signature');
+                          })
+                        }
+                        className="mt-3 cursor-pointer rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        Send For Signature
+                      </button>
+                    ) : null}
+                    {stageProjection?.primaryAction?.key === 'activate_deal' ? (
+                      <button
+                        type="button"
+                        disabled={pendingAction === 'deal-active'}
+                        onClick={() =>
+                          void runAction('deal-active', async () => {
+                            await patchDealStatus(detail.deal.id, 'active');
+                          })
+                        }
+                        className="mt-3 cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        Finalize And Start Deal
+                      </button>
+                    ) : null}
+                    {stageProjection?.primaryAction?.key === 'move_to_payment' ? (
+                      <button
+                        type="button"
+                        disabled={pendingAction === 'deal-payment'}
+                        onClick={() =>
+                          void runAction('deal-payment', async () => {
+                            await patchDealStatus(detail.deal.id, 'payment_pending');
+                            if (detail.payment) {
+                              await patchPaymentStatus((detail.payment as ApiPayment).id, 'manual', { provider: 'manual' });
+                            }
+                          })
+                        }
+                        className="mt-3 cursor-pointer rounded-lg bg-nilink-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-nilink-accent-hover disabled:opacity-50"
+                      >
+                        Move To Payment
+                      </button>
+                    ) : null}
+                    {stageProjection?.primaryAction?.key === 'mark_payment_paid' && detail.payment ? (
+                      <div className="mt-3 space-y-2">
+                        <input
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nilink-accent/30"
+                          placeholder="Payment reference or note"
+                          value={paymentReference}
+                          onChange={(e) => setPaymentReference(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          disabled={pendingAction === 'payment-paid'}
+                          onClick={() =>
+                            void runAction('payment-paid', async () => {
+                              await patchPaymentStatus((detail.payment as ApiPayment).id, 'paid', {
+                                provider: 'manual',
+                                providerReference: paymentReference.trim(),
+                              });
+                              setPaymentReference('');
+                            })
+                          }
+                          className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          Mark As Paid
+                        </button>
+                      </div>
+                    ) : null}
+                    {stageProjection?.primaryAction?.key === 'close_deal' ? (
+                      <button
+                        type="button"
+                        disabled={pendingAction === 'deal-close'}
+                        onClick={() =>
+                          void runAction('deal-close', async () => {
+                            await patchDealStatus(detail.deal.id, 'closed');
+                          })
+                        }
+                        className="mt-3 cursor-pointer rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        Close Deal
+                      </button>
+                    ) : null}
                       </>
                     )}
                     {stageProjection?.remaining.length ? (
@@ -563,7 +650,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                               {del.revisionLimit}
                             </p>
                           </div>
-                          <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase text-gray-700">
+                          <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-700">
                             {displayStatusLabel}
                           </span>
                         </div>
@@ -601,7 +688,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                                 }
                                 className="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                               >
-                                Approve submission
+                                Approve Submission
                               </button>
                               <button
                                 type="button"
@@ -617,7 +704,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                                 }
                                 className="cursor-pointer rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
                               >
-                                Request revision
+                                Request Revision
                               </button>
                             </div>
                           )
@@ -770,7 +857,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                           {detail.payment.currency} {detail.payment.amount.toLocaleString()}
                         </span>
                         <span className="text-gray-500"> · </span>
-                        {paymentStatusCopy(detail.payment.status)}
+                        <span className="font-bold uppercase tracking-wide">{paymentStatusCopy(detail.payment.status)}</span>
                       </p>
                       <label htmlFor="payment-status-select" className="mt-4 block text-xs font-semibold text-gray-600">
                         Set payment status
@@ -784,7 +871,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                         >
                           {PAYMENT_STATUSES.map((s) => (
                             <option key={s} value={s}>
-                              {paymentStatusCopy(s)}
+                              {paymentStatusCopy(s).toUpperCase()}
                             </option>
                           ))}
                         </select>

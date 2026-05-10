@@ -1,20 +1,11 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { DealsSkeleton } from '@/components/dashboard/skeletons/DealsSkeleton';
-
-const DealManagement = dynamic(
-  () => import('@/components/dashboard/screens/DealManagement').then((m) => m.DealManagement),
-  { ssr: false, loading: () => <DealsSkeleton /> }
-);
-
-const BusinessDeals = dynamic(
-  () => import('@/components/dashboard/screens/BusinessDeals').then((m) => m.BusinessDeals),
-  { ssr: false, loading: () => <DealsSkeleton /> }
-);
+import { DealManagement } from '@/components/dashboard/screens/DealManagement';
+import { BusinessDeals } from '@/components/dashboard/screens/BusinessDeals';
 
 function DealsContent() {
   const { accountType } = useDashboard();

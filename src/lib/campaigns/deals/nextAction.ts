@@ -41,10 +41,13 @@ export function computeDealNextAction(args: {
       if (c === 'not_added') {
         return { nextActionOwner: 'brand', nextActionLabel: 'Add contract document' };
       }
-      if (c === 'uploaded' || c === 'sent_for_signature') {
+      if (c === 'uploaded') {
+        return { nextActionOwner: 'brand', nextActionLabel: 'Send contract for signature' };
+      }
+      if (c === 'sent_for_signature') {
         return { nextActionOwner: 'athlete', nextActionLabel: 'Review and sign contract' };
       }
-      return { nextActionOwner: 'brand', nextActionLabel: 'Send contract for signature' };
+      return { nextActionOwner: 'brand', nextActionLabel: 'Finalize and start deal' };
     case 'active':
       if (anyDeliverableNeedsAthlete(deliverables)) {
         return { nextActionOwner: 'athlete', nextActionLabel: 'Work on deliverables' };
@@ -59,8 +62,14 @@ export function computeDealNextAction(args: {
     case 'approved_completed':
       return { nextActionOwner: 'brand', nextActionLabel: 'Confirm payment readiness' };
     case 'payment_pending':
+      if (p === 'paid') {
+        return { nextActionOwner: 'brand', nextActionLabel: 'Archive and close deal' };
+      }
       if (p === 'ready_to_release') {
         return { nextActionOwner: 'brand', nextActionLabel: 'Release payment' };
+      }
+      if (p === 'manual' || p === 'pending' || p === 'awaiting_setup' || p === 'not_configured') {
+        return { nextActionOwner: 'brand', nextActionLabel: 'Record manual payment' };
       }
       if (p === 'failed') {
         return { nextActionOwner: 'brand', nextActionLabel: 'Resolve payment failure' };

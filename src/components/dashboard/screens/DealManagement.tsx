@@ -161,6 +161,18 @@ function cardProgressIndex(deal: ApiDeal): number {
   return 1;
 }
 
+function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
+  const map: Record<(typeof STAGE_ORDER)[number], string> = {
+    agreement: 'AGREEMENT',
+    work_in_progress: 'WORK IN PROGRESS',
+    review_revisions: 'REVIEW REVISIONS',
+    completed: 'COMPLETED',
+    payment: 'PAYMENT',
+    closed: 'CLOSED',
+  };
+  return map[step];
+}
+
 function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] }) {
   const index = stageProgress(stageId);
   return (
@@ -181,8 +193,8 @@ function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] })
             >
               {done ? '✓' : i + 1}
             </span>
-            <span className={`text-[11px] font-semibold ${current ? 'text-nilink-ink' : done ? 'text-emerald-700' : 'text-gray-500'}`}>
-              {step.replace(/_/g, ' ')}
+            <span className={`text-[11px] font-bold uppercase leading-tight tracking-wide ${current ? 'text-nilink-ink' : done ? 'text-emerald-700' : 'text-gray-500'}`}>
+              {stageStepLabel(step)}
             </span>
           </li>
         );
@@ -740,9 +752,9 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
             onClick={(e) => e.stopPropagation()}
           >
             {detailLoading ? (
-              <div className="flex items-center gap-2 p-8 text-sm text-gray-500">
+              <div className="flex items-center gap-2 p-8 text-xs font-bold uppercase tracking-wide text-gray-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Loading deal…
+                LOADING DEAL…
               </div>
             ) : detailError || !detail ? (
               <div className="space-y-4 p-8">
@@ -783,7 +795,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                           <h3 className="text-sm font-bold text-nilink-ink">{stageProjection.stageLabel}</h3>
                           <p className="text-xs text-gray-600">{stageProjection.stageDescription}</p>
                         </div>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700">
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-700">
                           {stageProjection.statusLine}
                         </span>
                       </div>
@@ -799,7 +811,7 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                   <section className="rounded-xl border border-gray-100 bg-white p-4">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Next Action</h3>
                     <p className="mt-2 text-sm font-semibold text-nilink-ink">
-                      {stageProjection?.primaryAction?.label ?? 'Continue with current deal workflow'}
+                      {stageProjection?.primaryAction?.label ?? 'Continue With Current Deal Workflow'}
                     </p>
                     <p className="mt-1 text-xs text-gray-600">
                       {stageProjection?.primaryAction?.enabled
@@ -872,9 +884,9 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                                   Due {del.dueAt ? formatIsoDate(del.dueAt) : 'TBD'} · Revisions {del.revisionCountUsed}/{del.revisionLimit}
                                 </p>
                               </div>
-                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase text-gray-700">
-                                {displayStatusLabel}
-                              </span>
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-700">
+                                  {displayStatusLabel}
+                                </span>
                             </div>
                             <p className="mt-2 text-sm text-gray-600">{del.instructions}</p>
                             <p className="mt-2 text-xs text-gray-500">
@@ -1039,11 +1051,11 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                                   }
                                   className="mt-3 w-full rounded-xl bg-nilink-ink py-2.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
                                 >
-                                  Send submission
+                                  {pendingKey === `sub-${del.id}` ? 'Sending...' : 'Send submission'}
                                 </button>
                               </div>
                             ) : (
-                              <p className="mt-3 text-xs text-gray-400">No athlete action needed for this deliverable right now.</p>
+                              <p className="mt-3 text-xs text-gray-400">No Athlete Action Needed For This Deliverable Right Now.</p>
                             )}
                             </div>
                           );
@@ -1056,7 +1068,8 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                     <section className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800">Payout Status</h3>
                       <p className="mt-2 text-sm font-semibold text-emerald-900">
-                        {detail.payment.currency} {detail.payment.amount.toLocaleString()} · {detail.payment.status.replace(/_/g, ' ')}
+                        {detail.payment.currency} {detail.payment.amount.toLocaleString()} ·{' '}
+                        <span className="font-bold uppercase tracking-wide">{detail.payment.status.replace(/_/g, ' ')}</span>
                       </p>
                       <p className="mt-1 text-xs text-emerald-800/90">
                         {detail.payment.paidAt ? `Paid ${formatIsoDate(detail.payment.paidAt)}` : 'Payment will update once release conditions are met.'}

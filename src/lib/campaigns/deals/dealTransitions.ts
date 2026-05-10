@@ -13,12 +13,13 @@ export const DEAL_ALLOWED_TRANSITIONS: Readonly<Record<DealStatus, ReadonlySet<D
   /** `approved_completed` allowed only when all deliverables are `completed` (enforced in repository). */
   submission_in_progress: new Set<DealStatus>(['under_review', 'approved_completed', 'cancelled', 'disputed']),
   under_review: new Set<DealStatus>([
+    'submission_in_progress',
     'revision_requested',
     'approved_completed',
     'cancelled',
     'disputed',
   ]),
-  revision_requested: new Set<DealStatus>(['submission_in_progress', 'approved_completed', 'cancelled', 'disputed']),
+  revision_requested: new Set<DealStatus>(['submission_in_progress', 'under_review', 'approved_completed', 'cancelled', 'disputed']),
   approved_completed: new Set<DealStatus>(['payment_pending', 'closed', 'cancelled', 'disputed']),
   payment_pending: new Set<DealStatus>(['paid', 'cancelled', 'disputed']),
   paid: new Set<DealStatus>(['closed', 'disputed']),
@@ -35,7 +36,7 @@ export function assertDealStatusTransition(from: DealStatus, to: DealStatus): vo
 }
 
 export function dealTransitionRequiresSignedContract(from: DealStatus, to: DealStatus): boolean {
-  return from === 'contract_pending' && to === 'active';
+  return (from === 'contract_pending' || from === 'created') && to === 'active';
 }
 
 export function assertContractStatusTransition(from: ContractStatus, to: ContractStatus): void {
