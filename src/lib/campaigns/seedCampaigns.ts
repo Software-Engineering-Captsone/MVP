@@ -212,7 +212,7 @@ export function buildSeedCampaignTemplates(): Record<string, unknown>[] {
         acceptApplications: true,
       }),
       image: '',
-      status: 'Reviewing Candidates',
+      status: 'Active',
       createdAt: daysAgoIso(7),
       updatedAt: daysAgoIso(1),
     },

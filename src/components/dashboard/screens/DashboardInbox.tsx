@@ -72,7 +72,7 @@ function getRenderableMessageBody(msg: ChatMessageRow): {
   if (raw.startsWith(APPLICATION_APPROVED_MARKER)) {
     const stripped = raw.replace(APPLICATION_APPROVED_MARKER, '').trim();
     return {
-      text: stripped || 'Application approved — you can coordinate here.',
+      text: stripped || 'Offer draft started - you can coordinate here.',
       isApplicationApprovedNotice: true,
     };
   }
@@ -82,7 +82,7 @@ function getRenderableMessageBody(msg: ChatMessageRow): {
 function getRenderableMessagePreview(body: string): string {
   if (body.startsWith(APPLICATION_APPROVED_MARKER)) {
     const stripped = body.replace(APPLICATION_APPROVED_MARKER, '').trim();
-    return stripped || 'Application approved — you can coordinate here.';
+    return stripped || 'Offer draft started - you can coordinate here.';
   }
   return body;
 }
@@ -1053,7 +1053,7 @@ function MessageBlock({
         <div className="max-w-md rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center shadow-sm">
           <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-            Application approved
+            Offer draft started
           </div>
           <p className="text-sm text-emerald-900">{renderable.text}</p>
           <p className="mt-1 text-xs text-emerald-700/80">{ts}</p>

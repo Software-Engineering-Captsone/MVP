@@ -10,7 +10,7 @@ describe('deriveCampaignStatusFromSubmission', () => {
     expect(status).toBe('Draft');
   });
 
-  it('returns Reviewing Candidates when submission is complete but not launched', () => {
+  it('keeps publish-ready but unlaunched submissions as Draft', () => {
     const status = deriveCampaignStatusFromSubmission(
       { campaignBriefV2: { schemaVersion: 'v2' } },
       {
@@ -18,7 +18,7 @@ describe('deriveCampaignStatusFromSubmission', () => {
         validatePublishReady: () => true,
       }
     );
-    expect(status).toBe('Reviewing Candidates');
+    expect(status).toBe('Draft');
   });
 
   it('returns Active when launched and campaign has not ended', () => {

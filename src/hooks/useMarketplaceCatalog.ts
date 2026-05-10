@@ -4,20 +4,50 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Athlete, Brand } from '@/lib/mockData';
 import { fetchAthletesCatalog, fetchBrandsCatalog } from '@/lib/marketplaceFetch';
 
+type MarketplaceCatalogSnapshot = {
+  brands: Brand[];
+  athletes: Athlete[];
+};
+
+let catalogCache: MarketplaceCatalogSnapshot | null = null;
+let catalogPromise: Promise<MarketplaceCatalogSnapshot> | null = null;
+
+async function loadMarketplaceCatalog(): Promise<MarketplaceCatalogSnapshot> {
+  if (catalogCache) return catalogCache;
+  if (!catalogPromise) {
+    catalogPromise = Promise.all([fetchBrandsCatalog(), fetchAthletesCatalog()])
+      .then(([brands, athletes]) => {
+        catalogCache = { brands, athletes };
+        return catalogCache;
+      })
+      .finally(() => {
+        catalogPromise = null;
+      });
+  }
+  return catalogPromise;
+}
+
 export function useMarketplaceCatalog() {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [brands, setBrands] = useState<Brand[]>(() => catalogCache?.brands ?? []);
+  const [athletes, setAthletes] = useState<Athlete[]>(() => catalogCache?.athletes ?? []);
+  const [loading, setLoading] = useState(() => catalogCache === null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (catalogCache) {
+      setBrands(catalogCache.brands);
+      setAthletes(catalogCache.athletes);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
-        const [b, a] = await Promise.all([fetchBrandsCatalog(), fetchAthletesCatalog()]);
+        const snapshot = await loadMarketplaceCatalog();
         if (!cancelled) {
-          setBrands(b);
-          setAthletes(a);
+          setBrands(snapshot.brands);
+          setAthletes(snapshot.athletes);
         }
       } catch (e) {
         if (!cancelled) {

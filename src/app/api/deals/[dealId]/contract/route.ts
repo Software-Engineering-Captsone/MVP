@@ -46,6 +46,9 @@ export async function POST(
           ? body.fileRef.trim()
           : null;
   }
+  if (!fileUrl) {
+    return NextResponse.json({ error: 'Contract document is required' }, { status: 400 });
+  }
 
   try {
     const contract = await createDealContract(dealId, fileUrl, {

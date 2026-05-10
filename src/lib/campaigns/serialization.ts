@@ -1,4 +1,5 @@
 import type { StoredApplication, StoredCampaign, StoredOffer } from './repository';
+import { normalizeApplicationStatus, normalizeCampaignStatus } from './status';
 
 function idOf(row: { _id?: unknown }): string {
   return row._id != null ? String(row._id) : '';
@@ -30,16 +31,17 @@ export function campaignToJSON(c: StoredCampaign) {
     platforms: c.platforms ?? [],
     image: c.image ?? '',
     campaignBriefV2: c.campaignBriefV2 ?? null,
-    status: c.status,
+    status: normalizeCampaignStatus(c.status),
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   };
 }
 
 export function applicationToJSON(a: StoredApplication) {
+  const status = normalizeApplicationStatus(a.status);
   const statusHistory = [
     { status: 'pending', at: a.createdAt },
-    ...(a.status && a.status !== 'pending' ? [{ status: a.status, at: a.updatedAt }] : []),
+    ...(status !== 'pending' ? [{ status, at: a.updatedAt }] : []),
   ].filter((entry) => entry.at);
   const previousPitch =
     typeof a.previousPitch === 'string' && a.previousPitch.trim().length > 0
@@ -50,9 +52,9 @@ export function applicationToJSON(a: StoredApplication) {
     id: idOf(a),
     campaignId: a.campaignId,
     athleteUserId: a.athleteUserId,
-    status: a.status,
+    status,
     pitch: a.pitch ?? '',
-    withdrawnByAthlete: a.status === 'withdrawn',
+    withdrawnByAthlete: status === 'withdrawn',
     statusHistory,
     hasPreviousPitch: previousPitch.length > 0,
     athleteSnapshot: a.athleteSnapshot ?? {},

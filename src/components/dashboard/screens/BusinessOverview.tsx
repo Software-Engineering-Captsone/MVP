@@ -16,6 +16,7 @@ import { staggerContainer, staggerItem } from '@/components/dashboard/dashboardM
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { useSavedMarketplace } from '@/hooks/useSavedMarketplace';
 import { formatCampaignRelativePosted, type ApiCampaignRow } from '@/lib/campaigns/clientMap';
+import { normalizeApplicationStatus, normalizeCampaignStatus } from '@/lib/campaigns/status';
 import { apiFetcher } from '@/hooks/api/fetcher';
 import { compensationAmountFromDealSnapshot, type ApiDeal } from '@/lib/deals/dashboardDealsClient';
 
@@ -77,7 +78,7 @@ export function BusinessOverview() {
   const { data: overview, isLoading: overviewLoading } = useSWR<BrandOverviewResponse>(
     '/api/dashboard/brand/overview',
     apiFetcher,
-    { revalidateOnFocus: false, refreshInterval: 30000 }
+    { revalidateOnFocus: true, refreshInterval: 30000 }
   );
   const campaigns = overview?.campaigns ?? EMPTY_CAMPAIGNS;
   const campaignRows = campaigns.slice(0, 3);
@@ -109,16 +110,18 @@ export function BusinessOverview() {
       const engagementLabel = String(snap.engagement ?? '').trim() || '—';
       const followersCount = parseHumanCount(followersLabel);
       const engagementPct = Number.parseFloat(engagementLabel.replace('%', '')) || 0;
-      const status = String(app.status ?? '').toLowerCase();
+      const status = normalizeApplicationStatus(app.status);
       const statusWeight =
         status === 'shortlisted'
           ? 8
           : status === 'under_review'
             ? 6
-            : status === 'applied'
+            : status === 'pending'
               ? 4
-              : status === 'offer_sent'
+              : status === 'offer_drafted'
                 ? 7
+              : status === 'offer_sent'
+                ? 8
                 : 3;
       const score = followersCount * 0.0005 + engagementPct * 5 + statusWeight;
       const previous = map.get(athleteId);
@@ -165,18 +168,18 @@ export function BusinessOverview() {
   }, [recommendedAthletes]);
 
   const activeCampaignCount = campaigns.filter((campaign) => {
-    const status = String(campaign.status ?? '').toLowerCase();
-    return status !== 'draft' && status !== 'archived' && status !== 'completed';
+    const status = normalizeCampaignStatus(campaign.status);
+    return status === 'Active';
   }).length;
 
   const pipelineCounts = useMemo(() => {
     const counts = { outreach: 0, review: 0, negotiating: 0, active: 0, completed: 0 };
     for (const app of campaignApplications) {
-      const status = String(app.status ?? '').toLowerCase();
-      if (status === 'applied' || status === 'pending') counts.outreach += 1;
+      const status = normalizeApplicationStatus(app.status);
+      if (status === 'pending') counts.outreach += 1;
       else if (status === 'under_review') counts.review += 1;
       else if (status === 'shortlisted') counts.negotiating += 1;
-      else if (status === 'offer_sent' || status === 'approved') counts.active += 1;
+      else if (status === 'offer_drafted' || status === 'offer_sent') counts.active += 1;
       else counts.completed += 1;
     }
     return counts;

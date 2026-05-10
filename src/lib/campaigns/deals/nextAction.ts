@@ -36,15 +36,18 @@ export function computeDealNextAction(args: {
 
   switch (deal.status) {
     case 'created':
-      return { nextActionOwner: 'brand', nextActionLabel: 'Advance deal to contract phase' };
+      return { nextActionOwner: 'brand', nextActionLabel: 'Send contract for signature' };
     case 'contract_pending':
       if (c === 'not_added') {
         return { nextActionOwner: 'brand', nextActionLabel: 'Add contract document' };
       }
-      if (c === 'uploaded' || c === 'sent_for_signature') {
+      if (c === 'uploaded') {
+        return { nextActionOwner: 'brand', nextActionLabel: 'Send contract for signature' };
+      }
+      if (c === 'sent_for_signature') {
         return { nextActionOwner: 'athlete', nextActionLabel: 'Review and sign contract' };
       }
-      return { nextActionOwner: 'brand', nextActionLabel: 'Send contract for signature' };
+      return { nextActionOwner: 'athlete', nextActionLabel: 'Review and sign contract' };
     case 'active':
       if (anyDeliverableNeedsAthlete(deliverables)) {
         return { nextActionOwner: 'athlete', nextActionLabel: 'Work on deliverables' };
@@ -57,7 +60,7 @@ export function computeDealNextAction(args: {
     case 'revision_requested':
       return { nextActionOwner: 'athlete', nextActionLabel: 'Apply revision feedback' };
     case 'approved_completed':
-      return { nextActionOwner: 'brand', nextActionLabel: 'Confirm payment readiness' };
+      return { nextActionOwner: 'brand', nextActionLabel: 'Mark payment paid' };
     case 'payment_pending':
       if (p === 'ready_to_release') {
         return { nextActionOwner: 'brand', nextActionLabel: 'Release payment' };
@@ -67,7 +70,7 @@ export function computeDealNextAction(args: {
       }
       return { nextActionOwner: 'system', nextActionLabel: 'Complete payment setup' };
     case 'paid':
-      return { nextActionOwner: 'brand', nextActionLabel: 'Archive and close deal' };
+      return { nextActionOwner: null, nextActionLabel: 'Payment complete' };
     case 'closed':
       return { nextActionOwner: null, nextActionLabel: 'No further actions' };
     case 'cancelled':
@@ -92,7 +95,7 @@ export function refineNextActionWithDeliverables(
     return { nextActionOwner: 'brand', nextActionLabel: 'Review submitted deliverables' };
   }
   if (deal.status === 'approved_completed' && allDeliverablesTerminal(deliverables)) {
-    return { nextActionOwner: 'brand', nextActionLabel: 'Move to payment' };
+    return { nextActionOwner: 'brand', nextActionLabel: 'Mark payment paid' };
   }
   return base;
 }

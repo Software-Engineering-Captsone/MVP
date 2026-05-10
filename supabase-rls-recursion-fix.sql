@@ -64,6 +64,7 @@ create policy "Brands update applications on own campaigns"
       'under_review',
       'shortlisted',
       'approved',
+      'offer_drafted',
       'declined',
       'offer_sent',
       'offer_declined'

@@ -3,12 +3,13 @@ import { getChatSessionUser } from '@/lib/chat/session';
 import { createClient } from '@/lib/supabase/server';
 import { jsonError } from '@/lib/api/jsonError';
 import {
-  getCampaignById,
   isPastCampaignApplicationDeadline,
+  listCampaignsByIds,
   listApplicationsForAthlete,
+  listOffersForAthlete,
 } from '@/lib/campaigns/repository';
 import { applicationToJSON } from '@/lib/campaigns/serialization';
-import { getThreadByApplicationId } from '@/lib/chat/service';
+import { listThreadsByApplicationIds } from '@/lib/chat/service';
 import {
   athleteMaySendOnApplication,
   athleteMayViewApplicationThread,
@@ -21,17 +22,25 @@ export async function GET() {
   if (session.role !== 'athlete') return jsonError(403, 'Forbidden');
 
   const rows = await listApplicationsForAthlete(session.id);
+  const campaigns = await listCampaignsByIds(rows.map((app) => String(app.campaignId ?? '')));
+  const campaignById = new Map(campaigns.map((campaign) => [String(campaign._id ?? ''), campaign]));
+  const offers = await listOffersForAthlete(session.id);
+  const threads = await listThreadsByApplicationIds(supabase, rows.map((app) => String(app._id ?? '')));
+  const threadByApplicationId = new Map(
+    threads
+      .filter((thread) => thread.application_id)
+      .map((thread) => [String(thread.application_id), thread]),
+  );
 
   const mapped = await Promise.all(
     rows.map(async (app) => {
-      const campaign = await getCampaignById(String(app.campaignId ?? ''));
+      const campaign = campaignById.get(String(app.campaignId ?? '')) ?? null;
       const brandId = campaign?.brandUserId != null ? String(campaign.brandUserId) : '';
 
       let canSend = false;
       let canViewThread = false;
       try {
-        const offers: Parameters<typeof athleteMaySendOnApplication>[1] = [];
-        const existingThread = await getThreadByApplicationId(supabase, String(app._id ?? ''));
+        const existingThread = threadByApplicationId.get(String(app._id ?? '')) ?? null;
         canSend = athleteMaySendOnApplication(app, offers);
         canViewThread = brandId
           ? await athleteMayViewApplicationThread(

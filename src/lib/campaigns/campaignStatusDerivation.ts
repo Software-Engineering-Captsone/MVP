@@ -1,10 +1,11 @@
-import { validateCampaignPublish } from './publishValidation';
+import type { CanonicalCampaignStatus } from './status';
 
 type CampaignSubmitIntent = 'draft' | 'publish';
 
 type DeriveStatusOptions = {
   intent: CampaignSubmitIntent;
   now?: Date;
+  /** Kept for backward-compatible call sites; draft submissions now always persist as Draft. */
   validatePublishReady?: (input: Record<string, unknown>) => boolean;
 };
 
@@ -36,15 +37,11 @@ function hasCampaignEnded(input: Record<string, unknown>, now: Date): boolean {
 export function deriveCampaignStatusFromSubmission(
   input: Record<string, unknown>,
   options: DeriveStatusOptions
-): 'Draft' | 'Reviewing Candidates' | 'Active' | 'Completed' {
+): CanonicalCampaignStatus {
   const now = options.now ?? new Date();
   if (hasCampaignEnded(input, now)) return 'Completed';
 
   if (options.intent === 'publish') return 'Active';
 
-  const isPublishReady = options.validatePublishReady
-    ? options.validatePublishReady(input)
-    : validateCampaignPublish(input, { enablePolicyWarnings: false }).blockingIssues.length === 0;
-
-  return isPublishReady ? 'Reviewing Candidates' : 'Draft';
+  return 'Draft';
 }

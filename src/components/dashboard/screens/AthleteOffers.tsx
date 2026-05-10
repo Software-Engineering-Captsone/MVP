@@ -135,7 +135,7 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
       }
       await mutateOffers();
       if (data.deal?.id) {
-        router.push(`/dashboard/deals?deal=${encodeURIComponent(data.deal.id)}`);
+        router.push(`/dashboard/deals/${encodeURIComponent(data.deal.id)}`);
       } else {
         setNotice('Offer accepted. Your deal is now in Deals.');
         router.push('/dashboard/deals');
@@ -442,4 +442,3 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
     </div>
   );
 }
-

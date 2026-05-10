@@ -34,7 +34,7 @@ export function useApplicationsList() {
   const { data, error, isLoading, mutate } = useSWR<ApplicationsListResponse>(
     '/api/applications',
     apiFetcher,
-    { revalidateOnFocus: false, refreshInterval: 0 }
+    { revalidateOnFocus: true, refreshInterval: 0 }
   );
   return {
     applications: data?.applications ?? [],

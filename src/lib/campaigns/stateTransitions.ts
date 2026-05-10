@@ -1,3 +1,13 @@
+import {
+  type CanonicalApplicationStatus,
+  type CanonicalCampaignStatus,
+  canCreateOfferDraftFromApplicationStatus,
+  canSendOfferFromApplicationStatus,
+  isKnownApplicationStatus,
+  normalizeApplicationStatus,
+  normalizeCampaignStatus,
+} from './status';
+
 export class CampaignStatusTransitionError extends Error {
   constructor(message: string) {
     super(message);
@@ -5,36 +15,39 @@ export class CampaignStatusTransitionError extends Error {
   }
 }
 
-/** Application review states (brand-controlled after submit). */
-const APPLICATION_TRANSITIONS: Record<
-  string,
-  Set<'under_review' | 'shortlisted' | 'rejected' | 'offer_sent' | 'offer_declined'>
-> = {
-  // New lifecycle
-  applied: new Set(['under_review', 'shortlisted', 'rejected']),
-  under_review: new Set(['shortlisted', 'rejected']),
-  shortlisted: new Set(['under_review', 'rejected', 'offer_sent']),
-  rejected: new Set(),
+/** Application review states. Legacy values are normalized before transition checks. */
+const APPLICATION_TRANSITIONS: Record<CanonicalApplicationStatus, Set<CanonicalApplicationStatus>> = {
+  pending: new Set(['under_review', 'shortlisted', 'declined', 'withdrawn', 'offer_drafted']),
+  under_review: new Set(['pending', 'shortlisted', 'declined', 'withdrawn', 'offer_drafted']),
+  shortlisted: new Set(['under_review', 'declined', 'withdrawn', 'offer_drafted', 'offer_sent']),
+  offer_drafted: new Set(['shortlisted', 'declined', 'withdrawn', 'offer_sent']),
   offer_sent: new Set(['offer_declined']),
-  offer_declined: new Set(),
-  // Legacy lifecycle aliases (`from` keys). Targets use canonical statuses only.
-  pending: new Set(['shortlisted', 'offer_sent', 'rejected']),
-  approved: new Set(['offer_declined']),
   declined: new Set(),
+  withdrawn: new Set(['pending']),
+  offer_declined: new Set(),
 };
 
 export function isApplicationStatusTransitionAllowed(
   from: string,
-  to: 'under_review' | 'shortlisted' | 'rejected' | 'offer_sent' | 'offer_declined'
+  to: string
 ): boolean {
-  const allowed = APPLICATION_TRANSITIONS[from];
+  if (!isKnownApplicationStatus(from) || !isKnownApplicationStatus(to)) return false;
+  const normalizedFrom = normalizeApplicationStatus(from);
+  const normalizedTo = normalizeApplicationStatus(to);
+  if (normalizedTo === 'offer_drafted') {
+    return canCreateOfferDraftFromApplicationStatus(normalizedFrom);
+  }
+  if (normalizedTo === 'offer_sent') {
+    return canSendOfferFromApplicationStatus(normalizedFrom);
+  }
+  const allowed = APPLICATION_TRANSITIONS[normalizedFrom];
   if (!allowed) return false;
-  return allowed.has(to);
+  return allowed.has(normalizedTo);
 }
 
 export function assertApplicationStatusTransition(
   from: string,
-  to: 'under_review' | 'shortlisted' | 'rejected' | 'offer_sent' | 'offer_declined'
+  to: string
 ): void {
   if (!isApplicationStatusTransitionAllowed(from, to)) {
     throw new ApplicationStatusTransitionError(
@@ -45,11 +58,12 @@ export function assertApplicationStatusTransition(
   }
 }
 
-const DEAL_CREATION_SOURCES = new Set([
-  'Active',
-  'Reviewing Candidates',
-  'Deal Creation in Progress',
-]);
+const CAMPAIGN_TRANSITIONS: Record<CanonicalCampaignStatus, Set<CanonicalCampaignStatus>> = {
+  Draft: new Set(['Active', 'Cancelled']),
+  Active: new Set(['Completed', 'Cancelled']),
+  Completed: new Set(),
+  Cancelled: new Set(),
+};
 
 /**
  * Guards only high-risk campaign jumps; other status changes remain allowed for product flexibility.
@@ -58,11 +72,13 @@ export function validateCampaignStatusTransition(
   fromStatus: string,
   toStatus: string
 ): { ok: true } | { ok: false; error: string } {
-  if (fromStatus === toStatus) return { ok: true };
-  if (toStatus === 'Deal Creation in Progress' && !DEAL_CREATION_SOURCES.has(fromStatus)) {
+  const from = normalizeCampaignStatus(fromStatus);
+  const to = normalizeCampaignStatus(toStatus);
+  if (from === to) return { ok: true };
+  if (!CAMPAIGN_TRANSITIONS[from].has(to)) {
     return {
       ok: false,
-      error: `Campaign cannot move to Deal Creation in Progress from status "${fromStatus}"`,
+      error: `Campaign cannot move from "${from}" to "${to}"`,
     };
   }
   return { ok: true };

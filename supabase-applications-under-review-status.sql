@@ -18,6 +18,7 @@ alter table public.applications
       'under_review',
       'shortlisted',
       'approved',
+      'offer_drafted',
       'offer_sent',
       'offer_declined',
       'declined',
@@ -59,6 +60,7 @@ create policy "Brands update applications on own campaigns"
       'under_review',
       'shortlisted',
       'approved',
+      'offer_drafted',
       'declined',
       'offer_sent',
       'offer_declined'

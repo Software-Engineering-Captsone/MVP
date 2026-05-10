@@ -191,7 +191,7 @@ export async function POST(
         campaign_id: offer.campaign_id,
         application_id: offer.application_id,
         terms_snapshot: termsSnapshot,
-        status: 'created',
+        status: 'contract_pending',
       })
       .select('id')
       .single();

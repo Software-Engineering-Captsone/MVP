@@ -75,9 +75,8 @@ function ContentCard({ item, showPlay }: { item: ContentItem; showPlay: boolean 
   );
 }
 
-// Aligned with deriveCampaignStatusFromSubmission: 'Active' is the published, accepting-applicants
-// state; 'Reviewing Candidates' is the draft-but-publish-ready state. Both are eligible for
-// referral invites. (Legacy 'Open for Applications' kept for backwards-compatible API rows.)
+// 'Active' is the canonical published, accepting-applicants state.
+// Legacy open/reviewing labels remain eligible for backwards-compatible API rows.
 const REFERRAL_ELIGIBLE_STATUSES = new Set([
   'Active',
   'Reviewing Candidates',

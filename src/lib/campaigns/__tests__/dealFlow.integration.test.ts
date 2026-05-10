@@ -75,7 +75,7 @@ describe('deal flow integration: brand approve → offer send → athlete accept
       .insert({
         brand_id: brandId,
         name: `IT Campaign ${stamp}`,
-        status: 'Open for Applications',
+        status: 'Active',
         visibility: 'Public',
         accept_applications: true,
       })
@@ -127,13 +127,13 @@ describe('deal flow integration: brand approve → offer send → athlete accept
       new Request('http://test/api/applications/' + applicationId, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status: 'approved' }),
+        body: JSON.stringify({ status: 'shortlisted' }),
       }) as never,
       { params: Promise.resolve({ id: applicationId }) },
     );
     if (approveRes.status !== 200) {
       const errBody = await approveRes.clone().json().catch(() => ({}));
-      throw new Error(`application approval PATCH got ${approveRes.status}: ${JSON.stringify(errBody)}`);
+      throw new Error(`application shortlist PATCH got ${approveRes.status}: ${JSON.stringify(errBody)}`);
     }
     expect(approveRes.status).toBe(200);
 
@@ -159,6 +159,13 @@ describe('deal flow integration: brand approve → offer send → athlete accept
     const draftJson = (await draftRes.json()) as { offers: Array<{ id: string }> };
     expect(draftJson.offers).toHaveLength(1);
     const offerId = draftJson.offers[0].id;
+
+    const { data: draftedApp } = await adminClient
+      .from('applications')
+      .select('status')
+      .eq('id', applicationId)
+      .single();
+    expect(draftedApp?.status).toBe('offer_drafted');
 
     const { POST: postSend } = await import('@/app/api/offers/[offerId]/send/route');
     const sendRes = await postSend(

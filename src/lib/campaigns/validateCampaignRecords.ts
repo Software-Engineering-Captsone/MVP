@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { normalizeInboundApplicationStatus, normalizeCampaignStatus } from './status';
 
 function formatJoiError(err: Joi.ValidationError): string {
   return err.details.map((d) => d.message.replace(/"/g, "'")).join('; ');
@@ -6,11 +7,14 @@ function formatJoiError(err: Joi.ValidationError): string {
 
 const CAMPAIGN_STATUSES = [
   'Draft',
-  'Ready to Launch',
-  'Reviewing Candidates',
-  'Deal Creation in Progress',
   'Active',
   'Completed',
+  'Cancelled',
+  // Legacy statuses kept readable for older persisted rows.
+  'Ready to Launch',
+  'Open for Applications',
+  'Reviewing Candidates',
+  'Deal Creation in Progress',
 ] as const;
 
 const campaignSchema = Joi.object({
@@ -31,8 +35,8 @@ const campaignSchema = Joi.object({
 
 export function validateCampaignInput(data: Record<string, unknown>): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...data };
-  if (merged.status === 'Open for Applications') {
-    merged.status = 'Active';
+  if (typeof merged.status === 'string') {
+    merged.status = normalizeCampaignStatus(merged.status);
   }
   const { error, value } = campaignSchema.validate(merged, {
     abortEarly: false,
@@ -59,15 +63,17 @@ const applicationSchema = Joi.object({
       'applied',
       'under_review',
       'shortlisted',
+      'offer_drafted',
       'rejected',
       'offer_sent',
       'offer_declined',
       // Legacy statuses kept for backward-compatible reads/migrations.
       'pending',
       'approved',
-      'declined'
+      'declined',
+      'withdrawn'
     )
-    .default('applied'),
+    .default('pending'),
   pitch: Joi.string().allow('').optional(),
   athleteSnapshot: Joi.object().unknown(true).optional(),
   messages: Joi.array().items(applicationMessageSchema).optional(),
@@ -78,6 +84,9 @@ export function validateApplicationInput(data: Record<string, unknown>): Record<
   const merged: Record<string, unknown> = { ...data };
   if (merged.source == null || merged.source === '') {
     merged.source = 'regular';
+  }
+  if (typeof merged.status === 'string') {
+    merged.status = normalizeInboundApplicationStatus(merged.status) ?? merged.status;
   }
   const { error, value } = applicationSchema.validate(merged, {
     abortEarly: false,

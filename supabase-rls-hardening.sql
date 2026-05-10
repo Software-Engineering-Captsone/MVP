@@ -158,7 +158,7 @@ begin
         to authenticated
         using (
           visibility = 'Public'
-          and status in ('Open for Applications', 'Reviewing Candidates')
+          and status in ('Active', 'Open for Applications', 'Reviewing Candidates')
         )
     $policy$;
   end if;

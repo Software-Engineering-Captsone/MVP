@@ -16,7 +16,7 @@ export function useCampaignsList(searchParams?: URLSearchParams) {
   const { data, error, isLoading, mutate } = useSWR<CampaignsListResponse>(
     key,
     apiFetcher,
-    { revalidateOnFocus: false, refreshInterval: 0 }
+    { revalidateOnFocus: true, refreshInterval: 0 }
   );
   return {
     campaigns: data?.campaigns ?? [],

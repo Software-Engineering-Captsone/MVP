@@ -1,18 +1,8 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-import { ProfileSkeleton } from '@/components/dashboard/skeletons/ProfileSkeleton';
-
-const ProfileEditor = dynamic(
-  () => import('@/components/dashboard/screens/ProfileEditor').then((m) => m.ProfileEditor),
-  { ssr: false, loading: () => <ProfileSkeleton /> }
-);
-
-const BusinessProfile = dynamic(
-  () => import('@/components/dashboard/screens/BusinessProfile').then((m) => m.BusinessProfile),
-  { ssr: false, loading: () => <ProfileSkeleton /> }
-);
+import { ProfileEditor } from '@/components/dashboard/screens/ProfileEditor';
+import { BusinessProfile } from '@/components/dashboard/screens/BusinessProfile';
 
 export default function ProfilePage() {
   const { accountType } = useDashboard();

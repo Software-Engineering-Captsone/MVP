@@ -534,7 +534,7 @@ export function AthleteExploreMarketplace() {
           body: JSON.stringify({
             pitch: pitch.trim(),
             athleteSnapshot: {},
-            status: 'applied',
+            status: 'pending',
           }),
         });
         const data = (await res.json()) as { error?: string };

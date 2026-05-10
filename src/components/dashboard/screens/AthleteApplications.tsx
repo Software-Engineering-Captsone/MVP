@@ -2,21 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Check, FileEdit, History, Loader2, XCircle } from 'lucide-react';
+import { Calendar, Check, FileEdit, History, XCircle } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
 import { useApplicationsList, type ApplicationWithCampaign } from '@/hooks/api/useApplicationsList';
+import {
+  applicationStatusLabel,
+  type CanonicalApplicationStatus,
+  normalizeApplicationStatus,
+} from '@/lib/campaigns/status';
 
-type ApplicationStatus =
-  | 'applied'
-  | 'under_review'
-  | 'shortlisted'
-  | 'approved'
-  | 'offer_sent'
-  | 'offer_declined'
-  | 'rejected'
-  | 'withdrawn';
+type ApplicationStatus = CanonicalApplicationStatus;
 
 type ApplicationTab =
   | 'all'
@@ -41,8 +38,6 @@ const EDIT_PROMPT_CHIPS = [
   { label: 'Content idea', text: 'Content idea: I would create ' },
 ] as const;
 const EDIT_PROMPT_TEXTS = EDIT_PROMPT_CHIPS.map((chip) => chip.text);
-const LOAD_ERROR_MESSAGE = 'Could not load applications. Refresh and try again.';
-const NETWORK_ERROR_MESSAGE = 'Network issue while loading applications. Please try again.';
 const UPDATE_ERROR_MESSAGE = 'Update failed. Check your connection and try again.';
 const WITHDRAW_ERROR_MESSAGE = 'Withdraw failed. Check your connection and try again.';
 const REAPPLY_ERROR_MESSAGE = 'Re-apply failed. Check your connection and try again.';
@@ -60,42 +55,27 @@ function tabLabel(tab: ApplicationTab): string {
 }
 
 function normalizeStatus(row: ApplicationWithCampaign['application']): ApplicationStatus {
-  const status = String(row.status ?? '');
-  if (status === 'rejected' && row.withdrawnByAthlete === true) return 'withdrawn';
-  if (status === 'withdrawn') return 'withdrawn';
-  if (status === 'applied' || status === 'pending') return 'applied';
-  if (status === 'under_review') return 'under_review';
-  if (status === 'shortlisted') return 'shortlisted';
-  if (status === 'approved') return 'approved';
-  if (status === 'offer_sent') return 'offer_sent';
-  if (status === 'offer_declined') return 'offer_declined';
-  return 'rejected';
+  if (row.withdrawnByAthlete === true) return 'withdrawn';
+  return normalizeApplicationStatus(row.status);
 }
 
 function statusLabel(status: ApplicationStatus): string {
-  if (status === 'under_review') return 'Under review';
-  if (status === 'approved') return 'Approved';
-  if (status === 'offer_sent') return 'Offer sent';
-  if (status === 'offer_declined') return 'Offer declined';
-  if (status === 'shortlisted') return 'Shortlisted';
-  if (status === 'withdrawn') return 'Withdrawn';
-  if (status === 'rejected') return 'Rejected';
-  return 'Applied';
+  return applicationStatusLabel(status);
 }
 
 function statusClass(status: ApplicationStatus): string {
   if (status === 'offer_sent') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'approved') return 'border-teal-200 bg-teal-50 text-teal-800';
+  if (status === 'offer_drafted') return 'border-teal-200 bg-teal-50 text-teal-800';
   if (status === 'offer_declined') return 'border-orange-200 bg-orange-50 text-orange-700';
   if (status === 'shortlisted') return 'border-amber-200 bg-amber-50 text-amber-700';
   if (status === 'under_review') return 'border-blue-200 bg-blue-50 text-blue-700';
   if (status === 'withdrawn') return 'border-slate-200 bg-slate-100 text-slate-700';
-  if (status === 'rejected') return 'border-red-200 bg-red-50 text-red-700';
+  if (status === 'declined') return 'border-red-200 bg-red-50 text-red-700';
   return 'border-gray-200 bg-gray-50 text-gray-700';
 }
 
 function statusHelperCopy(status: ApplicationStatus): string {
-  if (status === 'applied') {
+  if (status === 'pending') {
     return 'Submitted successfully. The brand has not started reviewing your application yet.';
   }
   if (status === 'under_review') {
@@ -104,8 +84,8 @@ function statusHelperCopy(status: ApplicationStatus): string {
   if (status === 'shortlisted') {
     return 'You made the shortlist. You may receive an offer next.';
   }
-  if (status === 'approved') {
-    return 'The brand approved your application and is finalizing terms. You will see the formal offer under Offers once it is sent.';
+  if (status === 'offer_drafted') {
+    return 'The brand is drafting your offer. You will see the formal offer under Offers once it is sent.';
   }
   if (status === 'offer_sent') {
     return 'An offer has been sent. Review details and respond in your Offers tab.';
@@ -120,11 +100,11 @@ function statusHelperCopy(status: ApplicationStatus): string {
 }
 
 function pipelineIndex(status: ApplicationStatus): number | null {
-  if (status === 'applied') return 0;
+  if (status === 'pending') return 0;
   if (status === 'under_review') return 1;
   if (status === 'shortlisted') return 2;
   /** Past shortlist: offer step in progress (draft) or delivered. */
-  if (status === 'approved' || status === 'offer_sent') return 3;
+  if (status === 'offer_drafted' || status === 'offer_sent') return 3;
   return null;
 }
 
@@ -215,10 +195,10 @@ export function AthleteApplications() {
     for (const row of sorted) {
       const status = normalizeStatus(row.application);
       if (
-        status === 'applied' ||
+        status === 'pending' ||
         status === 'under_review' ||
         status === 'shortlisted' ||
-        status === 'approved' ||
+        status === 'offer_drafted' ||
         status === 'offer_sent'
       ) {
         counts.active += 1;
@@ -237,7 +217,7 @@ export function AthleteApplications() {
       const status = normalizeStatus(row.application);
       if (status === 'under_review') inReview += 1;
       if (status === 'offer_sent') offersSent += 1;
-      if (status === 'offer_declined' || status === 'rejected' || status === 'withdrawn') {
+      if (status === 'offer_declined' || status === 'declined' || status === 'withdrawn') {
         closed += 1;
       }
     }
@@ -255,14 +235,14 @@ export function AthleteApplications() {
       const status = normalizeStatus(row.application);
       if (activeTab === 'active') {
         return (
-          status === 'applied' ||
+          status === 'pending' ||
           status === 'under_review' ||
           status === 'shortlisted' ||
-          status === 'approved' ||
+          status === 'offer_drafted' ||
           status === 'offer_sent'
         );
       }
-      return status === 'offer_declined' || status === 'rejected' || status === 'withdrawn';
+      return status === 'offer_declined' || status === 'declined' || status === 'withdrawn';
     });
   }, [activeTab, sorted]);
 
@@ -413,7 +393,7 @@ export function AthleteApplications() {
         body: JSON.stringify({
           pitch: rowActionError.retryPitch ?? '',
           athleteSnapshot: {},
-          status: 'applied',
+          status: 'pending',
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -607,8 +587,8 @@ export function AthleteApplications() {
             <ul className="space-y-3">
               {displayRows.map((row) => {
                 const status = normalizeStatus(row.application);
-                const canEdit = status === 'applied';
-                const canWithdraw = status === 'applied';
+                const canEdit = status === 'pending';
+                const canWithdraw = status === 'pending';
                 const reapplyBlockedByDeadline =
                   status === 'withdrawn' && row.campaign?.applicationDeadlinePassed === true;
                 const canReapply =
@@ -760,7 +740,7 @@ export function AthleteApplications() {
                                     body: JSON.stringify({
                                       pitch: row.application.pitch ?? '',
                                       athleteSnapshot: {},
-                                      status: 'applied',
+                                      status: 'pending',
                                     }),
                                   });
                                   const data = (await res.json()) as { error?: string };

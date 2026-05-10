@@ -180,7 +180,7 @@ function ensureDemoSeed(draft: FallbackStore): void {
       id: randomUUID(),
       threadId: approvedThreadId,
       fromUserId: brandUserId,
-      body: '[nilink-notice:application_approved] Application approved — you can coordinate here.',
+      body: '[nilink-notice:application_approved] Offer draft started - you can coordinate here.',
       createdAt: t1,
       messageKind: 'system',
       offerId: null,

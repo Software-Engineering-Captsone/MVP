@@ -1,31 +1,32 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { DealsSkeleton } from '@/components/dashboard/skeletons/DealsSkeleton';
-
-const DealManagement = dynamic(
-  () => import('@/components/dashboard/screens/DealManagement').then((m) => m.DealManagement),
-  { ssr: false, loading: () => <DealsSkeleton /> }
-);
-
-const BusinessDeals = dynamic(
-  () => import('@/components/dashboard/screens/BusinessDeals').then((m) => m.BusinessDeals),
-  { ssr: false, loading: () => <DealsSkeleton /> }
-);
+import { DealManagement } from '@/components/dashboard/screens/DealManagement';
+import { BusinessDeals } from '@/components/dashboard/screens/BusinessDeals';
 
 function DealsContent() {
   const { accountType } = useDashboard();
   const params = useSearchParams();
+  const router = useRouter();
   const deal = params.get('deal');
+
+  useEffect(() => {
+    if (deal) router.replace(`/dashboard/deals/${encodeURIComponent(deal)}`);
+  }, [deal, router]);
+
+  if (deal) {
+    return <DealsSkeleton />;
+  }
 
   if (accountType === 'business') {
     return <BusinessDeals />;
   }
 
-  return <DealManagement initialDealId={deal} />;
+  return <DealManagement />;
 }
 
 export default function DealsPage() {

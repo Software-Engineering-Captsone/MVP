@@ -500,6 +500,54 @@ const DEAL_SELECT =
   'chat_thread_id, terms_snapshot, status, contract_id, payment_id, ' +
   'created_at, updated_at';
 
+async function setDealStatusDirect(
+  supabase: SupabaseClient,
+  dealId: string,
+  status: DealStatus,
+): Promise<void> {
+  const { error } = await supabase.from('deals').update({ status }).eq('id', dealId);
+  if (error) throw new Error(error.message);
+}
+
+async function loadDealStatus(
+  supabase: SupabaseClient,
+  dealId: string,
+): Promise<DealStatus | null> {
+  const { data, error } = await supabase.from('deals').select('status').eq('id', dealId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? ((data as { status: string }).status as DealStatus) : null;
+}
+
+async function moveDealToReview(supabase: SupabaseClient, dealId: string): Promise<void> {
+  const status = await loadDealStatus(supabase, dealId);
+  if (status && status !== 'under_review' && status !== 'cancelled' && status !== 'closed' && status !== 'paid') {
+    await setDealStatusDirect(supabase, dealId, 'under_review');
+  }
+}
+
+async function moveDealToRevision(supabase: SupabaseClient, dealId: string): Promise<void> {
+  const status = await loadDealStatus(supabase, dealId);
+  if (status && status !== 'revision_requested' && status !== 'cancelled' && status !== 'closed' && status !== 'paid') {
+    await setDealStatusDirect(supabase, dealId, 'revision_requested');
+  }
+}
+
+async function completeDealIfAllDeliverablesDone(supabase: SupabaseClient, dealId: string): Promise<void> {
+  const { data, error } = await supabase.from('deal_deliverables').select('status').eq('deal_id', dealId);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as Array<{ status: string }>;
+  if (rows.length === 0 || rows.some((row) => row.status !== 'completed')) return;
+
+  const status = await loadDealStatus(supabase, dealId);
+  if (status && status !== 'approved_completed' && status !== 'payment_pending' && status !== 'paid' && status !== 'closed') {
+    await setDealStatusDirect(supabase, dealId, 'approved_completed');
+  }
+}
+
+async function markDealPaid(supabase: SupabaseClient, dealId: string): Promise<void> {
+  await setDealStatusDirect(supabase, dealId, 'paid');
+}
+
 async function loadAthleteMetaForDeals(
   supabase: SupabaseClient,
   rows: DbDealRow[],
@@ -900,10 +948,14 @@ export async function createDealContract(
   if (existingErr) throw new Error(existingErr.message);
 
   if (existing) {
+    const existingRow = existing as unknown as DbContractRow;
+    if (existingRow.status === 'signed') {
+      throw new Error('Signed contracts cannot be replaced');
+    }
     const { data: updated, error: updateErr } = await supabase
       .from('deal_contracts')
-      .update({ file_url: fileUrl, status: 'uploaded' })
-      .eq('id', (existing as unknown as DbContractRow).id)
+      .update({ file_url: fileUrl, status: 'sent_for_signature' })
+      .eq('id', existingRow.id)
       .select(CONTRACT_SELECT)
       .single();
     if (updateErr || !updated) {
@@ -920,12 +972,15 @@ export async function createDealContract(
       metadata: { contractId: out.id },
     });
     notifyDealPlaceholder('contract_uploaded', { dealId, contractId: out.id });
+    if ((await loadDealStatus(supabase, dealId)) === 'created') {
+      await setDealStatusDirect(supabase, dealId, 'contract_pending');
+    }
     return out;
   }
 
   const { data: inserted, error: insertErr } = await supabase
     .from('deal_contracts')
-    .insert({ deal_id: dealId, file_url: fileUrl, status: 'uploaded' })
+    .insert({ deal_id: dealId, file_url: fileUrl, status: 'sent_for_signature' })
     .select(CONTRACT_SELECT)
     .single();
   if (insertErr || !inserted) {
@@ -949,6 +1004,9 @@ export async function createDealContract(
     metadata: { contractId: contract.id },
   });
   notifyDealPlaceholder('contract_uploaded', { dealId, contractId: contract.id });
+  if ((await loadDealStatus(supabase, dealId)) === 'created') {
+    await setDealStatusDirect(supabase, dealId, 'contract_pending');
+  }
 
   return contract;
 }
@@ -972,13 +1030,14 @@ export async function updateContractStatus(
 
   const { data: dealRow, error: dealErr } = await supabase
     .from('deals')
-    .select('brand_id, athlete_id')
+    .select('brand_id, athlete_id, status')
     .eq('id', currentRow.deal_id)
     .maybeSingle();
   if (dealErr) throw new Error(dealErr.message);
   if (!dealRow) throw new Error('Deal not found');
   const brandId = (dealRow as { brand_id: string }).brand_id;
   const athleteId = (dealRow as { athlete_id: string }).athlete_id;
+  const dealStatus = (dealRow as { status: string }).status as DealStatus;
   if (to === 'signed') {
     if (actor.role !== 'athlete' || actor.userId !== athleteId) {
       throw new Error('Only the athlete on this deal can sign the contract');
@@ -1015,6 +1074,9 @@ export async function updateContractStatus(
       metadata: { contractId },
     });
     notifyDealPlaceholder('contract_signed', { dealId: currentRow.deal_id, contractId });
+    if (dealStatus === 'contract_pending' || dealStatus === 'created') {
+      await setDealStatusDirect(supabase, currentRow.deal_id, 'active');
+    }
   }
   return out;
 }
@@ -1038,7 +1100,14 @@ export async function updatePaymentStatus(
   await assertActorIsDealBrand(supabase, currentRow.deal_id, actor);
 
   const fromStatus = currentRow.status as PaymentStatus;
-  assertPaymentStatusTransition(fromStatus, to);
+  const dealStatus = await loadDealStatus(supabase, currentRow.deal_id);
+  if (to === 'paid') {
+    if (dealStatus !== 'approved_completed' && dealStatus !== 'payment_pending' && dealStatus !== 'paid') {
+      throw new Error('Payment can only be marked paid after deliverables are complete');
+    }
+  } else {
+    assertPaymentStatusTransition(fromStatus, to);
+  }
 
   const patch: Record<string, unknown> = { status: to };
   if (to === 'paid' && !currentRow.paid_at) {
@@ -1066,6 +1135,7 @@ export async function updatePaymentStatus(
     metadata: { paymentId, from: fromStatus, to },
   });
   if (to === 'paid') {
+    await markDealPaid(supabase, currentRow.deal_id);
     notifyDealPlaceholder('payment_paid', { dealId: currentRow.deal_id, paymentId });
   } else {
     notifyDealPlaceholder('payment_status_changed', {
@@ -1096,6 +1166,20 @@ export async function updateDealStatus(
   const currentRow = current as unknown as DbDealRow;
   const from = currentRow.status as DealStatus;
   assertDealStatusTransition(from, to);
+  const isBrand = actor.role === 'brand' && actor.userId === currentRow.brand_id;
+  const isAthlete = actor.role === 'athlete' && actor.userId === currentRow.athlete_id;
+  if (!isBrand && !isAthlete) {
+    throw new Error('Forbidden');
+  }
+  const brandOnly =
+    to === 'contract_pending' ||
+    to === 'payment_pending' ||
+    to === 'paid' ||
+    to === 'closed' ||
+    (from === 'contract_pending' && to === 'active');
+  if (brandOnly && !isBrand) {
+    throw new Error('Only the brand on this deal can perform this action');
+  }
 
   if (dealTransitionRequiresSignedContract(from, to)) {
     const { data: contract, error: contractErr } = await supabase
@@ -1271,6 +1355,7 @@ export async function createSubmissionForDeliverable(
     .update({ status: 'draft_submitted' })
     .eq('id', deliverableId);
   if (deliverableUpdateErr) throw new Error(deliverableUpdateErr.message);
+  await moveDealToReview(supabase, deliverableRow.deal_id);
 
   const apiSub = dbSubmissionToApi(inserted as unknown as DbSubmissionRow);
   await recordDealActivity({
@@ -1346,6 +1431,7 @@ export async function updateDeliverable(
       metadata: {},
     });
     notifyDealPlaceholder('deliverable_completed', { dealId: row.deal_id, deliverableId });
+    await completeDealIfAllDeliverablesDone(supabase, row.deal_id);
   }
   return api;
 }
@@ -1427,14 +1513,9 @@ export async function updateSubmission(
         /* no-op */
       }
     } else if (to === 'approved') {
-      if (d.publish_required) {
-        assertDeliverableStatusTransition(d.status as DeliverableStatus, 'approved');
-        deliverablePatch.status = 'approved';
-      } else {
-        assertDeliverableStatusTransition(d.status as DeliverableStatus, 'approved');
-        assertDeliverableStatusTransition('approved', 'completed');
-        deliverablePatch.status = 'completed';
-      }
+      assertDeliverableStatusTransition(d.status as DeliverableStatus, 'approved');
+      assertDeliverableStatusTransition('approved', 'completed');
+      deliverablePatch.status = 'completed';
     }
 
     if (Object.keys(deliverablePatch).length > 0) {
@@ -1462,6 +1543,7 @@ export async function updateSubmission(
       submissionId,
       deliverableId: currentRow.deliverable_id,
     });
+    await moveDealToRevision(supabase, currentRow.deal_id);
   } else if (to === 'approved') {
     await recordDealActivity({
       dealId: currentRow.deal_id,
@@ -1477,6 +1559,7 @@ export async function updateSubmission(
       submissionId,
       deliverableId: currentRow.deliverable_id,
     });
+    await completeDealIfAllDeliverablesDone(supabase, currentRow.deal_id);
   }
 
   return apiOut;

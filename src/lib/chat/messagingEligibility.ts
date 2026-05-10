@@ -13,7 +13,12 @@ const OFFER_STATUSES_ALLOWING_ATHLETE_SEND = new Set(['draft', 'sent', 'accepted
 /** Athlete may send on application thread after brand review, or when an offer exists. */
 export function athleteMaySendOnApplication(app: StoredApplication, offers: StoredOffer[]): boolean {
   const appStatus = String(app.status ?? '');
-  if (appStatus === 'under_review' || appStatus === 'shortlisted' || appStatus === 'offer_sent') {
+  if (
+    appStatus === 'under_review' ||
+    appStatus === 'shortlisted' ||
+    appStatus === 'offer_drafted' ||
+    appStatus === 'offer_sent'
+  ) {
     return true;
   }
   // Legacy compatibility.

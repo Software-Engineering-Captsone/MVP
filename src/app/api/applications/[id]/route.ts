@@ -16,11 +16,19 @@ import {
   ensureApplicationCampaignThread,
   insertApplicationApprovedNoticeOnce,
 } from '@/lib/chat/service';
+import { normalizeInboundApplicationStatus } from '@/lib/campaigns/status';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Inbound from brand UI; `rejected` is normalized to `declined` for the DB. */
-const ALLOWED_INBOUND = new Set(['shortlisted', 'approved', 'declined', 'under_review', 'rejected']);
+/** Inbound from brand UI; legacy labels are normalized before hitting the DB. */
+const ALLOWED_INBOUND = new Set([
+  'under_review',
+  'shortlisted',
+  'offer_drafted',
+  'approved',
+  'declined',
+  'rejected',
+]);
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const user = await getAuthUser();
@@ -67,8 +75,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (typeof raw !== 'string' || !ALLOWED_INBOUND.has(raw)) {
     return jsonError(400, 'Invalid status');
   }
-  const status: 'under_review' | 'shortlisted' | 'approved' | 'declined' =
-    raw === 'rejected' ? 'declined' : (raw as 'under_review' | 'shortlisted' | 'approved' | 'declined');
+  const status = normalizeInboundApplicationStatus(raw);
+  if (!status || !ALLOWED_INBOUND.has(raw)) {
+    return jsonError(400, 'Invalid status');
+  }
+  if (status === 'withdrawn') {
+    return jsonError(400, 'Invalid status');
+  }
 
   try {
     const updated = await updateApplicationStatus(id, user.userId, status);
@@ -76,9 +89,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Not found or forbidden' }, { status: 404 });
     }
 
-    // On approval, spin up (or return) the application-linked chat thread
-    // and drop a one-time system notice. Chat failure must not fail approval.
-    if (status === 'approved') {
+    // When an offer draft exists, spin up (or return) the application-linked chat thread
+    // and drop a one-time system notice. Chat failure must not fail the status update.
+    if (status === 'offer_drafted') {
       try {
         const campaign = await getCampaignByIdForBrand(String(updated.campaignId), user.userId);
         if (campaign) {

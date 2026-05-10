@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Edit3, Calendar, DollarSign, MapPin,
   Users, Eye, Target, Package, Globe, Lock,
   Check, Clock, Send, MoreHorizontal,
   FileText, Video, Image, ArrowRight, TrendingUp,
-  XCircle, UserPlus, Zap, MessageSquare, Loader2,
+  XCircle, UserPlus, Zap, MessageSquare, Loader2, ChevronLeft,
 } from 'lucide-react';
 import { authFetch } from '@/lib/authFetch';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
@@ -17,18 +17,11 @@ const OfferWizard = dynamic(
   () => import('@/components/offers/OfferWizard').then((m) => m.OfferWizard),
   { ssr: false, loading: () => null }
 );
-import { COPY_INVITE_TO_CAMPAIGN, COPY_REFERRAL, COPY_SEND_OFFER } from '@/lib/productCopy';
 import type {
-  ApplicationQueueSource,
   Campaign,
   CampaignStatus,
   CandidateStatus,
 } from '@/components/dashboard/screens/campaignDashboardTypes';
-
-const applicationSourceStyles: Record<ApplicationQueueSource, string> = {
-  referral: 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
-  regular: 'bg-gray-50 text-gray-600 border-gray-200',
-};
 
 /* ── Status Badge (shared) ──────────────────────────────────── */
 const campaignStatusStyles: Record<CampaignStatus, string> = {
@@ -39,6 +32,7 @@ const campaignStatusStyles: Record<CampaignStatus, string> = {
   'Deal Creation in Progress': 'bg-gray-100 text-nilink-ink border-gray-300',
   'Active': 'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Completed': 'bg-gray-100 text-gray-600 border-gray-300',
+  'Cancelled': 'bg-red-50 text-red-600 border-red-200',
 };
 
 const candidateStatusStyles: Record<CandidateStatus, string> = {
@@ -47,6 +41,7 @@ const candidateStatusStyles: Record<CandidateStatus, string> = {
   'Applied': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
   'Under Review': 'bg-blue-50 text-blue-700 border-blue-200',
   'Shortlisted': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Offer Drafted': 'bg-teal-50 text-teal-700 border-teal-200',
   'Offer Sent': 'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Offer Declined': 'bg-orange-50 text-orange-700 border-orange-200',
   'Withdrawn': 'bg-slate-100 text-slate-700 border-slate-300',
@@ -67,7 +62,7 @@ const deliverableStatusStyles: Record<string, string> = {
 /* ── Tab Definitions ────────────────────────────────────────── */
 type TabId = 'overview' | 'candidates' | 'athletes' | 'deliverables' | 'activity';
 
-const tabs: { id: TabId; label: string }[] = [
+const baseTabs: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'candidates', label: 'Candidates' },
   { id: 'athletes', label: 'Athletes' },
@@ -75,13 +70,15 @@ const tabs: { id: TabId; label: string }[] = [
   { id: 'activity', label: 'Activity' },
 ];
 
-type CandidateFilter = 'All' | 'Applied' | 'Under Review' | 'Shortlisted' | 'Offer Sent';
+type CandidateFilter = 'All' | 'Applied' | 'Under Review' | 'Shortlisted' | 'Offer Drafted' | 'Offer Sent';
 
-/** Application queue slice (referral vs organic) for the candidates table. */
-type QueueSourceFilter = 'all' | 'referral' | 'regular';
 
 function isEligibleForOffer(candidateStatus: CandidateStatus): boolean {
-  return candidateStatus === 'Shortlisted';
+  return candidateStatus === 'Shortlisted' || candidateStatus === 'Offer Drafted';
+}
+
+function canRejectCandidate(candidateStatus: CandidateStatus): boolean {
+  return ['Applied', 'Under Review', 'Shortlisted', 'Offer Drafted'].includes(candidateStatus);
 }
 
 /* ── Main Component ─────────────────────────────────────────── */
@@ -92,14 +89,13 @@ interface Props {
   brandReviewMode?: boolean;
   onPatchApplication?: (
     applicationId: string,
-    status: 'under_review' | 'shortlisted' | 'rejected' | 'approved'
+    status: 'under_review' | 'shortlisted' | 'rejected' | 'offer_drafted'
   ) => Promise<{ warnings?: { code?: string; message: string }[] } | undefined>;
-  onPatchCampaignStatus?: (campaignId: string, status: CampaignStatus) => Promise<void>;
   /**
-   * Handoff: create offer draft(s) from selected application ids, then caller may advance campaign.
-   * When set, “Send Shortlisted to Offers” uses this instead of only patching campaign status.
+   * Handoff: create offer draft(s) from selected application ids without changing campaign status.
    */
-  onSendSelectedToDeals?: (applicationIds: string[]) => Promise<void>;
+  onCreateOfferDrafts?: (applicationIds: string[]) => Promise<Record<string, string> | void>;
+  initialOfferByApplicationId?: Record<string, string>;
   onApplicationsUpdated?: () => void | Promise<void>;
 }
 
@@ -108,15 +104,15 @@ export function CampaignDetail({
   onBack,
   brandReviewMode = false,
   onPatchApplication,
-  onPatchCampaignStatus,
-  onSendSelectedToDeals,
+  onCreateOfferDrafts,
+  initialOfferByApplicationId = {},
   onApplicationsUpdated,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>(() =>
+    brandReviewMode && campaign.candidates.length > 0 ? 'candidates' : 'overview'
+  );
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
   const [candidateFilter, setCandidateFilter] = useState<CandidateFilter>('All');
-  const [queueSourceFilter, setQueueSourceFilter] = useState<QueueSourceFilter>('all');
-  const [openMenuForId, setOpenMenuForId] = useState<string | null>(null);
   const [messageAppId, setMessageAppId] = useState<string | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const { user: dashboardUser } = useDashboard();
@@ -129,29 +125,47 @@ export function CampaignDetail({
   const [applicationPatchNotice, setApplicationPatchNotice] = useState<string | null>(null);
   const [threadLoading, setThreadLoading] = useState(false);
   const [promotingToOffers, setPromotingToOffers] = useState(false);
-  const [offerIdByApplicationId, setOfferIdByApplicationId] = useState<Record<string, string>>({});
-  const [offersMapLoading, setOffersMapLoading] = useState(false);
-  const [offersMapError, setOffersMapError] = useState<string | null>(null);
+  const [offerIdByApplicationId, setOfferIdByApplicationId] =
+    useState<Record<string, string>>(initialOfferByApplicationId);
+  const [optimisticStatusByCandidateId, setOptimisticStatusByCandidateId] =
+    useState<Record<string, CandidateStatus>>({});
+  const [rowActionLoadingById, setRowActionLoadingById] = useState<Record<string, string>>({});
   const [wizardOfferId, setWizardOfferId] = useState<string | null>(null);
 
+  const visibleTabs = useMemo(
+    () =>
+      baseTabs.filter((tab) => {
+        if (tab.id === 'athletes') return campaign.athletes.length > 0;
+        if (tab.id === 'deliverables') return campaign.deliverables.length > 0;
+        if (tab.id === 'activity') return campaign.activity.length > 0;
+        return true;
+      }),
+    [campaign.activity.length, campaign.athletes.length, campaign.deliverables.length]
+  );
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(campaign.candidates.length > 0 ? 'candidates' : 'overview');
+    }
+  }, [activeTab, campaign.candidates.length, visibleTabs]);
+
+  useEffect(() => {
+    setOfferIdByApplicationId(initialOfferByApplicationId);
+  }, [initialOfferByApplicationId]);
+
+  const candidatesWithOptimisticStatus = useMemo(
+    () =>
+      campaign.candidates.map((candidate) => ({
+        ...candidate,
+        status: optimisticStatusByCandidateId[candidate.id] ?? candidate.status,
+      })),
+    [campaign.candidates, optimisticStatusByCandidateId]
+  );
 
   const filteredCandidates = useMemo(() => {
-    let list =
-      candidateFilter === 'All'
-        ? campaign.candidates
-        : campaign.candidates.filter((c) => c.status === candidateFilter);
-    if (queueSourceFilter === 'referral') {
-      list = list.filter((c) => c.applicationSource === 'referral');
-    } else if (queueSourceFilter === 'regular') {
-      list = list.filter((c) => c.applicationSource !== 'referral');
-    }
-    return list;
-  }, [campaign.candidates, candidateFilter, queueSourceFilter]);
-
-  const referralApplicationCount = useMemo(
-    () => campaign.candidates.filter((c) => c.applicationSource === 'referral').length,
-    [campaign.candidates]
-  );
+    if (candidateFilter === 'All') return candidatesWithOptimisticStatus;
+    return candidatesWithOptimisticStatus.filter((c) => c.status === candidateFilter);
+  }, [candidatesWithOptimisticStatus, candidateFilter]);
 
   const selectableCandidateIds = useMemo(
     () => filteredCandidates.filter((c) => isEligibleForOffer(c.status)).map((c) => c.id),
@@ -222,39 +236,91 @@ export function CampaignDetail({
     void authFetch(`/api/chat/threads/${activeThreadId}/read`, { method: 'POST' });
   }, [activeThreadId, threadLoading]);
 
-  const loadOfferIdMap = useCallback(async (): Promise<Record<string, string>> => {
-    if (!brandReviewMode) return {};
-    setOffersMapLoading(true);
-    setOffersMapError(null);
-    try {
-      const res = await authFetch(`/api/campaigns/${campaign.id}/offers`);
-      const data = (await res.json()) as {
-        offers?: { id: string; applicationId: string | null }[];
-        error?: string;
-      };
-      if (!res.ok || !data.offers) {
-        setOfferIdByApplicationId({});
-        setOffersMapError(data.error || 'Could not load offer links');
-        return {};
-      }
-      const map: Record<string, string> = {};
-      for (const o of data.offers) {
-        if (o.applicationId) map[o.applicationId] = o.id;
-      }
-      setOfferIdByApplicationId(map);
-      return map;
-    } catch {
-      setOfferIdByApplicationId({});
-      setOffersMapError('Network error while loading offers');
-      return {};
-    } finally {
-      setOffersMapLoading(false);
-    }
-  }, [brandReviewMode, campaign.id]);
+  const setRowLoading = (applicationId: string, label: string | null) => {
+    setRowActionLoadingById((prev) => {
+      const next = { ...prev };
+      if (label) next[applicationId] = label;
+      else delete next[applicationId];
+      return next;
+    });
+  };
 
-  useEffect(() => {
-    void loadOfferIdMap();
-  }, [loadOfferIdMap, campaign.status, campaign.candidates.length]);
+  const patchCandidateStatus = async (
+    applicationId: string,
+    status: 'under_review' | 'shortlisted' | 'rejected' | 'offer_drafted',
+    optimisticStatus: CandidateStatus,
+    loadingLabel: string
+  ) => {
+    if (!onPatchApplication) return;
+    setRowLoading(applicationId, loadingLabel);
+    const previous = optimisticStatusByCandidateId[applicationId];
+    setOptimisticStatusByCandidateId((prev) => ({ ...prev, [applicationId]: optimisticStatus }));
+    try {
+      const result = await onPatchApplication(applicationId, status);
+      if (result?.warnings?.length) {
+        setApplicationPatchNotice(result.warnings.map((warning) => warning.message).join(' '));
+      }
+    } catch (error) {
+      setOptimisticStatusByCandidateId((prev) => {
+        const next = { ...prev };
+        if (previous) next[applicationId] = previous;
+        else delete next[applicationId];
+        return next;
+      });
+      setApplicationPatchNotice(error instanceof Error ? error.message : 'Application update failed.');
+    } finally {
+      setRowLoading(applicationId, null);
+    }
+  };
+
+  const createOfferDrafts = async (applicationIds: string[]) => {
+    if (applicationIds.length === 0) return {};
+    if (onCreateOfferDrafts) {
+      const map = (await onCreateOfferDrafts(applicationIds)) ?? {};
+      setOfferIdByApplicationId((prev) => ({ ...prev, ...map }));
+      return map;
+    }
+
+    const res = await authFetch(`/api/campaigns/${campaign.id}/offers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicationIds }),
+    });
+    const data = (await res.json()) as {
+      offers?: { id: string; applicationId?: string | null }[];
+      error?: string;
+    };
+    if (!res.ok || !data.offers) {
+      throw new Error(data.error || 'Offer draft could not be created.');
+    }
+    const map = Object.fromEntries(
+      data.offers
+        .filter((offer) => offer.applicationId)
+        .map((offer) => [String(offer.applicationId), offer.id])
+    );
+    setOfferIdByApplicationId((prev) => ({ ...prev, ...map }));
+    return map;
+  };
+
+  const openOrCreateOffer = async (applicationId: string) => {
+    const existingOfferId = offerIdByApplicationId[applicationId];
+    if (existingOfferId) {
+      setWizardOfferId(existingOfferId);
+      return;
+    }
+    setRowLoading(applicationId, 'Creating offer');
+    setOptimisticStatusByCandidateId((prev) => ({ ...prev, [applicationId]: 'Offer Drafted' }));
+    try {
+      const map = await createOfferDrafts([applicationId]);
+      const offerId = map[applicationId];
+      if (offerId) setWizardOfferId(offerId);
+      await onApplicationsUpdated?.();
+    } catch (error) {
+      setApplicationPatchNotice(error instanceof Error ? error.message : 'Offer draft could not be created.');
+    } finally {
+      setRowLoading(applicationId, null);
+    }
+  };
 
   const sendThreadMessage = async () => {
     if (!messageAppId || !messageDraft.trim() || !currentUserId) return;
@@ -289,54 +355,50 @@ export function CampaignDetail({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 md:p-12">
-      {/* Backdrop */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
-      />
-
-      {/* Modal Container */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.96, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="relative flex h-[800px] max-h-[90vh] w-[1100px] max-w-[95vw] flex-col overflow-hidden rounded-2xl bg-white text-nilink-ink shadow-2xl"
-      >
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="relative flex flex-1 flex-col min-h-0 overflow-hidden bg-white font-sans text-nilink-ink"
+    >
         {/* ── Header ── */}
-        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1
-                    className="text-3xl font-black uppercase tracking-wide"
-                    style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-                  >
-                    {campaign.name}
-                  </h1>
-                  <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border whitespace-nowrap ${campaignStatusStyles[campaign.status]}`}>
-                    {campaign.status}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-400 mt-0.5">{campaign.subtitle} · {campaign.goal}</p>
+        <div className="shrink-0 border-b border-gray-100 bg-white dash-main-gutter-x py-4">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
+            <button
+              onClick={onBack}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:border-gray-200 hover:bg-gray-50 hover:text-gray-900"
+              aria-label="Back to campaigns"
+            >
+              <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+              Back
+            </button>
+            <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
+              <ol className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm leading-tight">
+                <li className="truncate text-gray-400">Campaigns</li>
+                <li className="shrink-0 select-none text-gray-300" aria-hidden>/</li>
+                <li className="truncate font-semibold text-nilink-ink" aria-current="page">{campaign.name}</li>
+              </ol>
+            </nav>
+            <button className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+              <Edit3 className="h-3.5 w-3.5" />
+              Edit Campaign
+            </button>
+          </div>
+          <div className="mt-4 flex items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1
+                  className="text-3xl font-black uppercase tracking-wide"
+                  style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                >
+                  {campaign.name}
+                </h1>
+                <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border whitespace-nowrap ${campaignStatusStyles[campaign.status]}`}>
+                  {campaign.status}
+                </span>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Campaign
-              </button>
-              <button
-                onClick={onBack}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Close"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
+              <p className="mt-0.5 text-sm text-gray-400">{campaign.subtitle} · {campaign.goal}</p>
             </div>
           </div>
         </div>
@@ -358,7 +420,7 @@ export function CampaignDetail({
 
         {/* ── Tab Bar ── */}
       <div className="dash-main-gutter-x flex shrink-0 items-center gap-6 border-b border-gray-100">
-        {tabs.map(tab => (
+        {visibleTabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -512,13 +574,12 @@ export function CampaignDetail({
                   Select All Eligible
                 </button>
                 <p className="max-w-md text-xs text-gray-400">
-                  Only <span className="font-semibold text-gray-600">Shortlisted</span> candidates can be sent
-                  to offers.
+                  Shortlisted candidates can be turned into editable offer drafts.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Status</span>
                   <div className="flex flex-wrap items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
-                    {(['All', 'Applied', 'Under Review', 'Shortlisted', 'Offer Sent'] as const).map((f) => {
+                    {(['All', 'Applied', 'Under Review', 'Shortlisted', 'Offer Drafted', 'Offer Sent'] as const).map((f) => {
                       const on = candidateFilter === f;
                       return (
                         <button
@@ -539,34 +600,6 @@ export function CampaignDetail({
                     })}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Queue</span>
-                  <div className="flex flex-wrap items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
-                    {(
-                      [
-                        { id: 'all' as const, label: 'All' },
-                        { id: 'referral' as const, label: COPY_REFERRAL },
-                        { id: 'regular' as const, label: 'Regular' },
-                      ] as const
-                    ).map(({ id, label }) => {
-                      const on = queueSourceFilter === id;
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => setQueueSourceFilter(id)}
-                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3 ${
-                            on
-                              ? 'bg-white text-nilink-ink shadow-sm'
-                              : 'text-gray-500 hover:bg-white hover:text-gray-700'
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
 
               {selectedEligibleCandidateIds.length > 0 && (
@@ -574,49 +607,42 @@ export function CampaignDetail({
                   type="button"
                   onClick={() => {
                     if (promotingToOffers) return;
-                    if (onSendSelectedToDeals) {
+                    if (onCreateOfferDrafts) {
                       setPromotingToOffers(true);
-                      void onSendSelectedToDeals(selectedEligibleCandidateIds)
-                        .then(() => setSelectedCandidates(new Set()))
-                        .catch(() => {})
+                      void createOfferDrafts(selectedEligibleCandidateIds)
+                        .then(() => {
+                          setOptimisticStatusByCandidateId((prev) => {
+                            const next = { ...prev };
+                            for (const id of selectedEligibleCandidateIds) next[id] = 'Offer Drafted';
+                            return next;
+                          });
+                          setSelectedCandidates(new Set());
+                          return onApplicationsUpdated?.();
+                        })
+                        .catch((error) => {
+                          setApplicationPatchNotice(error instanceof Error ? error.message : 'Offer drafts failed.');
+                        })
                         .finally(() => setPromotingToOffers(false));
                       return;
                     }
-                    if (!onPatchCampaignStatus) return;
-                    setPromotingToOffers(true);
-                    void onPatchCampaignStatus(campaign.id, 'Deal Creation in Progress').finally(() => {
-                      setPromotingToOffers(false);
-                    });
                   }}
                   disabled={
                     promotingToOffers ||
-                    (!onSendSelectedToDeals && !onPatchCampaignStatus) ||
+                    !onCreateOfferDrafts ||
                     selectedEligibleCandidateIds.length === 0
                   }
                   className="flex items-center gap-2 rounded-lg bg-nilink-accent px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-nilink-accent-hover"
                 >
                   <Send className="w-3.5 h-3.5" />
                   {promotingToOffers
-                    ? 'Moving to offer stage...'
-                    : `Send Shortlisted to Offers (${selectedEligibleCandidateIds.length})`}
+                    ? 'Creating drafts...'
+                    : `Create offer drafts (${selectedEligibleCandidateIds.length})`}
                 </button>
               )}
             </div>
 
             {/* Candidates Table */}
             <div className="flex-1 overflow-auto pb-6 dash-main-gutter-x">
-              {campaign.candidates.length > 0 && referralApplicationCount === 0 ? (
-                <div
-                  className="mb-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/90 px-4 py-3 text-sm text-gray-600"
-                  role="status"
-                >
-                  <p className="font-semibold text-gray-800">No {COPY_REFERRAL} applications in this queue yet</p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    When you use {COPY_INVITE_TO_CAMPAIGN} from an athlete profile, new rows appear here with the{' '}
-                    {COPY_REFERRAL} badge.
-                  </p>
-                </div>
-              ) : null}
               {campaign.candidates.length > 0 ? (
                 filteredCandidates.length > 0 ? (
                 <table className="w-full text-sm text-left">
@@ -624,22 +650,25 @@ export function CampaignDetail({
                     <tr>
                       <th className="px-5 py-3 rounded-l-xl w-10"></th>
                       <th className="px-5 py-3">Athlete</th>
-                      <th className="px-5 py-3" scope="col">
-                        Source <span className="sr-only">(Referral or Regular)</span>
-                      </th>
                       <th className="px-5 py-3">Sport</th>
                       <th className="px-5 py-3">Followers</th>
                       <th className="px-5 py-3">Engagement</th>
                       <th className="px-5 py-3">Status</th>
                       <th className="px-5 py-3">Applied</th>
-                      <th className="px-5 py-3" scope="col">
-                        {COPY_SEND_OFFER}
+                      <th className="px-5 py-3 rounded-r-xl" scope="col">
+                        Actions
                       </th>
-                      <th className="px-5 py-3 rounded-r-xl w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCandidates.map((candidate) => (
+                    {filteredCandidates.map((candidate) => {
+                      const loadingLabel = rowActionLoadingById[candidate.id];
+                      const offerId = offerIdByApplicationId[candidate.id];
+                      const showOfferAction =
+                        brandReviewMode &&
+                        (candidate.status === 'Shortlisted' ||
+                          candidate.status === 'Offer Drafted');
+                      return (
                       <tr
                         key={candidate.id}
                         className="group hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors"
@@ -656,7 +685,7 @@ export function CampaignDetail({
                             title={
                               isEligibleForOffer(candidate.status)
                                 ? 'Selected for offer handoff'
-                                : 'Only candidates with Shortlisted status can be sent to offers'
+                                : 'Move the application to Shortlisted before creating an offer draft'
                             }
                           />
                         </td>
@@ -673,13 +702,6 @@ export function CampaignDetail({
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border whitespace-nowrap ${applicationSourceStyles[candidate.applicationSource]}`}
-                          >
-                            {candidate.applicationSource === 'referral' ? COPY_REFERRAL : 'Regular'}
-                          </span>
-                        </td>
                         <td className="px-5 py-4 text-gray-600">{candidate.sport}</td>
                         <td className="px-5 py-4 font-medium text-gray-900">{candidate.followers}</td>
                         <td className="px-5 py-4 font-medium text-gray-900">{candidate.engagement}</td>
@@ -690,194 +712,94 @@ export function CampaignDetail({
                         </td>
                         <td className="px-5 py-4 text-gray-400 text-xs">{candidate.appliedDate}</td>
                         <td className="px-5 py-4">
-                          {brandReviewMode && offersMapLoading ? (
-                            <span
-                              className="inline-flex items-center gap-1 text-xs text-gray-500"
-                              role="status"
-                              aria-live="polite"
-                            >
-                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-                              Loading…
-                            </span>
-                          ) : brandReviewMode && offersMapError ? (
-                            <span className="text-xs text-red-600" role="alert" title={offersMapError}>
-                              Unavailable
-                            </span>
-                          ) : brandReviewMode && offerIdByApplicationId[candidate.id] ? (
-                            <button
-                              type="button"
-                              onClick={() => setWizardOfferId(offerIdByApplicationId[candidate.id])}
-                              className="text-xs font-bold uppercase tracking-wide text-nilink-accent underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-nilink-accent"
-                            >
-                              {COPY_SEND_OFFER}
-                            </button>
+                          {brandReviewMode ? (
+                            <div className="flex min-w-[260px] flex-wrap items-center gap-1.5">
+                              {loadingLabel ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-500">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  {loadingLabel}
+                                </span>
+                              ) : null}
+                              {onPatchApplication && candidate.status === 'Applied' ? (
+                                <button
+                                  type="button"
+                                  className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                  disabled={Boolean(loadingLabel)}
+                                  onClick={() =>
+                                    void patchCandidateStatus(
+                                      candidate.id,
+                                      'under_review',
+                                      'Under Review',
+                                      'Updating'
+                                    )
+                                  }
+                                >
+                                  Move to review
+                                </button>
+                              ) : null}
+                              {onPatchApplication &&
+                              (candidate.status === 'Applied' || candidate.status === 'Under Review') ? (
+                                <button
+                                  type="button"
+                                  className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                                  disabled={Boolean(loadingLabel)}
+                                  onClick={() =>
+                                    void patchCandidateStatus(
+                                      candidate.id,
+                                      'shortlisted',
+                                      'Shortlisted',
+                                      'Shortlisting'
+                                    )
+                                  }
+                                >
+                                  Shortlist
+                                </button>
+                              ) : null}
+                              {showOfferAction ? (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+                                  disabled={Boolean(loadingLabel)}
+                                  onClick={() => void openOrCreateOffer(candidate.id)}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                  {offerId ? 'Edit offer' : 'Create offer'}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                disabled={Boolean(loadingLabel)}
+                                onClick={() => setMessageAppId(candidate.id)}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                Message
+                              </button>
+                              {onPatchApplication && canRejectCandidate(candidate.status) ? (
+                                <button
+                                  type="button"
+                                  className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                  disabled={Boolean(loadingLabel)}
+                                  onClick={() =>
+                                    void patchCandidateStatus(candidate.id, 'rejected', 'Rejected', 'Rejecting')
+                                  }
+                                >
+                                  Reject
+                                </button>
+                              ) : null}
+                            </div>
                           ) : (
                             <span className="text-xs text-gray-300">—</span>
                           )}
                         </td>
-                        <td className="relative px-5 py-4 text-right">
-                          {brandReviewMode && onPatchApplication && (
-                            <>
-                              <button
-                                type="button"
-                                className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-400"
-                                aria-label="Application actions"
-                                onClick={() =>
-                                  setOpenMenuForId((v) => (v === candidate.id ? null : candidate.id))
-                                }
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </button>
-                              {openMenuForId === candidate.id && (
-                                <div className="absolute right-2 top-9 z-30 w-48 rounded-xl border border-gray-100 bg-white py-1 shadow-xl text-left">
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                    onClick={() => {
-                                      setMessageAppId(candidate.id);
-                                      setOpenMenuForId(null);
-                                    }}
-                                  >
-                                    <MessageSquare className="h-3.5 w-3.5" />
-                                    Message
-                                  </button>
-                                  {candidate.status === 'Applied' && (
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                      onClick={() => {
-                                        setOpenMenuForId(null);
-                                        void (async () => {
-                                          const r = await onPatchApplication(candidate.id, 'under_review');
-                                          if (r?.warnings?.length) {
-                                            setApplicationPatchNotice(
-                                              r.warnings.map((w) => w.message).join(' ')
-                                            );
-                                          }
-                                        })();
-                                      }}
-                                    >
-                                      Move to review
-                                    </button>
-                                  )}
-                                  {(candidate.status === 'Applied' || candidate.status === 'Under Review') && (
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                      onClick={() => {
-                                        setOpenMenuForId(null);
-                                        void (async () => {
-                                          const r = await onPatchApplication(candidate.id, 'shortlisted');
-                                          if (r?.warnings?.length) {
-                                            setApplicationPatchNotice(
-                                              r.warnings.map((w) => w.message).join(' ')
-                                            );
-                                          }
-                                        })();
-                                      }}
-                                    >
-                                      Shortlist
-                                    </button>
-                                  )}
-                                  {(candidate.status === 'Applied' ||
-                                    candidate.status === 'Under Review' ||
-                                    candidate.status === 'Shortlisted') && (
-                                    <button
-                                      type="button"
-                                      title="Marks the application approved, ensures a campaign offer draft exists, and opens the offer editor"
-                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-emerald-700 hover:bg-emerald-50"
-                                      onClick={() => {
-                                        setOpenMenuForId(null);
-                                        void (async () => {
-                                          const r = await onPatchApplication(candidate.id, 'approved');
-                                          if (r?.warnings?.length) {
-                                            setApplicationPatchNotice(
-                                              r.warnings.map((w) => w.message).join(' ')
-                                            );
-                                          }
-                                          let offerId: string | undefined;
-                                          const offerRes = await authFetch(
-                                            `/api/campaigns/${campaign.id}/offers`,
-                                            {
-                                              method: 'POST',
-                                              headers: { 'Content-Type': 'application/json' },
-                                              body: JSON.stringify({
-                                                applicationIds: [candidate.id],
-                                              }),
-                                            }
-                                          );
-                                          const offerData = (await offerRes.json()) as {
-                                            offers?: { id: string; applicationId?: string | null }[];
-                                            error?: string;
-                                          };
-                                          if (offerRes.ok && offerData.offers?.length) {
-                                            offerId = offerData.offers.find(
-                                              (o) => o.applicationId === candidate.id
-                                            )?.id;
-                                          } else if (!offerRes.ok) {
-                                            setApplicationPatchNotice(
-                                              offerData.error ||
-                                                'Application was approved but offer draft could not be created.'
-                                            );
-                                          }
-                                          const map = await loadOfferIdMap();
-                                          offerId = offerId ?? map[candidate.id];
-                                          if (offerId) setWizardOfferId(offerId);
-                                          await onApplicationsUpdated?.();
-                                        })();
-                                      }}
-                                    >
-                                      <Check className="h-3.5 w-3.5" />
-                                      Approve
-                                    </button>
-                                  )}
-                                  {(candidate.status === 'Applied' ||
-                                    candidate.status === 'Under Review' ||
-                                    candidate.status === 'Shortlisted') && (
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                                      onClick={() => {
-                                        setOpenMenuForId(null);
-                                        void (async () => {
-                                          const r = await onPatchApplication(candidate.id, 'rejected');
-                                          if (r?.warnings?.length) {
-                                            setApplicationPatchNotice(
-                                              r.warnings.map((w) => w.message).join(' ')
-                                            );
-                                          }
-                                        })();
-                                      }}
-                                    >
-                                      Reject
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
                 ) : (
-                  <div className="space-y-2 px-4 py-16 text-center text-sm text-gray-400">
+                  <div className="px-4 py-16 text-center text-sm text-gray-400">
                     <p>No candidates match this filter.</p>
-                    {queueSourceFilter === 'referral' && referralApplicationCount === 0 ? (
-                      <p className="text-gray-500">
-                        No {COPY_REFERRAL} applications on this campaign yet — use {COPY_INVITE_TO_CAMPAIGN} from an
-                        athlete profile.
-                      </p>
-                    ) : null}
-                    {queueSourceFilter === 'referral' && referralApplicationCount > 0 ? (
-                      <p className="text-gray-500">
-                        No {COPY_REFERRAL} rows in this status view — try Status: All.
-                      </p>
-                    ) : null}
-                    {queueSourceFilter === 'regular' && campaign.candidates.length > 0 ? (
-                      <p className="text-gray-500">No regular (non-referral) rows in this status view.</p>
-                    ) : null}
                   </div>
                 )
               ) : (
@@ -1045,7 +967,7 @@ export function CampaignDetail({
                 <div className="absolute left-4 top-6 bottom-6 w-px bg-gray-100" />
 
                 <div className="space-y-0">
-                  {campaign.activity.map((item, idx) => {
+                  {campaign.activity.map((item) => {
                     const getIcon = () => {
                       switch (item.type) {
                         case 'status_change': return <ArrowRight className="w-3.5 h-3.5" />;
@@ -1099,18 +1021,17 @@ export function CampaignDetail({
             offerId={wizardOfferId}
             onClose={() => {
               setWizardOfferId(null);
-              void (async () => {
-                const res = await authFetch(`/api/campaigns/${campaign.id}/offers`);
-                const data = (await res.json()) as {
-                  offers?: { id: string; applicationId: string | null }[];
-                };
-                if (!res.ok || !data.offers) return;
-                const map: Record<string, string> = {};
-                for (const o of data.offers) {
-                  if (o.applicationId) map[o.applicationId] = o.id;
+              void onApplicationsUpdated?.();
+            }}
+            onSubmitted={() => {
+              setOptimisticStatusByCandidateId((prev) => {
+                const next = { ...prev };
+                for (const [applicationId, offerId] of Object.entries(offerIdByApplicationId)) {
+                  if (offerId === wizardOfferId) next[applicationId] = 'Offer Sent';
                 }
-                setOfferIdByApplicationId(map);
-              })();
+                return next;
+              });
+              void onApplicationsUpdated?.();
             }}
           />
         )}
@@ -1183,7 +1104,6 @@ export function CampaignDetail({
             </div>
           </>
         )}
-      </motion.div>
-    </div>
+    </motion.div>
   );
 }

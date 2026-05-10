@@ -207,13 +207,13 @@ create index if not exists idx_campaigns_open_public
   on public.campaigns(created_at desc)
   where visibility = 'Public'
     and accept_applications = true
-    and status in ('Open for Applications','Reviewing Candidates');
+    and status in ('Active','Open for Applications','Reviewing Candidates');
 
 --   • Sport filter on discovery feed
 create index if not exists idx_campaigns_target_sport
   on public.campaigns(target_sport)
   where visibility = 'Public'
-    and status in ('Open for Applications','Reviewing Candidates');
+    and status in ('Active','Open for Applications','Reviewing Candidates');
 
 --   • GIN arrays for platform/school containment queries
 create index if not exists idx_campaigns_platforms
@@ -284,7 +284,7 @@ create policy "Anyone can view open public campaigns"
   on public.campaigns for select
   using (
     visibility = 'Public'
-    and status in ('Open for Applications','Reviewing Candidates')
+    and status in ('Active','Open for Applications','Reviewing Candidates')
   );
 
 
@@ -292,7 +292,7 @@ create policy "Anyone can view open public campaigns"
 -- 3. APPLICATIONS
 -- ─────────────────────────────────────────────────────────────────
 -- An athlete's formal bid to join a campaign. Brand reviews pending
--- applications and moves them to shortlisted/approved/declined.
+-- applications and moves them through review, shortlist, and offer draft states.
 -- Athlete can withdraw before a decision is made.
 --
 -- Design decisions:
@@ -303,8 +303,8 @@ create policy "Anyone can view open public campaigns"
 --   • One row per (campaign, athlete) pair — uniqueness enforced.
 --   • State machine is enforced by trigger + RLS WITH CHECK:
 --       - Athlete can set status = 'pending' (insert) or 'withdrawn' only.
---       - Brand can set status = 'shortlisted'/'approved'/'declined' only.
---       - Neither side can revert an 'approved'/'declined'/'withdrawn' row.
+--       - Brand can set status = 'under_review'/'shortlisted'/'offer_drafted'/'declined'/'offer_sent'.
+--       - Neither side can revert a closed application row.
 --   • decided_at is auto-set by the trigger when status leaves 'pending'.
 -- ─────────────────────────────────────────────────────────────────
 create table if not exists public.applications (
@@ -313,7 +313,7 @@ create table if not exists public.applications (
   athlete_id            uuid not null references public.profiles(id)  on delete cascade,
   status                text not null check (status in (
                           'pending','under_review','shortlisted','approved',
-                          'offer_sent','offer_declined','declined','withdrawn'
+                          'offer_drafted','offer_sent','offer_declined','declined','withdrawn'
                         )) default 'pending',
   pitch                 text default '',
   previous_pitch        text,
@@ -355,7 +355,7 @@ begin
     where c.id = new.campaign_id
       and c.visibility = 'Public'
       and c.accept_applications = true
-      and c.status in ('Open for Applications','Reviewing Candidates')
+      and c.status in ('Active','Open for Applications','Reviewing Candidates')
   ) then
     raise exception 'Campaign is not accepting applications';
   end if;
@@ -509,6 +509,7 @@ create policy "Brands update applications on own campaigns"
       'under_review',
       'shortlisted',
       'approved',
+      'offer_drafted',
       'declined',
       'offer_sent',
       'offer_declined'

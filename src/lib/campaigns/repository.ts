@@ -1,6 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
+import {
+  canCreateOfferDraftFromApplicationStatus,
+  canSendOfferFromApplicationStatus,
+  normalizeApplicationStatus,
+  normalizeCampaignStatus,
+} from '@/lib/campaigns/status';
 
 /* ─────────────────────────────────────────────────────────────────
  * API shape types
@@ -218,7 +224,7 @@ function dbCampaignToStored(row: DbCampaignRow): StoredCampaign {
       row.campaign_brief_v2 && typeof row.campaign_brief_v2 === 'object' && !Array.isArray(row.campaign_brief_v2)
         ? (row.campaign_brief_v2 as Record<string, unknown>)
         : null,
-    status: row.status,
+    status: normalizeCampaignStatus(row.status),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -272,7 +278,7 @@ function dbApplicationToStored(row: DbApplicationRow): StoredApplication {
     _id: row.id,
     campaignId: row.campaign_id,
     athleteUserId: row.athlete_id,
-    status: row.status,
+    status: normalizeApplicationStatus(row.status),
     pitch: row.pitch ?? '',
     previousPitch: row.previous_pitch ?? '',
     athleteSnapshot: snapshot,
@@ -343,6 +349,18 @@ export async function getCampaignById(campaignId: string): Promise<StoredCampaig
   return data ? dbCampaignToStored(data as unknown as DbCampaignRow) : null;
 }
 
+export async function listCampaignsByIds(campaignIds: string[]): Promise<StoredCampaign[]> {
+  const ids = [...new Set(campaignIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select(CAMPAIGN_SELECT)
+    .in('id', ids);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => dbCampaignToStored(r as unknown as DbCampaignRow));
+}
+
 export async function getCampaignByIdForBrand(
   campaignId: string,
   brandUserId: string,
@@ -369,7 +387,7 @@ export async function createCampaign(input: Record<string, unknown>): Promise<St
     goal: String(input.goal ?? ''),
     brief: String(input.brief ?? ''),
     image_url: String(input.image ?? ''),
-    status: String(input.status ?? 'Draft'),
+    status: normalizeCampaignStatus(input.status ?? 'Draft'),
     visibility: input.visibility === 'Private' ? 'Private' : 'Public',
     accept_applications: input.acceptApplications !== false,
     package_id: String(input.packageId ?? ''),
@@ -453,7 +471,7 @@ export async function updateCampaign(
   if (patch.brief !== undefined) update.brief = patch.brief;
   if (patch.image !== undefined) update.image_url = patch.image;
   if (patch.campaignBriefV2 !== undefined) update.campaign_brief_v2 = patch.campaignBriefV2;
-  if (patch.status !== undefined) update.status = patch.status;
+  if (patch.status !== undefined) update.status = normalizeCampaignStatus(patch.status);
   if (patch.visibility !== undefined) update.visibility = patch.visibility === 'Private' ? 'Private' : 'Public';
   if (patch.acceptApplications !== undefined) update.accept_applications = patch.acceptApplications;
   if (patch.packageId !== undefined) update.package_id = patch.packageId;
@@ -583,7 +601,7 @@ export async function createApplication(
       if (!campaign.acceptApplications || campaign.visibility !== 'Public') {
         return { error: 'duplicate', application: existingApp };
       }
-      if (campaign.status !== 'Open for Applications' && campaign.status !== 'Reviewing Candidates') {
+      if (normalizeCampaignStatus(campaign.status) !== 'Active') {
         return { error: 'duplicate', application: existingApp };
       }
       const snapshot =
@@ -712,6 +730,7 @@ export async function updateApplicationStatus(
     | 'pending'
     | 'under_review'
     | 'shortlisted'
+    | 'offer_drafted'
     | 'approved'
     | 'declined'
     | 'offer_sent'
@@ -749,6 +768,7 @@ async function updateApplicationStatusWithClient(
     | 'pending'
     | 'under_review'
     | 'shortlisted'
+    | 'offer_drafted'
     | 'approved'
     | 'declined'
     | 'offer_sent'
@@ -772,7 +792,7 @@ async function updateApplicationStatusWithClient(
 
   const { data, error } = await supabase
     .from('applications')
-    .update({ status })
+    .update({ status: normalizeApplicationStatus(status) })
     .eq('id', applicationId)
     .select('*')
     .maybeSingle();
@@ -1109,9 +1129,9 @@ export async function createChatNegotiatedOfferDraft(input: {
 }
 
 /**
- * Bulk draft creation from approved applications. Used when a brand
- * picks N applicants from a campaign review screen and wants offer
- * drafts queued up. Skips application ids that already have an offer.
+ * Bulk draft creation from campaign applications. Idempotent: returns existing
+ * draft IDs for rows that already have offers, creates the missing drafts, and
+ * moves linked applications to `offer_drafted`.
  */
 export async function createOfferDraftsFromApplications(input: {
   brandUserId: string;
@@ -1141,9 +1161,12 @@ export async function createOfferDraftsFromApplications(input: {
 
   const { data: existingOffers, error: exErr } = await supabase
     .from('offers')
-    .select('application_id')
+    .select(OFFER_SELECT)
+    .eq('brand_id', input.brandUserId)
+    .eq('campaign_id', input.campaignId)
     .in('application_id', input.applicationIds);
   if (exErr) throw new Error(exErr.message);
+  const existing = (existingOffers ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
   const taken = new Set(
     (existingOffers ?? [])
       .map((r) => r.application_id)
@@ -1151,6 +1174,7 @@ export async function createOfferDraftsFromApplications(input: {
   );
 
   const toInsert = (apps ?? [])
+    .filter((a) => canCreateOfferDraftFromApplicationStatus(a.status))
     .filter((a) => !taken.has(a.id))
     .map((a) => ({
       brand_id: input.brandUserId,
@@ -1162,14 +1186,31 @@ export async function createOfferDraftsFromApplications(input: {
       structured_draft: {},
     }));
 
-  if (toInsert.length === 0) return [];
+  let insertedOffers: StoredOffer[] = [];
 
-  const { data: inserted, error: insErr } = await supabase
-    .from('offers')
-    .insert(toInsert)
-    .select(OFFER_SELECT);
-  if (insErr) throw new Error(insErr.message);
-  return (inserted ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
+  if (toInsert.length > 0) {
+    const { data: inserted, error: insErr } = await supabase
+      .from('offers')
+      .insert(toInsert)
+      .select(OFFER_SELECT);
+    if (insErr) throw new Error(insErr.message);
+    insertedOffers = (inserted ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
+  }
+
+  const handoffApplicationIds = [...existing, ...insertedOffers]
+    .map((offer) => offer.applicationId)
+    .filter((id): id is string => typeof id === 'string' && input.applicationIds.includes(id));
+
+  if (handoffApplicationIds.length > 0) {
+    const { error: statusErr } = await supabase
+      .from('applications')
+      .update({ status: 'offer_drafted' })
+      .in('id', handoffApplicationIds)
+      .in('status', ['pending', 'under_review', 'shortlisted', 'approved', 'offer_drafted']);
+    if (statusErr) throw new Error(statusErr.message);
+  }
+
+  return [...existing, ...insertedOffers];
 }
 
 /**
@@ -1252,7 +1293,7 @@ export async function sendOfferDraftByBrand(
   if (appError) throw new Error(appError.message);
   const app = appRow ? dbApplicationToStored(appRow as unknown as DbApplicationRow) : null;
   if (!app) return sent;
-  if (app.status === 'shortlisted' || app.status === 'approved') {
+  if (canSendOfferFromApplicationStatus(app.status)) {
     try {
       await updateApplicationStatus(sent.applicationId, brandUserId, 'offer_sent');
     } catch (e) {

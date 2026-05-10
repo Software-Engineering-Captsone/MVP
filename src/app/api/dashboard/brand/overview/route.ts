@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { jsonError } from '@/lib/api/jsonError';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import {
-  listApplicationsForCampaign,
+  listApplicationsForCampaigns,
   listCampaignsForBrand,
 } from '@/lib/campaigns/repository';
 import { campaignToJSON } from '@/lib/campaigns/serialization';
@@ -23,11 +23,10 @@ export async function GET() {
 
   try {
     const campaigns = await listCampaignsForBrand(user.userId);
-    const [applicationsByCampaign, deals] = await Promise.all([
-      Promise.all(campaigns.map((campaign) => listApplicationsForCampaign(String(campaign._id)))),
+    const [applications, deals] = await Promise.all([
+      listApplicationsForCampaigns(campaigns.map((campaign) => String(campaign._id))),
       listDealsForCurrentUser(),
     ]);
-    const applications = applicationsByCampaign.flat();
     const enrichedApplications = await enrichApplicationsForBrandCampaigns(applications);
 
     return NextResponse.json({

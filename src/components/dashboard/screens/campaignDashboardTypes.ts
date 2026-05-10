@@ -5,7 +5,8 @@ export type CampaignStatus =
   | 'Reviewing Candidates'
   | 'Deal Creation in Progress'
   | 'Active'
-  | 'Completed';
+  | 'Completed'
+  | 'Cancelled';
 
 export type CandidateStatus =
   | 'Recommended'
@@ -13,6 +14,7 @@ export type CandidateStatus =
   | 'Applied'
   | 'Under Review'
   | 'Shortlisted'
+  | 'Offer Drafted'
   | 'Offer Sent'
   | 'Offer Declined'
   | 'Withdrawn'

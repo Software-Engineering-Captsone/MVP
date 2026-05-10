@@ -47,6 +47,21 @@ export async function getThreadByApplicationId(
   return mapThreadRow(data as Record<string, unknown>);
 }
 
+export async function listThreadsByApplicationIds(
+  supabase: SupabaseClient,
+  applicationIds: string[]
+): Promise<ChatThreadRow[]> {
+  const ids = [...new Set(applicationIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('chat_threads')
+    .select(THREAD_SELECT)
+    .in('application_id', ids)
+    .eq('thread_kind', 'application_approved');
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => mapThreadRow(row as Record<string, unknown>));
+}
+
 /**
  * True if the participant has posted at least one user (non-system) message in the thread.
  */
@@ -257,7 +272,7 @@ export async function insertApplicationApprovedNoticeOnce(
     supabase,
     threadId,
     brandUserId,
-    `${APPLICATION_APPROVED_NOTICE_MARKER} Application approved — you can coordinate here.`,
+    `${APPLICATION_APPROVED_NOTICE_MARKER} Offer draft started - you can coordinate here.`,
     { messageKind: 'system' }
   );
 }

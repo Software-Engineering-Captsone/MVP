@@ -49,11 +49,11 @@ export type DeliverableProjection = {
 
 const STAGE_LABELS: Record<DealStageId, string> = {
   agreement: 'Agreement',
-  work_in_progress: 'Work in Progress',
-  review_revisions: 'Review & Revisions',
-  completed: 'Completed',
-  payment: 'Payment',
-  closed: 'Closed',
+  work_in_progress: 'Work',
+  review_revisions: 'Review',
+  completed: 'Payout',
+  payment: 'Payout',
+  closed: 'Done',
 };
 
 export const STAGE_ORDER: DealStageId[] = [
@@ -92,14 +92,14 @@ function latestSubmissionForDeliverable(
 
 export function dealStatusCopy(status: string): string {
   const map: Record<string, string> = {
-    created: 'Preparing agreement',
-    contract_pending: 'Waiting on contract',
+    created: 'Agreement setup',
+    contract_pending: 'Agreement',
     active: 'Work in progress',
     submission_in_progress: 'Work in progress',
     under_review: 'Under review',
     revision_requested: 'Revision requested',
-    approved_completed: 'Completed',
-    payment_pending: 'Payment processing',
+    approved_completed: 'Ready for payout',
+    payment_pending: 'Payout pending',
     paid: 'Paid',
     closed: 'Closed',
     cancelled: 'Cancelled',
@@ -110,8 +110,8 @@ export function dealStatusCopy(status: string): string {
 
 export function contractStatusCopy(status: string): string {
   const map: Record<string, string> = {
-    not_added: 'No contract uploaded yet',
-    uploaded: 'Contract uploaded',
+    not_added: 'No contract yet',
+    uploaded: 'Preparing signature',
     sent_for_signature: 'Ready to sign',
     signed: 'Contract signed',
   };
@@ -190,12 +190,12 @@ function deriveStage(
 
 function stageDescription(stageId: DealStageId): string {
   const map: Record<DealStageId, string> = {
-    agreement: 'Finalize contract terms and signatures before execution.',
-    work_in_progress: 'Athlete is producing deliverables for this deal.',
-    review_revisions: 'Brand is reviewing submissions and guiding revisions.',
-    completed: 'All deliverables are complete. Ready for payout workflow.',
-    payment: 'Payout workflow is in progress or complete.',
-    closed: 'Deal is finalized and no further actions are required.',
+    agreement: 'Finalize the contract before work begins.',
+    work_in_progress: 'Deliverables are being created and submitted.',
+    review_revisions: 'Submissions are being reviewed or revised.',
+    completed: 'All deliverables are approved. Payout is ready.',
+    payment: 'Payout is in progress or complete.',
+    closed: 'This deal is finalized.',
   };
   return map[stageId];
 }
@@ -254,6 +254,18 @@ function actionsForStage(
         secondaryActions: [],
       };
     }
+    if (contract.status === 'uploaded') {
+      return {
+        primaryAction: {
+          key: 'send_contract',
+          label: 'Send contract for signature',
+          owner: 'brand',
+          enabled: actor === 'brand',
+          reason: actor === 'brand' ? undefined : 'Waiting on brand',
+        },
+        secondaryActions: [],
+      };
+    }
     return {
       primaryAction: {
         key: 'await_contract',
@@ -265,13 +277,27 @@ function actionsForStage(
     };
   }
 
+  if (stageId === 'completed') {
+    return {
+      primaryAction: {
+        key: 'mark_paid',
+        label: payment?.status === 'paid' ? 'Payment completed' : 'Mark paid',
+        owner: payment?.status === 'paid' ? 'none' : 'brand',
+        enabled: actor === 'brand' && payment?.status !== 'paid',
+        reason: actor === 'brand' ? undefined : 'Waiting on brand',
+      },
+      secondaryActions: [],
+    };
+  }
+
   if (stageId === 'payment') {
     return {
       primaryAction: {
-        key: 'await_payment',
-        label: payment?.status === 'paid' ? 'Payment completed' : 'Awaiting payment',
-        owner: payment?.status === 'paid' ? 'none' : 'system',
-        enabled: false,
+        key: payment?.status === 'paid' ? 'paid' : 'mark_paid',
+        label: payment?.status === 'paid' ? 'Payment completed' : 'Mark paid',
+        owner: payment?.status === 'paid' ? 'none' : 'brand',
+        enabled: actor === 'brand' && payment?.status !== 'paid',
+        reason: actor === 'brand' ? undefined : 'Waiting on brand',
       },
       secondaryActions: [],
     };

@@ -6,6 +6,11 @@ import type {
 } from '@/components/dashboard/screens/campaignDashboardTypes';
 import type { CampaignBriefV2 } from '@/lib/campaigns/campaignBriefV2Mapper';
 import { normalizeCampaignBriefV2 } from '@/lib/campaigns/campaignBriefV2Mapper';
+import {
+  applicationStatusLabel,
+  normalizeApplicationStatus,
+  normalizeCampaignStatus,
+} from '@/lib/campaigns/status';
 
 const PLACEHOLDER_ATHLETE =
   'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=400&q=80';
@@ -99,27 +104,26 @@ export type ApiApplicationRow = {
 };
 
 function appStatusToCandidate(status: string, withdrawnByAthlete?: boolean): CandidateStatus {
-  if (withdrawnByAthlete === true && status === 'rejected') {
+  if (withdrawnByAthlete === true) {
     return 'Withdrawn';
   }
-  switch (status) {
-    case 'applied':
+  switch (normalizeApplicationStatus(status)) {
     case 'pending':
       return 'Applied';
     case 'under_review':
       return 'Under Review';
     case 'shortlisted':
       return 'Shortlisted';
+    case 'offer_drafted':
+      return 'Offer Drafted';
     case 'offer_sent':
       return 'Offer Sent';
     case 'offer_declined':
       return 'Offer Declined';
-    case 'approved':
-      return 'Offer Sent';
-    case 'rejected':
-      return 'Rejected';
     case 'declined':
-      return 'Declined';
+      return 'Rejected';
+    case 'withdrawn':
+      return 'Withdrawn';
     default:
       return 'Applied';
   }
@@ -304,10 +308,10 @@ export function apiCampaignRowToDraftOverlayPrefill(row: ApiCampaignRow): Campai
 
 /** Maps legacy stored statuses to the current `CampaignStatus` union (UI + types). */
 export function normalizeUiCampaignStatus(raw: string | undefined): CampaignStatus {
-  const s = (raw ?? '').trim() || 'Draft';
-  if (s === 'Open for Applications') return 'Active';
-  return s as CampaignStatus;
+  return normalizeCampaignStatus(raw) as CampaignStatus;
 }
+
+export { applicationStatusLabel, normalizeApplicationStatus };
 
 export function apiCampaignToUi(
   c: ApiCampaignRow,

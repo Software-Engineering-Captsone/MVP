@@ -6,6 +6,7 @@ import {
   CampaignUpdatePatch,
   deleteDraftCampaign,
   getCampaignById,
+  listOffersForCampaign,
   listApplicationsForCampaign,
   updateCampaign,
 } from '@/lib/campaigns/repository';
@@ -93,10 +94,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   if (user.role === 'brand' && campaign.brandUserId === user.userId) {
     const applications = await listApplicationsForCampaign(id);
+    const offers = await listOffersForCampaign(id, user.userId);
+    const offerByApplicationId = Object.fromEntries(
+      offers
+        .filter((offer) => offer.applicationId)
+        .map((offer) => [String(offer.applicationId), offer._id]),
+    );
     const enrichedApplications = await enrichApplicationsForBrandCampaigns(applications);
     return NextResponse.json({
       campaign: campaignToJSON(campaign),
       applications: enrichedApplications,
+      offerByApplicationId,
     });
   }
 

@@ -36,7 +36,17 @@ const exploreFocusRing =
 export function AthleteDiscovery() {
   const { accountType } = useDashboard();
   const isAthleteView = accountType === 'athlete';
-  const { brands, athletes, loading, error } = useMarketplaceCatalog();
+
+  if (isAthleteView) {
+    return <AthleteExploreMarketplace />;
+  }
+
+  return <BusinessAthleteDiscovery />;
+}
+
+function BusinessAthleteDiscovery() {
+  const isAthleteView = false;
+  const { athletes, loading, error } = useMarketplaceCatalog();
   const {
     toggleAthlete,
     toggleBrand,
@@ -47,7 +57,6 @@ export function AthleteDiscovery() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSport, setActiveSport] = useState<string | null>(null);
-  const [activeIndustry, setActiveIndustry] = useState<string | null>(null);
   
   const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
@@ -68,28 +77,11 @@ export function AthleteDiscovery() {
     [athletes]
   );
 
-  const brandCategories = useMemo<MarketplaceCategory[]>(
-    () => [
-      { id: 'popular', title: 'Popular Brands', items: brands },
-      { id: 'aligned', title: 'Aligned Brands', items: [...brands].reverse() },
-      {
-        id: 'near_you',
-        title: 'Brands Near You',
-        items: [...brands].sort((a, b) => a.location.localeCompare(b.location)),
-      },
-    ],
-    [brands]
-  );
-
-  const categories: MarketplaceCategory[] = isAthleteView ? brandCategories : athleteCategories;
+  const categories: MarketplaceCategory[] = athleteCategories;
 
   const handleItemClick = (item: MarketplaceItem, categoryId: string) => {
     setExpandedCategory(categoryId);
-    if (isAthleteView && isBrandItem(item)) {
-      setSelectedBrand(item);
-      return;
-    }
-    if (!isAthleteView && !isBrandItem(item)) {
+    if (!isBrandItem(item)) {
       setSelectedAthlete(item);
     }
   };
@@ -100,22 +92,11 @@ export function AthleteDiscovery() {
     setSelectedBrand(null);
     setSearchQuery('');
     setActiveSport(null);
-    setActiveIndustry(null);
   };
 
-  const isFiltering = searchQuery.trim() !== '' || (isAthleteView ? activeIndustry !== null : activeSport !== null);
+  const isFiltering = searchQuery.trim() !== '' || activeSport !== null;
   
-  const filteredItems = isAthleteView 
-    ? brands.filter(b => {
-        const q = searchQuery.toLowerCase();
-        const matchesSearch =
-          b.name.toLowerCase().includes(q) ||
-          b.industry.toLowerCase().includes(q) ||
-          b.location.toLowerCase().includes(q);
-        const matchesIndustry = activeIndustry ? b.industry === activeIndustry : true;
-        return matchesSearch && matchesIndustry;
-      })
-    : athletes.filter(a => {
+  const filteredItems = athletes.filter(a => {
         const q = searchQuery.toLowerCase();
         const matchesSearch =
           a.name.toLowerCase().includes(q) ||
@@ -126,7 +107,7 @@ export function AthleteDiscovery() {
       });
 
   const savedAthletesFiltered = useMemo<Athlete[]>(() => {
-    if (isAthleteView || businessExploreTab !== 'saved') return [];
+    if (businessExploreTab !== 'saved') return [];
 
     const q = searchQuery.toLowerCase();
     return athletes.filter((a) => {
@@ -138,12 +119,10 @@ export function AthleteDiscovery() {
         a.sport.toLowerCase().includes(q);
       return matchesSearch;
     });
-  }, [athletes, businessExploreTab, isAthleteSaved, isAthleteView, searchQuery]);
+  }, [athletes, businessExploreTab, isAthleteSaved, searchQuery]);
 
   const currentAthleteList = useMemo<Athlete[]>(() => {
-    if (isAthleteView) return [];
-
-    if (!isAthleteView && businessExploreTab === 'saved') {
+    if (businessExploreTab === 'saved') {
       return savedAthletesFiltered;
     }
 
@@ -164,7 +143,6 @@ export function AthleteDiscovery() {
     businessExploreTab,
     expandedCategory,
     filteredItems,
-    isAthleteView,
     isFiltering,
     savedAthletesFiltered,
   ]);
@@ -178,7 +156,7 @@ export function AthleteDiscovery() {
   };
 
   const displayCategory = isFiltering ? 'search' : expandedCategory;
-  const hasSelection = isAthleteView ? !!selectedBrand : !!selectedAthlete;
+  const hasSelection = !!selectedAthlete;
 
   if (error) {
     return (
@@ -188,20 +166,12 @@ export function AthleteDiscovery() {
     );
   }
 
-  if (isAthleteView) {
-    return <AthleteExploreMarketplace />;
-  }
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white text-nilink-ink">
       <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-3 pt-5">
         <DashboardPageHeader
           title="Explore"
-          subtitle={
-            isAthleteView
-              ? 'Discover brands to partner with'
-              : 'Discover athletes for your campaigns'
-          }
+          subtitle="Discover athletes for your campaigns"
         />
       </div>
       <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 bg-white/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/90">

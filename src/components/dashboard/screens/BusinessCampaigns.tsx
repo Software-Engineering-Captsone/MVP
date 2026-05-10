@@ -87,8 +87,9 @@ const statusStyles: Record<CampaignStatus, string> = {
   'Open for Applications': 'bg-nilink-accent-soft text-nilink-accent border-nilink-accent-border',
   'Reviewing Candidates': 'bg-red-50 text-red-700 border-red-200',
   'Deal Creation in Progress': 'bg-red-50 text-red-800 border-red-200',
-  Active: 'bg-amber-50 text-amber-700 border-amber-200',
-  Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Completed: 'bg-gray-100 text-gray-600 border-gray-300',
+  Cancelled: 'bg-red-50 text-red-600 border-red-200',
 };
 
 const ACTIVE_LIKE_STATUSES = new Set<CampaignStatus>([
@@ -149,6 +150,8 @@ function AvatarGroup({ athletes, count }: { athletes: ContractedAthlete[]; count
 /* ── Main Component ─────────────────────────────────────────── */
 export function BusinessCampaigns() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [selectedOfferByApplicationId, setSelectedOfferByApplicationId] =
+    useState<Record<string, string>>({});
   const [showCreateOverlay, setShowCreateOverlay] = useState(false);
   const [draftResumeSession, setDraftResumeSession] = useState<DraftResumeSession | null>(null);
   const [wizardInstanceKey, setWizardInstanceKey] = useState(0);
@@ -386,6 +389,7 @@ export function BusinessCampaigns() {
         const data = (await res.json()) as {
           campaign?: ApiCampaignRow;
           applications?: ApiApplicationRow[];
+          offerByApplicationId?: Record<string, string>;
           error?: string;
         };
         if (!res.ok || !data.campaign) {
@@ -395,6 +399,7 @@ export function BusinessCampaigns() {
         setSelectedCampaign(
           apiCampaignToUi(data.campaign, data.applications ?? [])
         );
+        setSelectedOfferByApplicationId(data.offerByApplicationId ?? {});
       } catch {
         setListError('Network error');
       }
@@ -512,7 +517,7 @@ export function BusinessCampaigns() {
 
   const handlePatchApplication = async (
     applicationId: string,
-    status: 'under_review' | 'shortlisted' | 'rejected' | 'approved'
+    status: 'under_review' | 'shortlisted' | 'rejected' | 'offer_drafted'
   ) => {
     const res = await authFetch(`/api/applications/${applicationId}`, {
       method: 'PATCH',
@@ -532,23 +537,8 @@ export function BusinessCampaigns() {
     return { warnings: data.warnings };
   };
 
-  const handlePatchCampaignStatus = async (campaignId: string, status: CampaignStatus) => {
-    const res = await authFetch(`/api/campaigns/${campaignId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    if (!res.ok) {
-      const data = (await res.json()) as { error?: string };
-      setListError(data.error || 'Could not update campaign status');
-      return;
-    }
-    await refreshSelectedCampaign();
-    await mutateCampaigns();
-  };
-
-  /** Offer handoff (POST /api/campaigns/[id]/offers) then advance campaign to deal creation. */
-  const handleSendSelectedToDeals = async (campaignId: string, applicationIds: string[]) => {
+  /** Offer handoff (POST /api/campaigns/[id]/offers). Campaign status stays Active. */
+  const handleCreateOfferDrafts = async (campaignId: string, applicationIds: string[]) => {
     setListError(null);
     const offerRes = await authFetch(`/api/campaigns/${campaignId}/offers`, {
       method: 'POST',
@@ -556,6 +546,7 @@ export function BusinessCampaigns() {
       body: JSON.stringify({ applicationIds }),
     });
     const offerData = (await offerRes.json()) as {
+      offers?: { id: string; applicationId?: string | null }[];
       error?: string;
       details?: { applicationId: string; reason: string }[];
     };
@@ -567,18 +558,15 @@ export function BusinessCampaigns() {
       setListError((offerData.error || 'Offer handoff failed') + detailMsg);
       throw new Error(offerData.error || 'Offer handoff failed');
     }
-    const patchRes = await authFetch(`/api/campaigns/${campaignId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Deal Creation in Progress' as CampaignStatus }),
-    });
-    const patchData = (await patchRes.json()) as { error?: string };
-    if (!patchRes.ok) {
-      setListError(patchData.error || 'Could not update campaign status');
-      throw new Error(patchData.error || 'Could not update campaign status');
-    }
+    const map = Object.fromEntries(
+      (offerData.offers ?? [])
+        .filter((offer) => offer.applicationId)
+        .map((offer) => [String(offer.applicationId), offer.id])
+    );
+    setSelectedOfferByApplicationId((prev) => ({ ...prev, ...map }));
     await refreshSelectedCampaign();
     await mutateCampaigns();
+    return map;
   };
 
   // Stats (palette matches StatusBadge tokens)
@@ -883,12 +871,15 @@ export function BusinessCampaigns() {
           <CampaignDetail
             key="campaign-detail"
             campaign={selectedCampaign}
-            onBack={() => setSelectedCampaign(null)}
+            onBack={() => {
+              setSelectedCampaign(null);
+              setSelectedOfferByApplicationId({});
+            }}
             brandReviewMode
             onPatchApplication={handlePatchApplication}
-            onPatchCampaignStatus={handlePatchCampaignStatus}
-            onSendSelectedToDeals={(applicationIds) =>
-              handleSendSelectedToDeals(selectedCampaign.id, applicationIds)
+            initialOfferByApplicationId={selectedOfferByApplicationId}
+            onCreateOfferDrafts={(applicationIds) =>
+              handleCreateOfferDrafts(selectedCampaign.id, applicationIds)
             }
             onApplicationsUpdated={refreshSelectedCampaign}
           />

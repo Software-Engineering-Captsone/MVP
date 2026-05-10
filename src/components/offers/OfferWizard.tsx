@@ -354,17 +354,11 @@ export function OfferWizard({ offerId, onClose, onSubmitted }: Props) {
               <p id="offer-wizard-desc" className="mt-1 text-xs text-gray-500">
                 Step through each section, then use Submit offer to save terms and send the offer to the athlete.
               </p>
-              {offer && (
+              {offer ? (
                 <p className="mt-1 text-xs text-gray-500">
-                  Athlete user: <span className="font-mono text-[11px]">{offer.athleteUserId}</span>
-                  {offer.campaignId ? (
-                    <>
-                      {' '}
-                      · Campaign: <span className="font-mono text-[11px]">{offer.campaignId}</span>
-                    </>
-                  ) : null}
+                  {offer.campaignId ? 'Campaign offer' : 'Direct offer'} · Terms are shown to the athlete after sending.
                 </p>
-              )}
+              ) : null}
             </div>
             <button
               ref={closeButtonRef}

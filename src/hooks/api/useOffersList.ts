@@ -38,7 +38,7 @@ export function useOffersList(options?: { enabled?: boolean; refreshInterval?: n
   const { data, error, isLoading, mutate } = useSWR<OffersListResponse>(
     key,
     apiFetcher,
-    { revalidateOnFocus: false, refreshInterval: options?.refreshInterval ?? 0 }
+    { revalidateOnFocus: true, refreshInterval: options?.refreshInterval ?? 0 }
   );
   return {
     offers: data?.offers ?? [],

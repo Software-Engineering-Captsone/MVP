@@ -1,19 +1,8 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
-import { AthleteDashboardSkeleton } from '@/components/dashboard/skeletons/AthleteDashboardSkeleton';
-import { BusinessOverviewSkeleton } from '@/components/dashboard/skeletons/BusinessOverviewSkeleton';
-
-const AthleteDashboard = dynamic(
-  () => import('@/components/dashboard/screens/AthleteDashboard').then((m) => m.AthleteDashboard),
-  { ssr: false, loading: () => <AthleteDashboardSkeleton /> }
-);
-
-const BusinessOverview = dynamic(
-  () => import('@/components/dashboard/screens/BusinessOverview').then((m) => m.BusinessOverview),
-  { ssr: false, loading: () => <BusinessOverviewSkeleton /> }
-);
+import { AthleteDashboard } from '@/components/dashboard/screens/AthleteDashboard';
+import { BusinessOverview } from '@/components/dashboard/screens/BusinessOverview';
 
 export default function DashboardPage() {
   const { accountType } = useDashboard();

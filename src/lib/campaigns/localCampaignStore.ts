@@ -111,7 +111,11 @@ export async function readLocalCampaignStore(): Promise<LocalCampaignStoreSnapsh
 
     let migrated = false;
     const migratedCampaigns = base.campaigns.map((c) => {
-      if (String(c.status) === 'Open for Applications') {
+      if (
+        String(c.status) === 'Open for Applications' ||
+        String(c.status) === 'Reviewing Candidates' ||
+        String(c.status) === 'Deal Creation in Progress'
+      ) {
         migrated = true;
         return { ...c, status: 'Active' } as StoredCampaign;
       }
