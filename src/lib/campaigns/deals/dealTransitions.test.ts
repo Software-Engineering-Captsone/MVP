@@ -5,6 +5,7 @@ import {
   dealTransitionRequiresSignedContract,
 } from './dealTransitions';
 import { assertDeliverableStatusTransition } from './deliverableTransitions';
+import { assertPaymentStatusTransition } from './paymentTransitions';
 import { assertSubmissionStatusTransition } from './submissionTransitions';
 
 describe('assertDealStatusTransition', () => {
@@ -20,6 +21,11 @@ describe('assertDealStatusTransition', () => {
     expect(() => assertDealStatusTransition('approved_completed', 'payment_pending')).not.toThrow();
   });
 
+  it('allows review loops back to work and revision resubmission review', () => {
+    expect(() => assertDealStatusTransition('under_review', 'submission_in_progress')).not.toThrow();
+    expect(() => assertDealStatusTransition('revision_requested', 'under_review')).not.toThrow();
+  });
+
   it('rejects skipping stages (created -> active)', () => {
     expect(() => assertDealStatusTransition('created', 'active')).toThrow(/Invalid deal status transition/);
   });
@@ -32,6 +38,7 @@ describe('assertDealStatusTransition', () => {
 describe('dealTransitionRequiresSignedContract', () => {
   it('is true only for contract_pending -> active', () => {
     expect(dealTransitionRequiresSignedContract('contract_pending', 'active')).toBe(true);
+    expect(dealTransitionRequiresSignedContract('created', 'active')).toBe(true);
     expect(dealTransitionRequiresSignedContract('created', 'contract_pending')).toBe(false);
     expect(dealTransitionRequiresSignedContract('active', 'submission_in_progress')).toBe(false);
   });
@@ -82,5 +89,20 @@ describe('assertSubmissionStatusTransition', () => {
     expect(() => assertSubmissionStatusTransition('approved', 'viewed')).toThrow(
       /Invalid submission status transition/,
     );
+  });
+});
+
+describe('assertPaymentStatusTransition', () => {
+  it('allows manual payment setup to be marked paid', () => {
+    expect(() => assertPaymentStatusTransition('not_configured', 'manual')).not.toThrow();
+    expect(() => assertPaymentStatusTransition('manual', 'paid')).not.toThrow();
+  });
+
+  it('allows manual confirmation to mark any non-terminal payment paid', () => {
+    expect(() => assertPaymentStatusTransition('not_configured', 'paid')).not.toThrow();
+    expect(() => assertPaymentStatusTransition('awaiting_setup', 'paid')).not.toThrow();
+    expect(() => assertPaymentStatusTransition('pending', 'paid')).not.toThrow();
+    expect(() => assertPaymentStatusTransition('ready_to_release', 'paid')).not.toThrow();
+    expect(() => assertPaymentStatusTransition('failed', 'paid')).not.toThrow();
   });
 });

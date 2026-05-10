@@ -467,12 +467,13 @@ export async function patchContractStatus(contractId: string, status: string): P
 
 export async function patchPaymentStatus(
   paymentId: string,
-  status: string
+  status: string,
+  body?: { provider?: string; providerReference?: string }
 ): Promise<{ payment: ApiPayment; deal?: ApiDeal }> {
   const res = await authFetch(`/api/payment/${paymentId}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...body }),
   });
   if (!res.ok) throw new Error(await readApiError(res));
   return (await res.json()) as { payment: ApiPayment; deal?: ApiDeal };
@@ -574,32 +575,34 @@ export function parseTermsSnapshot(raw: unknown): ParsedTerms | null {
 }
 
 export function humanizeDealStatus(status: string): string {
-  return status.replace(/_/g, ' ');
+  return status
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function activitySummary(a: ApiActivity): string {
   switch (a.eventType) {
     case 'deal_created':
-      return 'Deal created';
+      return 'Deal Created';
     case 'contract_uploaded':
-      return 'Contract uploaded';
+      return 'Contract Uploaded';
     case 'contract_signed':
-      return 'Contract signed';
+      return 'Contract Signed';
     case 'submission_submitted':
-      return 'Submission received';
+      return 'Submission Received';
     case 'revision_requested':
-      return 'Revision requested';
+      return 'Revision Requested';
     case 'submission_approved':
-      return 'Submission approved';
+      return 'Submission Approved';
     case 'deliverable_completed':
-      return 'Deliverable completed';
+      return 'Deliverable Completed';
     case 'deal_completed':
-      return 'Deal marked complete';
+      return 'Deal Marked Complete';
     case 'payment_status_changed':
     case 'payment_pending':
     case 'payment_paid':
-      return 'Payment update';
+      return 'Payment Update';
     default:
-      return a.eventType.replace(/_/g, ' ');
+      return humanizeDealStatus(a.eventType);
   }
 }

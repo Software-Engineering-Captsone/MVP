@@ -1,30 +1,47 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AlertCircle, ChevronRight, Handshake, RefreshCw, Search } from 'lucide-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, ChevronRight, Handshake, Loader2, RefreshCw, Search } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import {
-  businessSectionForDeal,
+  activitySummary,
+  fetchDealDetail,
   fetchDealsList,
+  fetchSubmissionsForDeliverable,
   formatIsoDate,
+  humanizeDealStatus,
   parseTermsSnapshot,
+  patchContractStatus,
+  patchDealStatus,
+  patchPaymentStatus,
+  patchSubmission,
+  postDealContract,
+  uploadDealContractFromFile,
   type ApiDeal,
-  type BusinessDealSection,
+  type ApiDealDetail,
+  type ApiDeliverable,
+  type ApiPayment,
+  type ApiSubmission,
 } from '@/lib/deals/dashboardDealsClient';
-import { dealStatusCopy } from '@/lib/deals/stageProjection';
+import { CONTRACT_STATUSES, DEAL_STATUSES, PAYMENT_STATUSES } from '@/lib/campaigns/deals/types';
+import {
+  buildDealStageProjection,
+  buildDeliverableProjection,
+  contractStatusCopy,
+  filterMainTimelineActivities,
+  paymentStatusCopy,
+  stageProgress,
+  STAGE_ORDER,
+} from '@/lib/deals/stageProjection';
 import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
 
-type BusinessFilter = '' | BusinessDealSection | 'payment';
-
-const FILTERS: Array<{ value: BusinessFilter; label: string }> = [
-  { value: '', label: 'All deals' },
-  { value: 'needs_action', label: 'Needs action' },
-  { value: 'awaiting_athlete', label: 'Waiting on athlete' },
-  { value: 'awaiting_review', label: 'In review' },
-  { value: 'payment', label: 'Payment' },
-  { value: 'completed', label: 'Done' },
-];
+function nextOwnerLabel(owner: ApiDeal['nextActionOwner']): string {
+  if (owner === 'brand') return 'Brand';
+  if (owner === 'athlete') return 'Athlete';
+  if (owner === 'system') return 'System';
+  return '—';
+}
 
 function DealStatusBadge({ status }: { status: string }) {
   const soft =
@@ -32,44 +49,85 @@ function DealStatusBadge({ status }: { status: string }) {
       ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
       : status === 'cancelled' || status === 'disputed'
         ? 'bg-red-50 text-red-700 border-red-200'
-        : status === 'under_review' || status === 'revision_requested'
+        : status === 'under_review' || status === 'submission_in_progress'
           ? 'bg-amber-50 text-amber-800 border-amber-200'
           : 'bg-gray-50 text-gray-700 border-gray-200';
   return (
     <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${soft}`}>
-      {dealStatusCopy(status)}
+      {humanizeDealStatus(status)}
     </span>
   );
 }
 
-function nextOwnerLabel(owner: ApiDeal['nextActionOwner']): string {
-  if (owner === 'brand') return 'You';
-  if (owner === 'athlete') return 'Athlete';
-  if (owner === 'system') return 'Payment';
-  return 'Done';
+function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
+  const map: Record<(typeof STAGE_ORDER)[number], string> = {
+    agreement: 'AGREEMENT',
+    work_in_progress: 'WORK IN PROGRESS',
+    review_revisions: 'REVIEW REVISIONS',
+    completed: 'COMPLETED',
+    payment: 'PAYMENT',
+    closed: 'CLOSED',
+  };
+  return map[step];
 }
 
-function matchesFilter(deal: ApiDeal, filter: BusinessFilter): boolean {
-  if (!filter) return true;
-  if (filter === 'payment') {
-    return deal.status === 'approved_completed' || deal.status === 'payment_pending' || deal.status === 'paid';
-  }
-  return businessSectionForDeal(deal) === filter;
+function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] }) {
+  const index = stageProgress(stageId);
+  return (
+    <ol className="grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-6">
+      {STAGE_ORDER.map((step, i) => {
+        const done = i < index;
+        const current = i === index;
+        return (
+          <li key={step} className="flex items-center gap-2">
+            <span
+              className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                current
+                  ? 'bg-nilink-accent text-white ring-2 ring-nilink-accent/25'
+                  : done
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-200 text-gray-500'
+              }`}
+            >
+              {done ? '✓' : i + 1}
+            </span>
+            <span className={`text-[11px] font-bold uppercase leading-tight tracking-wide ${current ? 'text-nilink-ink' : done ? 'text-emerald-700' : 'text-gray-500'}`}>
+              {stageStepLabel(step)}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 export function BusinessDeals() {
-  const router = useRouter();
   const [deals, setDeals] = useState<ApiDeal[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<BusinessFilter>('');
+  /** Empty string = all deal lifecycle statuses */
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ApiDealDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [submissionsByDeliverable, setSubmissionsByDeliverable] = useState<Record<string, ApiSubmission[]>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [contractUrlInput, setContractUrlInput] = useState('');
+  const [contractFile, setContractFile] = useState<File | null>(null);
+  const contractFilePrimaryRef = useRef<HTMLInputElement>(null);
+  const contractFileAdvancedRef = useRef<HTMLInputElement>(null);
+  const [paymentReference, setPaymentReference] = useState('');
+  const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
 
   const loadList = useCallback(async () => {
     setListLoading(true);
     setListError(null);
     try {
-      setDeals(await fetchDealsList());
+      const rows = await fetchDealsList();
+      setDeals(rows);
     } catch (e) {
       setListError(e instanceof Error ? e.message : 'Failed to load deals');
     } finally {
@@ -81,162 +139,785 @@ export function BusinessDeals() {
     void loadList();
   }, [loadList]);
 
-  useDealsRealtimeRefresh({ enabled: true, onInvalidate: loadList });
-
   const filteredDeals = useMemo(() => {
+    const byStatus = statusFilter.trim()
+      ? deals.filter((d) => d.status === statusFilter.trim())
+      : deals;
     const q = searchQuery.trim().toLowerCase();
-    return deals.filter((deal) => {
-      if (!matchesFilter(deal, filter)) return false;
-      if (!q) return true;
-      const terms = parseTermsSnapshot(deal.termsSnapshot);
+    if (!q) return byStatus;
+    return byStatus.filter((d) => {
+      const terms = parseTermsSnapshot(d.termsSnapshot);
       const hay = [
-        deal.athleteName ?? '',
-        deal.athleteSport ?? '',
-        deal.athleteSchool ?? '',
-        deal.campaignName ?? '',
-        deal.status,
-        deal.nextActionLabel,
+        d.athleteUserId,
+        d.athleteName ?? '',
+        d.athleteSport ?? '',
+        d.athleteSchool ?? '',
+        d.campaignName ?? '',
+        d.id,
+        d.status,
+        d.nextActionLabel,
+        terms?.offerOrigin ?? '',
         terms?.notes ?? '',
-        terms?.compensationLine ?? '',
       ]
         .join(' ')
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [deals, filter, searchQuery]);
+  }, [deals, searchQuery, statusFilter]);
+
+  const loadDetail = useCallback(async (dealId: string) => {
+    setDetailLoading(true);
+    setDetailError(null);
+    setActionError(null);
+    try {
+      const d = await fetchDealDetail(dealId);
+      setDetail(d);
+      const subMap: Record<string, ApiSubmission[]> = {};
+      await Promise.all(
+        d.deliverables.map(async (del) => {
+          try {
+            subMap[del.id] = await fetchSubmissionsForDeliverable(del.id);
+          } catch {
+            subMap[del.id] = [];
+          }
+        })
+      );
+      setSubmissionsByDeliverable(subMap);
+    } catch (e) {
+      setDetailError(e instanceof Error ? e.message : 'Failed to load deal');
+      setDetail(null);
+      setSubmissionsByDeliverable({});
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedId) void loadDetail(selectedId);
+    else {
+      setDetail(null);
+      setSubmissionsByDeliverable({});
+    }
+  }, [selectedId, loadDetail]);
+
+  const refreshFromRealtime = useCallback(() => {
+    void loadList();
+    if (selectedId) void loadDetail(selectedId);
+  }, [loadList, loadDetail, selectedId]);
+  useDealsRealtimeRefresh({ enabled: true, dealId: selectedId, onInvalidate: refreshFromRealtime });
+
+  const pendingReviews = useMemo(() => {
+    if (!detail) return [];
+    const out: { submission: ApiSubmission; deliverable: ApiDeliverable }[] = [];
+    for (const del of detail.deliverables) {
+      const subs = submissionsByDeliverable[del.id] ?? [];
+      const latest = subs.reduce<ApiSubmission | null>((acc, s) => (!acc || s.version > acc.version ? s : acc), null);
+      if (latest && (latest.status === 'submitted' || latest.status === 'viewed')) {
+        out.push({ submission: latest, deliverable: del });
+      }
+    }
+    return out;
+  }, [detail, submissionsByDeliverable]);
+  const stageProjection = useMemo(() => {
+    if (!detail) return null;
+    return buildDealStageProjection({
+      actor: 'brand',
+      deal: detail.deal,
+      contract: detail.contract,
+      payment: detail.payment,
+      deliverables: detail.deliverables,
+      submissionsByDeliverable,
+    });
+  }, [detail, submissionsByDeliverable]);
+  const primaryReviewTarget = pendingReviews[0] ?? null;
+
+  const runAction = async (key: string, fn: () => Promise<void>) => {
+    setPendingAction(key);
+    setActionError(null);
+    try {
+      await fn();
+      if (selectedId) await loadDetail(selectedId);
+      await loadList();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Action failed');
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const sortedActivities = useMemo(() => {
+    const acts = detail?.activities ?? [];
+    return filterMainTimelineActivities(acts).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [detail?.activities]);
 
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-nilink-page font-sans text-nilink-ink">
-      <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 bg-white pb-4 pt-5">
-        <DashboardPageHeader title="Deals" subtitle="Track contracts, deliverables, reviews, and payout" />
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[220px] flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search athlete, campaign, or next step"
-              className="w-full rounded-full border border-gray-200 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
-            />
+        <div className="flex flex-1 flex-col overflow-hidden bg-nilink-page">
+        <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 bg-white pb-4 pt-5">
+          <DashboardPageHeader title="Deals" subtitle="Live pipeline, deliverables, reviews, and payment" />
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="relative min-w-[200px] flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by athlete, status, notes..."
+                className="w-full rounded-full border border-gray-200 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
+              />
+            </div>
+            <div className="flex min-w-[180px] flex-1 max-w-xs items-center gap-2">
+              <label htmlFor="deal-status-filter" className="sr-only">
+                Filter by deal status
+              </label>
+              <select
+                id="deal-status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full rounded-full border border-gray-200 bg-white py-2 pl-3 pr-8 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300"
+              >
+                <option value="">All statuses</option>
+                {DEAL_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {humanizeDealStatus(s).toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadList()}
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${listLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
           </div>
-          <label htmlFor="business-deal-filter" className="sr-only">
-            Filter deals
-          </label>
-          <select
-            id="business-deal-filter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as BusinessFilter)}
-            className="min-w-[190px] rounded-full border border-gray-200 bg-white py-2 pl-3 pr-8 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300"
-          >
-            {FILTERS.map((item) => (
-              <option key={item.value || 'all'} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => void loadList()}
-            disabled={listLoading}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${listLoading ? 'animate-spin' : ''}`} aria-hidden />
-            Refresh
-          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto pb-8 pt-4 dash-main-gutter-x">
+          {listError ? (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {listError}
+            </div>
+          ) : null}
+
+          {listLoading ? (
+            <div className="animate-pulse overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="flex gap-6 border-b border-gray-200 bg-gray-50/90 px-4 py-3">
+                {[80, 72, 160, 56, 52].map((w, i) => (
+                  <div key={i} className={`h-3 rounded bg-gray-200`} style={{ width: w }} />
+                ))}
+              </div>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-6 border-b border-gray-100 px-4 py-3">
+                  <div className="space-y-1.5">
+                    <div className="h-4 w-32 rounded bg-gray-200" />
+                    <div className="h-3 w-20 rounded bg-gray-200" />
+                  </div>
+                  <div className="h-5 w-20 rounded-full bg-gray-200" />
+                  <div className="h-4 w-44 rounded bg-gray-200" />
+                  <div className="ml-auto h-3 w-16 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
+          ) : filteredDeals.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
+                <Handshake className="h-7 w-7" aria-hidden />
+              </div>
+              <h2 className="mt-5 text-lg font-bold text-nilink-ink">
+                {deals.length === 0 ? 'No deals in your pipeline yet' : 'No matches for this filter'}
+              </h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
+                {deals.length === 0
+                  ? 'When athletes accept your offers, deals appear here so you can upload contracts, review submissions, and track payment.'
+                  : 'Try clearing the status filter or search to see all of your deals.'}
+              </p>
+              {deals.length === 0 ? (
+                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/dashboard/campaigns"
+                    className="inline-flex rounded-xl bg-nilink-accent px-5 py-2.5 text-sm font-bold text-white transition hover:bg-nilink-accent-hover"
+                  >
+                    Go to campaigns
+                  </Link>
+                  <Link
+                    href="/dashboard/messages"
+                    className="inline-flex rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
+                  >
+                    Open messages
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+              <table className="min-w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50/90 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    <th className="whitespace-nowrap px-4 py-3">Athlete</th>
+                    <th className="whitespace-nowrap px-4 py-3">Deal status</th>
+                    <th className="min-w-[200px] px-4 py-3">Next step</th>
+                    <th className="whitespace-nowrap px-4 py-3">Type</th>
+                    <th className="whitespace-nowrap px-4 py-3">Updated</th>
+                    <th className="w-10 px-2 py-3" aria-hidden />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDeals.map((d) => {
+                    const athleteName = d.athleteName?.trim() || 'Athlete';
+                    const athleteMeta = [d.athleteSport, d.athleteSchool].filter(Boolean).join(' · ');
+                    return (
+                      <tr
+                        key={d.id}
+                        className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50/80"
+                        onClick={() => setSelectedId(d.id)}
+                      >
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="font-semibold text-nilink-ink">{athleteName}</div>
+                          {athleteMeta ? <div className="mt-0.5 text-xs text-gray-500">{athleteMeta}</div> : null}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <DealStatusBadge status={d.status} />
+                        </td>
+                        <td className="max-w-md px-4 py-3 text-gray-700">
+                          <span className="font-semibold text-nilink-accent">{nextOwnerLabel(d.nextActionOwner)}:</span>{' '}
+                          <span className="line-clamp-2">{d.nextActionLabel || '—'}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                          {d.campaignName ?? (d.campaignId ? 'Campaign deal' : 'Direct deal')}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{formatIsoDate(d.updatedAt)}</td>
+                        <td className="px-2 py-3 text-gray-300">
+                          <ChevronRight className="h-4 w-4" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto pb-8 pt-4 dash-main-gutter-x">
-        {listError ? (
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
-            {listError}
-          </div>
-        ) : null}
-
-        {listLoading ? (
-          <div className="animate-pulse overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex gap-6 border-b border-gray-200 bg-gray-50/90 px-4 py-3">
-              {[80, 72, 160, 56, 52].map((w, i) => (
-                <div key={i} className="h-3 rounded bg-gray-200" style={{ width: w }} />
-              ))}
-            </div>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-6 border-b border-gray-100 px-4 py-3">
-                <div className="space-y-1.5">
-                  <div className="h-4 w-32 rounded bg-gray-200" />
-                  <div className="h-3 w-20 rounded bg-gray-200" />
+      {selectedId ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-6"
+          role="dialog"
+          aria-modal
+          onClick={() => setSelectedId(null)}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-t-2xl border border-gray-100 bg-white shadow-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="max-h-[92vh] overflow-y-auto">
+              {detailLoading ? (
+                <div className="flex items-center gap-2 p-8 text-xs font-bold uppercase tracking-wide text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  LOADING DEAL…
                 </div>
-                <div className="h-5 w-20 rounded-full bg-gray-200" />
-                <div className="h-4 w-44 rounded bg-gray-200" />
-                <div className="ml-auto h-3 w-16 rounded bg-gray-200" />
-              </div>
-            ))}
-          </div>
-        ) : filteredDeals.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-nilink-accent-soft text-nilink-accent">
-              <Handshake className="h-7 w-7" aria-hidden />
+              ) : detailError || !detail ? (
+                <div className="p-8 text-sm text-red-600">{detailError || 'Deal not found'}</div>
+              ) : (
+                <>
+                  <div className="border-b border-gray-100 bg-nilink-sidebar px-6 py-5 text-white">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Deal overview</p>
+                    <p className="mt-1 text-lg font-semibold">Collaboration with this athlete</p>
+                    <p className="mt-1 text-xs text-white/85">
+                      {detail.deal.campaignName ? `Campaign: ${detail.deal.campaignName}` : 'Direct collaboration'}
+                    </p>
+                    <p className="mt-1 text-xs text-white/85">
+                      {stageProjection?.stageLabel ?? 'Deal'} · {stageProjection?.statusLine ?? humanizeDealStatus(detail.deal.status)}
+                    </p>
+                  </div>
+
+                  <div className="space-y-5 p-5">
+                    {actionError ? (
+                      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        {actionError}
+                      </div>
+                    ) : null}
+
+                    {stageProjection ? (
+                      <section className="rounded-2xl border border-gray-100 bg-nilink-page p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-bold text-nilink-ink">{stageProjection.stageLabel}</h3>
+                            <p className="text-xs text-gray-600">{stageProjection.stageDescription}</p>
+                          </div>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-700">
+                            {stageProjection.statusLine}
+                          </span>
+                        </div>
+                        <div className="mt-3">
+                          <ProgressTracker stageId={stageProjection.stageId} />
+                        </div>
+                      </section>
+                    ) : null}
+
+                    <section className="rounded-2xl border border-gray-100 bg-white p-4">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Next action</h3>
+                      {primaryReviewTarget ? (
+                        <>
+                          <p className="mt-2 text-sm font-semibold text-nilink-ink">
+                            Review latest submission for {primaryReviewTarget.deliverable.title}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-600">Approve to advance this deliverable, or request a targeted revision.</p>
+                          <p className="text-xs text-gray-500">
+                            v{primaryReviewTarget.submission.version} · {formatIsoDate(primaryReviewTarget.submission.submittedAt)}
+                          </p>
+                          <textarea
+                            className="mt-2 w-full rounded-lg border border-gray-200 p-2 text-sm"
+                            rows={2}
+                            placeholder="Feedback when requesting revision..."
+                            value={revisionFeedback[primaryReviewTarget.submission.id] ?? ''}
+                            onChange={(e) =>
+                              setRevisionFeedback((prev) => ({ ...prev, [primaryReviewTarget.submission.id]: e.target.value }))
+                            }
+                          />
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={pendingAction === `ap-${primaryReviewTarget.submission.id}`}
+                              onClick={() =>
+                                void runAction(`ap-${primaryReviewTarget.submission.id}`, async () => {
+                                  await patchSubmission(primaryReviewTarget.submission.id, { status: 'approved' });
+                                })
+                              }
+                              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Approve Submission
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pendingAction === `rv-${primaryReviewTarget.submission.id}`}
+                              onClick={() =>
+                                void runAction(`rv-${primaryReviewTarget.submission.id}`, async () => {
+                                  const fb = revisionFeedback[primaryReviewTarget.submission.id]?.trim();
+                                  await patchSubmission(primaryReviewTarget.submission.id, {
+                                    status: 'revision_requested',
+                                    ...(fb ? { feedback: fb } : {}),
+                                  });
+                                })
+                              }
+                              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              Request Revision
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="mt-2 text-sm font-semibold text-nilink-ink">
+                            {stageProjection?.primaryAction?.label ?? 'No Immediate Brand Action Required'}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-600">Keep The Workflow Focused On The Current Stage.</p>
+                          {!stageProjection?.primaryAction?.enabled ? (
+                            <p className="text-xs text-gray-500">
+                              {stageProjection?.primaryAction?.reason ?? 'Waiting on athlete/system progression.'}
+                            </p>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'upload_contract' ? (
+                            <div className="mt-3 space-y-3">
+                              <div className="flex flex-wrap gap-2">
+                                <input
+                                  className="min-w-[200px] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                  placeholder="Contract document URL"
+                                  value={contractUrlInput}
+                                  onChange={(e) => setContractUrlInput(e.target.value)}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={pendingAction === 'contract-post'}
+                                  onClick={() =>
+                                    void runAction('contract-post', async () => {
+                                      await postDealContract(detail.deal.id, contractUrlInput.trim() || undefined);
+                                      setContractUrlInput('');
+                                    })
+                                  }
+                                  className="rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                >
+                                  Save URL
+                                </button>
+                              </div>
+                              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2">
+                                <p className="text-[11px] text-gray-600">Or upload PDF / Word (stored in Supabase).</p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <input
+                                      ref={contractFilePrimaryRef}
+                                      type="file"
+                                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                      className="max-w-full text-xs text-gray-700 file:mr-2 file:rounded-md file:border file:border-gray-200 file:bg-white file:px-2 file:py-1"
+                                      onChange={(e) => setContractFile(e.target.files?.[0] ?? null)}
+                                    />
+                                  <button
+                                    type="button"
+                                    disabled={pendingAction === 'contract-file' || !contractFile}
+                                    onClick={() =>
+                                      void runAction('contract-file', async () => {
+                                        if (!contractFile) return;
+                                        await uploadDealContractFromFile(detail.deal.id, contractFile);
+                                        setContractFile(null);
+                                        if (contractFilePrimaryRef.current) contractFilePrimaryRef.current.value = '';
+                                        if (contractFileAdvancedRef.current) contractFileAdvancedRef.current.value = '';
+                                      })
+                                    }
+                                    className="rounded-lg bg-nilink-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                  >
+                                    Upload file
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'send_for_signature' && detail.contract ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'contract-send'}
+                              onClick={() =>
+                                void runAction('contract-send', async () => {
+                                  await patchContractStatus(detail.contract!.id, 'sent_for_signature');
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                            >
+                              Send For Signature
+                            </button>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'activate_deal' ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'deal-active'}
+                              onClick={() =>
+                                void runAction('deal-active', async () => {
+                                  await patchDealStatus(detail.deal.id, 'active');
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Finalize And Start Deal
+                            </button>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'move_to_payment' ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'deal-payment'}
+                              onClick={() =>
+                                void runAction('deal-payment', async () => {
+                                  await patchDealStatus(detail.deal.id, 'payment_pending');
+                                  if (detail.payment) {
+                                    await patchPaymentStatus((detail.payment as ApiPayment).id, 'manual', { provider: 'manual' });
+                                  }
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-nilink-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-nilink-accent-hover disabled:opacity-50"
+                            >
+                              Move To Payment
+                            </button>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'mark_payment_paid' && detail.payment ? (
+                            <div className="mt-3 space-y-2">
+                              <input
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                placeholder="Payment reference or note"
+                                value={paymentReference}
+                                onChange={(e) => setPaymentReference(e.target.value)}
+                              />
+                              <button
+                                type="button"
+                                disabled={pendingAction === 'payment-paid'}
+                                onClick={() =>
+                                  void runAction('payment-paid', async () => {
+                                    await patchPaymentStatus((detail.payment as ApiPayment).id, 'paid', {
+                                      provider: 'manual',
+                                      providerReference: paymentReference.trim(),
+                                    });
+                                    setPaymentReference('');
+                                  })
+                                }
+                                className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                Mark As Paid
+                              </button>
+                            </div>
+                          ) : null}
+                          {stageProjection?.primaryAction?.key === 'close_deal' ? (
+                            <button
+                              type="button"
+                              disabled={pendingAction === 'deal-close'}
+                              onClick={() =>
+                                void runAction('deal-close', async () => {
+                                  await patchDealStatus(detail.deal.id, 'closed');
+                                })
+                              }
+                              className="mt-3 rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                            >
+                              Close Deal
+                            </button>
+                          ) : null}
+                        </>
+                      )}
+                      {stageProjection?.remaining.length ? (
+                        <ul className="mt-3 space-y-1 text-xs text-gray-600">
+                          {stageProjection.remaining.map((item) => (
+                            <li key={item}>- {item}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+
+                    <section>
+                      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">Deliverables</h3>
+                      <ul className="space-y-3">
+                        {detail.deliverables.map((del) => {
+                          const subs = submissionsByDeliverable[del.id] ?? [];
+                          const latest = subs.reduce<ApiSubmission | null>((acc, s) => (!acc || s.version > acc.version ? s : acc), null);
+                          const projection = buildDeliverableProjection({
+                            actor: 'brand',
+                            deliverable: del,
+                            submissionsByDeliverable,
+                          });
+                          const postExecutionStage = stageProjection?.stageId === 'payment' || stageProjection?.stageId === 'closed';
+                          const displayStatusLabel = postExecutionStage
+                            ? del.status === 'completed'
+                              ? 'Completed'
+                              : 'In payout phase'
+                            : projection.statusLabel;
+                          return (
+                            <li key={del.id} className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-semibold text-nilink-ink">{del.title}</p>
+                                  <p className="text-xs text-gray-500">
+                                    Due {del.dueAt ? formatIsoDate(del.dueAt) : '—'} · Revisions {del.revisionCountUsed}/{del.revisionLimit}
+                                  </p>
+                                </div>
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-700">
+                                  {displayStatusLabel}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm text-gray-600">{del.instructions}</p>
+                              <p className="mt-2 text-xs text-gray-500">
+                                Latest: {projection.latestSubmissionLabel}
+                                {projection.latestSubmissionAt ? ` · ${formatIsoDate(projection.latestSubmissionAt)}` : ''}
+                              </p>
+                              {projection.feedback ? (
+                                <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                                  Feedback: {projection.feedback}
+                                </p>
+                              ) : null}
+                              {latest?.notes ? <p className="mt-2 text-xs text-gray-600">{latest.notes}</p> : null}
+                              {projection.primaryAction?.key === 'approve_submission' && latest ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={pendingAction === `ap-${latest.id}`}
+                                    onClick={() =>
+                                      void runAction(`ap-${latest.id}`, async () => {
+                                        await patchSubmission(latest.id, { status: 'approved' });
+                                      })
+                                    }
+                                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                  >
+                                    Approve Submission
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={pendingAction === `rv-${latest.id}`}
+                                    onClick={() =>
+                                      void runAction(`rv-${latest.id}`, async () => {
+                                        const fb = revisionFeedback[latest.id]?.trim();
+                                        await patchSubmission(latest.id, {
+                                          status: 'revision_requested',
+                                          ...(fb ? { feedback: fb } : {}),
+                                        });
+                                      })
+                                    }
+                                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                                  >
+                                    Request Revision
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-xs text-gray-400">No Brand Action Needed On This Deliverable Right Now.</p>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+
+                    <section>
+                      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">Timeline</h3>
+                      <ul className="space-y-2 border-l-2 border-gray-200 pl-4">
+                        {sortedActivities.map((a) => (
+                          <li key={a.id} className="relative text-sm text-gray-700">
+                            <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-nilink-accent" />
+                            <span className="font-semibold text-nilink-ink">{activitySummary(a)}</span>
+                            <span className="ml-2 text-xs text-gray-400">{formatIsoDate(a.createdAt)}</span>
+                          </li>
+                        ))}
+                        {sortedActivities.length === 0 ? <li className="text-sm text-gray-400">No major updates yet.</li> : null}
+                      </ul>
+                    </section>
+
+                    <details className="rounded-2xl border border-dashed border-gray-200 p-4">
+                      <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-gray-500">
+                        Operator controls
+                      </summary>
+                      <div className="mt-3 space-y-4">
+                        <section className="rounded-xl border border-gray-100 bg-nilink-page p-4">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">Contract operations</h4>
+                          {detail.contract ? (
+                            <>
+                              <p className="mt-1 text-sm">Status: {contractStatusCopy(detail.contract.status)}</p>
+                              {detail.contract.fileUrl ? (
+                                <a
+                                  href={detail.contract.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-2 inline-block text-sm font-semibold text-nilink-accent hover:underline"
+                                >
+                                  Open file link
+                                </a>
+                              ) : null}
+                              <div className="mt-3 space-y-3">
+                                <div className="flex flex-wrap gap-2">
+                                  <input
+                                    className="min-w-[200px] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                                    placeholder="Document URL"
+                                    value={contractUrlInput}
+                                    onChange={(e) => setContractUrlInput(e.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    disabled={pendingAction === 'contract-post'}
+                                    onClick={() =>
+                                      void runAction('contract-post', async () => {
+                                        await postDealContract(detail.deal.id, contractUrlInput.trim() || undefined);
+                                        setContractUrlInput('');
+                                      })
+                                    }
+                                    className="rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                  >
+                                    Save URL
+                                  </button>
+                                </div>
+                                <div className="rounded-lg border border-dashed border-gray-200 bg-white px-3 py-2">
+                                  <p className="text-[11px] text-gray-600">Or upload PDF / Word.</p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <input
+                                      ref={contractFileAdvancedRef}
+                                      type="file"
+                                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                      className="max-w-full text-xs text-gray-700 file:mr-2 file:rounded-md file:border file:border-gray-200 file:bg-white file:px-2 file:py-1"
+                                      onChange={(e) => setContractFile(e.target.files?.[0] ?? null)}
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={pendingAction === 'contract-file' || !contractFile}
+                                      onClick={() =>
+                                        void runAction('contract-file', async () => {
+                                          if (!contractFile) return;
+                                          await uploadDealContractFromFile(detail.deal.id, contractFile);
+                                          setContractFile(null);
+                                          if (contractFilePrimaryRef.current) contractFilePrimaryRef.current.value = '';
+                                          if (contractFileAdvancedRef.current) contractFileAdvancedRef.current.value = '';
+                                        })
+                                      }
+                                      className="rounded-lg bg-nilink-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
+                                    >
+                                      Upload file
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {CONTRACT_STATUSES.filter((s) => s !== 'signed').map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    disabled={pendingAction === `c-${s}`}
+                                    onClick={() =>
+                                      void runAction(`c-${s}`, async () => {
+                                        await patchContractStatus(detail.contract!.id, s);
+                                      })
+                                    }
+                                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-gray-50 disabled:opacity-50"
+                                  >
+                                    SET {s.replace(/_/g, ' ').toUpperCase()}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-500">No contract record.</p>
+                          )}
+                        </section>
+
+                        <section className="rounded-xl border border-gray-100 bg-nilink-page p-4">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">Payment operations</h4>
+                          {detail.payment ? (
+                            <>
+                              <p className="text-sm text-gray-600">
+                                {detail.payment.currency} {detail.payment.amount.toLocaleString()} ·{' '}
+                                <span className="font-bold uppercase tracking-wide">{paymentStatusCopy(detail.payment.status)}</span>
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {PAYMENT_STATUSES.map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    disabled={pendingAction === `p-${s}`}
+                                    onClick={() =>
+                                      void runAction(`p-${s}`, async () => {
+                                        await patchPaymentStatus((detail.payment as ApiPayment).id, s);
+                                      })
+                                    }
+                                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold hover:bg-gray-50 disabled:opacity-50"
+                                  >
+                                    {s.replace(/_/g, ' ').toUpperCase()}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-500">No payment record.</p>
+                          )}
+                        </section>
+                      </div>
+                    </details>
+
+                    <div className="flex flex-col gap-2 pb-2 sm:flex-row sm:gap-3">
+                      {selectedId ? (
+                        <Link
+                          href={`/dashboard/deals/${selectedId}`}
+                          className="flex-1 rounded-xl border border-nilink-accent bg-white py-3 text-center text-sm font-bold text-nilink-accent transition hover:bg-nilink-accent-soft"
+                          onClick={() => setSelectedId(null)}
+                        >
+                          Open full workspace
+                        </Link>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(null)}
+                        className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-nilink-ink hover:bg-gray-50"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <h2 className="mt-5 text-lg font-bold text-nilink-ink">
-              {deals.length === 0 ? 'No deals in your pipeline yet' : 'No matches for this view'}
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
-              {deals.length === 0
-                ? 'When athletes accept offers, deals appear here with contract, review, and payout steps.'
-                : 'Try another filter or search term.'}
-            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="min-w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/90 text-[11px] font-bold uppercase tracking-wide text-gray-500">
-                  <th className="whitespace-nowrap px-4 py-3">Athlete</th>
-                  <th className="whitespace-nowrap px-4 py-3">Stage</th>
-                  <th className="min-w-[220px] px-4 py-3">Next step</th>
-                  <th className="whitespace-nowrap px-4 py-3">Deal</th>
-                  <th className="whitespace-nowrap px-4 py-3">Updated</th>
-                  <th className="w-10 px-2 py-3" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDeals.map((deal) => {
-                  const athleteName = deal.athleteName?.trim() || 'Athlete';
-                  const athleteMeta = [deal.athleteSport, deal.athleteSchool].filter(Boolean).join(' · ');
-                  return (
-                    <tr
-                      key={deal.id}
-                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50/80"
-                      onClick={() => router.push(`/dashboard/deals/${deal.id}`)}
-                    >
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="font-semibold text-nilink-ink">{athleteName}</div>
-                        {athleteMeta ? <div className="mt-0.5 text-xs text-gray-500">{athleteMeta}</div> : null}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <DealStatusBadge status={deal.status} />
-                      </td>
-                      <td className="max-w-md px-4 py-3 text-gray-700">
-                        <span className="font-semibold text-nilink-accent">{nextOwnerLabel(deal.nextActionOwner)}:</span>{' '}
-                        <span className="line-clamp-2">{deal.nextActionLabel || 'No further action'}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                        {deal.campaignName ?? (deal.campaignId ? 'Campaign deal' : 'Direct deal')}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{formatIsoDate(deal.updatedAt)}</td>
-                      <td className="px-2 py-3 text-gray-300">
-                        <ChevronRight className="h-4 w-4" aria-hidden />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

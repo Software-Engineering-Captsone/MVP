@@ -3,6 +3,7 @@
 import { useState, createContext, useContext, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import useSWR from 'swr';
 import type { OffersListResponse } from '@/hooks/api/useOffersList';
 import { apiFetcher } from '@/hooks/api/fetcher';
@@ -62,6 +63,18 @@ const businessNavigation: NavItem[] = [
   { href: '/dashboard/deals', icon: CreditCard, label: 'Deals' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
   { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
+];
+
+const dashboardPrefetchPaths = [
+  '/dashboard',
+  '/dashboard/search',
+  '/dashboard/applications',
+  '/dashboard/offers',
+  '/dashboard/campaigns',
+  '/dashboard/deals',
+  '/dashboard/analytics',
+  '/dashboard/messages',
+  '/dashboard/profile',
 ];
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -156,6 +169,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     };
   }, [supabase, router, mapSupabaseUser, hydrateAvatarFromProfile]);
 
+  useEffect(() => {
+    if (booting || !sessionUser) return;
+    dashboardPrefetchPaths.forEach((path) => router.prefetch(path));
+  }, [booting, sessionUser, router]);
+
   /* ── Onboarding gate for athletes ── */
   useEffect(() => {
     if (booting || !sessionUser) return;
@@ -230,9 +248,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
             >
               <div className="flex min-h-[44px] w-full items-center justify-center gap-0 rounded-xl px-2 py-2 group-hover:justify-start group-hover:gap-2">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center transition-transform duration-150 hover:scale-[1.04] active:scale-[0.98]">
+                <motion.span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.98 }}
+                >
                   <NilinkLogoMark surface="inverse" />
-                </span>
+                </motion.span>
                 <NilinkLogoText surface="dark" collapsible />
               </div>
             </Link>
@@ -258,14 +280,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   <li key={item.href + item.label}>
                     <Link
                       href={item.href}
+                      onMouseEnter={() => router.prefetch(item.href)}
+                      onFocus={() => router.prefetch(item.href)}
                       className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
                     >
-                      <div
-                        className={`group/link flex min-h-[44px] w-full items-center justify-start gap-2 rounded-xl px-2 py-2 text-sm font-medium tracking-wide transition-[background-color,color,transform] duration-200 active:scale-[0.99] ${
+                      <motion.div
+                        className={`group/link flex min-h-[44px] w-full items-center justify-start gap-2 rounded-xl px-2 py-2 text-sm font-medium tracking-wide transition-colors duration-200 ${
                           isActive
                             ? 'bg-stone-100 text-zinc-700 shadow-sm'
                             : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'
                         }`}
+                        whileTap={{ scale: 0.99 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                       >
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center">
                           <item.icon
@@ -289,7 +315,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                             </span>
                           )}
                         </div>
-                      </div>
+                      </motion.div>
                     </Link>
                   </li>
                 );
@@ -300,12 +326,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <div className="mt-auto shrink-0 bg-nilink-sidebar px-3 pb-3 pt-3">
             <div className="border-t border-nilink-sidebar-muted pt-3">
               <div className="relative">
-                <button
+                <motion.button
                   type="button"
                   aria-expanded={isProfileMenuOpen}
                   aria-haspopup="menu"
                   onClick={() => setIsProfileMenuOpen((open) => !open)}
-                  className="flex w-full min-h-[44px] items-center justify-start gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-2 py-2 text-left outline-none transition-[background-color,transform] hover:bg-white/[0.1] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
+                  className="flex w-full min-h-[44px] items-center justify-start gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-2 py-2 text-left outline-none transition-colors hover:bg-white/[0.1] focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-2 focus-visible:ring-offset-nilink-sidebar"
+                  whileTap={{ scale: 0.99 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center">
                     <img
@@ -322,7 +350,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     className="pointer-events-none h-4 w-4 max-w-0 shrink-0 text-gray-400 opacity-0 transition-all duration-300 group-hover:max-w-[20px] group-hover:opacity-100"
                     aria-hidden
                   />
-                </button>
+                </motion.button>
 
                 {isProfileMenuOpen && (
                   <div
@@ -331,31 +359,40 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     onClick={() => setIsProfileMenuOpen(false)}
                   />
                 )}
-                {isProfileMenuOpen && (
-                  <div
-                    role="menu"
-                    className="absolute bottom-full right-0 z-50 mb-2 w-48 origin-bottom-right rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
-                  >
-                    <Link
-                      href="/dashboard/profile"
-                      role="menuitem"
-                      className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                      }}
+                <AnimatePresence>
+                  {isProfileMenuOpen && (
+                    <motion.div
+                      key="profile-menu"
+                      role="menu"
+                      className="absolute bottom-full right-0 z-50 mb-2 w-48 origin-bottom-right rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+                      initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
                     >
-                      Edit profile
-                    </Link>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="block w-full border-t border-gray-100 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                      onClick={handleSignOut}
-                    >
-                      Sign out
-                    </button>
-                  </div>
-                )}
+                      <Link
+                        href="/dashboard/profile"
+                        role="menuitem"
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                        }}
+                        onMouseEnter={() => router.prefetch('/dashboard/profile')}
+                        onFocus={() => router.prefetch('/dashboard/profile')}
+                      >
+                        Edit profile
+                      </Link>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full border-t border-gray-100 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                        onClick={handleSignOut}
+                      >
+                        Sign out
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </div>

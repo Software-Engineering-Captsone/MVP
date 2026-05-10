@@ -49,11 +49,11 @@ export type DeliverableProjection = {
 
 const STAGE_LABELS: Record<DealStageId, string> = {
   agreement: 'Agreement',
-  work_in_progress: 'Work',
-  review_revisions: 'Review',
-  completed: 'Payout',
-  payment: 'Payout',
-  closed: 'Done',
+  work_in_progress: 'Work in Progress',
+  review_revisions: 'Review & Revisions',
+  completed: 'Completed',
+  payment: 'Payment',
+  closed: 'Closed',
 };
 
 export const STAGE_ORDER: DealStageId[] = [
@@ -92,14 +92,14 @@ function latestSubmissionForDeliverable(
 
 export function dealStatusCopy(status: string): string {
   const map: Record<string, string> = {
-    created: 'Agreement setup',
-    contract_pending: 'Agreement',
+    created: 'Preparing agreement',
+    contract_pending: 'Waiting on contract',
     active: 'Work in progress',
     submission_in_progress: 'Work in progress',
     under_review: 'Under review',
     revision_requested: 'Revision requested',
-    approved_completed: 'Ready for payout',
-    payment_pending: 'Payout pending',
+    approved_completed: 'Completed',
+    payment_pending: 'Payment processing',
     paid: 'Paid',
     closed: 'Closed',
     cancelled: 'Cancelled',
@@ -110,10 +110,10 @@ export function dealStatusCopy(status: string): string {
 
 export function contractStatusCopy(status: string): string {
   const map: Record<string, string> = {
-    not_added: 'No contract yet',
-    uploaded: 'Preparing signature',
+    not_added: 'No contract uploaded yet',
+    uploaded: 'Contract uploaded',
     sent_for_signature: 'Ready to sign',
-    signed: 'Contract signed',
+    signed: 'Contract Signed',
   };
   return map[status] ?? status.replace(/_/g, ' ');
 }
@@ -150,7 +150,7 @@ export function paymentStatusCopy(status: string): string {
     ready_to_release: 'Ready to release',
     paid: 'Paid',
     failed: 'Payment issue',
-    manual: 'Manual payment',
+    manual: 'Manual Payment',
   };
   return map[status] ?? status.replace(/_/g, ' ');
 }
@@ -190,12 +190,12 @@ function deriveStage(
 
 function stageDescription(stageId: DealStageId): string {
   const map: Record<DealStageId, string> = {
-    agreement: 'Finalize the contract before work begins.',
-    work_in_progress: 'Deliverables are being created and submitted.',
-    review_revisions: 'Submissions are being reviewed or revised.',
-    completed: 'All deliverables are approved. Payout is ready.',
-    payment: 'Payout is in progress or complete.',
-    closed: 'This deal is finalized.',
+    agreement: 'Finalize contract terms and signatures before execution.',
+    work_in_progress: 'Athlete is producing deliverables for this deal.',
+    review_revisions: 'Brand is reviewing submissions and guiding revisions.',
+    completed: 'All deliverables are complete. Ready for payout workflow.',
+    payment: 'Payout workflow is in progress or complete.',
+    closed: 'Deal is finalized and no further actions are required.',
   };
   return map[stageId];
 }
@@ -208,24 +208,25 @@ function remainingChecklist(
 ): string[] {
   const items: string[] = [];
   if (stageId === 'agreement') {
-    if (!contract || contract.status === 'not_added') items.push('Upload contract');
-    if (contract && contract.status !== 'signed') items.push('Collect signatures');
+    if (!contract || contract.status === 'not_added') items.push('Upload Contract');
+    if (contract && contract.status !== 'signed') items.push('Collect Signatures');
   }
   if (stageId === 'work_in_progress' || stageId === 'review_revisions') {
     const open = deliverables.filter((d) => d.status !== 'completed').length;
-    items.push(`${open} deliverable${open === 1 ? '' : 's'} remaining`);
+    items.push(`${open} Deliverable${open === 1 ? '' : 's'} Remaining`);
   }
   if (stageId === 'completed' || stageId === 'payment') {
-    items.push('Finalize payout');
-    if (payment && payment.status !== 'paid') items.push(`Payment status: ${paymentStatusCopy(payment.status)}`);
+    items.push('Finalize Payout');
+    if (payment && payment.status !== 'paid') items.push(`Payment Status: ${paymentStatusCopy(payment.status)}`);
   }
-  if (stageId === 'closed') items.push('No remaining actions');
+  if (stageId === 'closed') items.push('No Remaining Actions');
   return items;
 }
 
 function actionsForStage(
   stageId: DealStageId,
   actor: ProjectionActor,
+  deal: ApiDeal,
   contract: ApiContract | null,
   payment: ApiPayment | null
 ): { primaryAction: StageAction | null; secondaryActions: StageAction[] } {
@@ -234,7 +235,19 @@ function actionsForStage(
       return {
         primaryAction: {
           key: 'upload_contract',
-          label: 'Upload contract',
+          label: 'Upload Contract',
+          owner: 'brand',
+          enabled: actor === 'brand',
+          reason: actor === 'brand' ? undefined : 'Waiting on brand',
+        },
+        secondaryActions: [],
+      };
+    }
+    if (contract.status === 'uploaded') {
+      return {
+        primaryAction: {
+          key: 'send_for_signature',
+          label: 'Send Contract For Signature',
           owner: 'brand',
           enabled: actor === 'brand',
           reason: actor === 'brand' ? undefined : 'Waiting on brand',
@@ -246,7 +259,7 @@ function actionsForStage(
       return {
         primaryAction: {
           key: 'sign_contract',
-          label: 'Sign contract',
+          label: 'Sign Contract',
           owner: 'athlete',
           enabled: actor === 'athlete',
           reason: actor === 'athlete' ? undefined : 'Waiting on athlete',
@@ -254,11 +267,11 @@ function actionsForStage(
         secondaryActions: [],
       };
     }
-    if (contract.status === 'uploaded') {
+    if (contract.status === 'signed' && (deal.status === 'created' || deal.status === 'contract_pending')) {
       return {
         primaryAction: {
-          key: 'send_contract',
-          label: 'Send contract for signature',
+          key: 'activate_deal',
+          label: 'Finalize And Start Deal',
           owner: 'brand',
           enabled: actor === 'brand',
           reason: actor === 'brand' ? undefined : 'Waiting on brand',
@@ -269,7 +282,7 @@ function actionsForStage(
     return {
       primaryAction: {
         key: 'await_contract',
-        label: 'Await contract signature',
+        label: 'Await Contract Signature',
         owner: 'athlete',
         enabled: false,
       },
@@ -277,27 +290,52 @@ function actionsForStage(
     };
   }
 
-  if (stageId === 'completed') {
+  if (stageId === 'payment') {
+    if (payment?.status === 'paid' || deal.status === 'paid') {
+      return {
+        primaryAction: {
+          key: 'close_deal',
+          label: actor === 'brand' ? 'Close Deal' : 'Payment Completed',
+          owner: actor === 'brand' ? 'brand' : 'none',
+          enabled: actor === 'brand',
+          reason: actor === 'brand' ? undefined : 'Waiting on brand to close the deal',
+        },
+        secondaryActions: [],
+      };
+    }
     return {
       primaryAction: {
-        key: 'mark_paid',
-        label: payment?.status === 'paid' ? 'Payment completed' : 'Mark paid',
-        owner: payment?.status === 'paid' ? 'none' : 'brand',
-        enabled: actor === 'brand' && payment?.status !== 'paid',
-        reason: actor === 'brand' ? undefined : 'Waiting on brand',
+        key: actor === 'brand' ? 'mark_payment_paid' : 'await_payment',
+        label: actor === 'brand' ? 'Record Manual Payment' : 'Awaiting Payment',
+        owner: 'brand',
+        enabled: actor === 'brand',
+        reason: actor === 'brand' ? undefined : 'Waiting on brand payment confirmation',
       },
       secondaryActions: [],
     };
   }
 
-  if (stageId === 'payment') {
+  if (stageId === 'review_revisions') {
     return {
       primaryAction: {
-        key: payment?.status === 'paid' ? 'paid' : 'mark_paid',
-        label: payment?.status === 'paid' ? 'Payment completed' : 'Mark paid',
-        owner: payment?.status === 'paid' ? 'none' : 'brand',
-        enabled: actor === 'brand' && payment?.status !== 'paid',
-        reason: actor === 'brand' ? undefined : 'Waiting on brand',
+        key: actor === 'brand' ? 'review_submission' : 'await_brand_review',
+        label: actor === 'brand' ? 'Review Submitted Work' : 'Await Brand Review',
+        owner: 'brand',
+        enabled: actor === 'brand',
+        reason: actor === 'brand' ? undefined : 'Waiting on brand review',
+      },
+      secondaryActions: [],
+    };
+  }
+
+  if (stageId === 'work_in_progress' && actor === 'brand') {
+    return {
+      primaryAction: {
+        key: 'await_athlete_work',
+        label: 'Await Athlete Submission',
+        owner: 'athlete',
+        enabled: false,
+        reason: 'Waiting on athlete submission',
       },
       secondaryActions: [],
     };
@@ -307,9 +345,22 @@ function actionsForStage(
     return {
       primaryAction: {
         key: 'closed',
-        label: 'No further actions',
+        label: 'No Further Actions',
         owner: 'none',
         enabled: false,
+      },
+      secondaryActions: [],
+    };
+  }
+
+  if (stageId === 'completed') {
+    return {
+      primaryAction: {
+        key: actor === 'brand' ? 'move_to_payment' : 'await_payment_setup',
+        label: actor === 'brand' ? 'Move To Payment' : 'Awaiting Payment Setup',
+        owner: 'brand',
+        enabled: actor === 'brand',
+        reason: actor === 'brand' ? undefined : 'Waiting on brand payment setup',
       },
       secondaryActions: [],
     };
@@ -328,7 +379,7 @@ export function buildDealStageProjection(args: {
 }): DealStageProjection {
   const { actor, deal, contract, payment, deliverables } = args;
   const stageId = deriveStage(deal, contract, payment, deliverables);
-  const fromStage = actionsForStage(stageId, actor, contract, payment);
+  const fromStage = actionsForStage(stageId, actor, deal, contract, payment);
   const isDisputed = deal.status === 'disputed';
   let statusLine = dealStatusCopy(deal.status);
   if (stageId === 'agreement' && contract) {
@@ -367,12 +418,12 @@ export function buildDeliverableProjection(args: {
   let secondaryActions: StageAction[] = [];
 
   if (actor === 'athlete') {
-    const canSubmit = ['not_started', 'revision_requested', 'under_review'].includes(deliverable.status);
+    const canSubmit = ['not_started', 'revision_requested'].includes(deliverable.status);
     if (canSubmit) {
       const resubmit = deliverable.status === 'revision_requested';
       primaryAction = {
         key: 'submit_work',
-        label: resubmit ? 'Resubmit deliverable' : 'Submit deliverable',
+        label: resubmit ? 'Resubmit Deliverable' : 'Submit Deliverable',
         owner: 'athlete',
         enabled: true,
       };
@@ -382,14 +433,14 @@ export function buildDeliverableProjection(args: {
     if (canReview) {
       primaryAction = {
         key: 'approve_submission',
-        label: 'Approve submission',
+        label: 'Approve Submission',
         owner: 'brand',
         enabled: true,
       };
       secondaryActions = [
         {
           key: 'request_revision',
-          label: 'Request revision',
+          label: 'Request Revision',
           owner: 'brand',
           enabled: true,
         },

@@ -17,7 +17,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Missing paymentId' }, { status: 400 });
   }
 
-  let body: { status?: unknown };
+  let body: { status?: unknown; provider?: unknown; providerReference?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -29,10 +29,18 @@ export async function PATCH(
   }
 
   try {
-    const payment = await updatePaymentStatus(paymentId, status as PaymentStatus, {
-      userId: user.userId,
-      role: user.role,
-    });
+    const payment = await updatePaymentStatus(
+      paymentId,
+      status as PaymentStatus,
+      {
+        userId: user.userId,
+        role: user.role,
+      },
+      {
+        provider: typeof body.provider === 'string' ? body.provider : undefined,
+        providerReference: typeof body.providerReference === 'string' ? body.providerReference : undefined,
+      },
+    );
     return NextResponse.json({ payment });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
