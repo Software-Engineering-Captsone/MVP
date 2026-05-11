@@ -123,11 +123,11 @@ export const brandDirectoryCardTokens = {
     'active:translate-y-0 active:shadow-sm motion-reduce:hover:translate-y-0',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent/30 focus-visible:ring-offset-2',
   ].join(' '),
-  bannerWrap: 'aspect-[16/9] shrink-0 overflow-hidden bg-gray-50',
+  bannerWrap: 'aspect-[160/87] shrink-0 overflow-hidden bg-gray-50',
   bannerImage:
     'h-full w-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02] motion-reduce:group-hover:scale-100',
   /** 16px padding; body grows so meta can sit above bottom for rhythm with opportunity cards */
-  body: 'flex flex-1 flex-col p-4',
+  body: 'flex flex-1 flex-col px-4 py-6',
   title: 'line-clamp-2 text-xl font-bold leading-snug tracking-tight text-gray-900 sm:text-[22px] sm:leading-[1.08]',
   /** 8px then 12px ladder: title → meta → spacer */
   meta: 'mt-2 text-[13px] font-semibold leading-snug text-gray-700',

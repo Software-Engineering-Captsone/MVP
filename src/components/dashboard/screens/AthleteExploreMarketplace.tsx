@@ -1113,6 +1113,7 @@ export function AthleteExploreMarketplace() {
                     openBrandPanel(brand);
                   }}
                   className={brandDirectoryCardTokens.root}
+                  aria-label={`Open ${brand.name}`}
                 >
                   <div className={brandDirectoryCardTokens.bannerWrap}>
                     <ImageWithFallback
@@ -1122,12 +1123,19 @@ export function AthleteExploreMarketplace() {
                     />
                   </div>
                   <div className={brandDirectoryCardTokens.body}>
-                    <p className={brandDirectoryCardTokens.title}>{brand.name}</p>
-                    <p className={brandDirectoryCardTokens.meta}>
-                      {brand.industry} · {brand.location}
-                    </p>
-                    <div className={brandDirectoryCardTokens.metaSpacer}>
-                      <p className={brandDirectoryCardTokens.metaHint}>Open profile & campaigns</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className={brandDirectoryCardTokens.title}>{brand.name}</p>
+                        <p className={brandDirectoryCardTokens.meta}>
+                          {brand.industry} · {brand.location}
+                        </p>
+                      </div>
+                      <span
+                        aria-hidden="true"
+                        className="flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#2796b7] px-6 text-sm font-semibold leading-none text-white shadow-sm transition-colors hover:bg-[#2287a5]"
+                      >
+                        View
+                      </span>
                     </div>
                   </div>
                 </button>
