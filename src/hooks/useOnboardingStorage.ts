@@ -51,7 +51,9 @@ export interface OnboardingCompliance {
 
 export interface OnboardingSocials {
   instagram: string;
+  instagramFollowers: string;
   tiktok: string;
+  tiktokFollowers: string;
   twitter: string;
   youtube: string;
 }
@@ -109,7 +111,7 @@ export const defaultDraft: OnboardingDraft = {
     profilePictureUrl: '',
     profileBannerUrl: '',
     bio: '',
-    socials: { instagram: '', tiktok: '', twitter: '', youtube: '' },
+    socials: { instagram: '', instagramFollowers: '', tiktok: '', tiktokFollowers: '', twitter: '', youtube: '' },
     availabilityStatus: '',
   },
 };
@@ -160,7 +162,9 @@ function loadDraft(): OnboardingDraft {
         socials: {
           ...defaultDraft.profile.socials,
           instagram: parsed.profile?.socials?.instagram ?? '',
+          instagramFollowers: parsed.profile?.socials?.instagramFollowers ?? '',
           tiktok: parsed.profile?.socials?.tiktok ?? '',
+          tiktokFollowers: parsed.profile?.socials?.tiktokFollowers ?? '',
           twitter: parsed.profile?.socials?.twitter ?? '',
           youtube: parsed.profile?.socials?.youtube ?? '',
         },

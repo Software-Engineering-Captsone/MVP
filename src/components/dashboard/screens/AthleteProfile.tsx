@@ -45,6 +45,38 @@ const TiktokIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+function socialUsername(raw: string | undefined, platform: 'instagram' | 'tiktok'): string {
+  const value = (raw ?? '').trim();
+  if (!value) return '';
+
+  let candidate = value;
+  try {
+    if (/^https?:\/\//i.test(value)) {
+      const url = new URL(value);
+      const host = url.hostname.replace(/^www\./, '').toLowerCase();
+      const validHost =
+        platform === 'instagram'
+          ? host === 'instagram.com'
+          : host === 'tiktok.com';
+      if (!validHost) return '';
+      candidate = url.pathname.split('/').filter(Boolean)[0] ?? '';
+    }
+  } catch {
+    return '';
+  }
+
+  const username = candidate.split(/[/?#]/)[0].replace(/^@+/, '').trim();
+  return /^[A-Za-z0-9._]+$/.test(username) ? username : '';
+}
+
+function socialProfileUrl(platform: 'instagram' | 'tiktok', handle: string | undefined): string | null {
+  const username = socialUsername(handle, platform);
+  if (!username) return null;
+  return platform === 'instagram'
+    ? `https://www.instagram.com/${encodeURIComponent(username)}/`
+    : `https://www.tiktok.com/@${encodeURIComponent(username)}`;
+}
+
 type ProfileTab = 'overview' | 'content';
 type ContentFilter = 'all' | 'photos' | 'videos';
 
@@ -765,6 +797,9 @@ export function AthleteProfile() {
     );
   }
 
+  const instagramUrl = socialProfileUrl('instagram', athlete.socialHandles.instagram);
+  const tiktokUrl = socialProfileUrl('tiktok', athlete.socialHandles.tiktok);
+
   return (
     <div className="min-h-full bg-nilink-surface pb-16">
       <div className="pt-4 sm:pt-6 dash-main-gutter-x">
@@ -820,14 +855,30 @@ export function AthleteProfile() {
                     <span className="text-gray-600">{athlete.school}</span>
                   </p>
                   <div className="mt-3.5 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700">
-                      <Instagram className="h-3.5 w-3.5 text-pink-600" />
-                      <span className="tabular-nums">{athlete.stats.instagram}</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700">
-                      <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" />
-                      <span className="tabular-nums">{athlete.stats.tiktok}</span>
-                    </span>
+                    {instagramUrl && (
+                      <a
+                        href={instagramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open ${athlete.name}'s Instagram profile`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-700"
+                      >
+                        <Instagram className="h-3.5 w-3.5 text-pink-600" />
+                        <span className="tabular-nums">{athlete.stats.instagram}</span>
+                      </a>
+                    )}
+                    {tiktokUrl && (
+                      <a
+                        href={tiktokUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open ${athlete.name}'s TikTok profile`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-nilink-ink"
+                      >
+                        <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" />
+                        <span className="tabular-nums">{athlete.stats.tiktok}</span>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -912,33 +963,37 @@ export function AthleteProfile() {
           <div className="space-y-8">
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
               <h2 className="text-lg font-bold text-gray-900">About</h2>
-              <p className="mt-3 leading-relaxed text-gray-600">{athlete.bio}</p>
+              <p className="mt-3 leading-relaxed text-gray-600">{athlete.bio || 'No bio listed yet.'}</p>
               <dl className="mt-6 grid gap-3 border-t border-gray-100 pt-6 text-sm sm:grid-cols-3">
                 <div>
                   <dt className="text-gray-400">Academic year</dt>
-                  <dd className="font-medium text-gray-900">{athlete.academicYear}</dd>
+                  <dd className="font-medium text-gray-900">{athlete.academicYear || 'Not listed'}</dd>
                 </div>
                 <div>
                   <dt className="text-gray-400">Hometown</dt>
-                  <dd className="font-medium text-gray-900">{athlete.hometown}</dd>
+                  <dd className="font-medium text-gray-900">{athlete.hometown || 'Not listed'}</dd>
                 </div>
                 <div>
                   <dt className="text-gray-400">Major</dt>
-                  <dd className="font-medium text-gray-900">{athlete.major}</dd>
+                  <dd className="font-medium text-gray-900">{athlete.major || 'Not listed'}</dd>
                 </div>
               </dl>
             </section>
 
             <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
               <h2 className="text-lg font-bold text-gray-900">Achievements</h2>
-              <ul className="mt-4 space-y-3">
-                {athlete.achievements.map((line) => (
-                  <li key={line} className="flex gap-3 text-gray-700">
-                    <Award className="mt-0.5 h-5 w-5 shrink-0 text-nilink-accent" />
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
+              {athlete.achievements.length > 0 ? (
+                <ul className="mt-4 space-y-3">
+                  {athlete.achievements.map((line) => (
+                    <li key={line} className="flex gap-3 text-gray-700">
+                      <Award className="mt-0.5 h-5 w-5 shrink-0 text-nilink-accent" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-sm text-gray-500">No achievements listed yet.</p>
+              )}
             </section>
 
           </div>

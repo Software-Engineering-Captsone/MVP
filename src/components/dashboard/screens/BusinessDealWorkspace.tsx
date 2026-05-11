@@ -2,27 +2,35 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowLeft,
+  Calendar,
   CheckCircle,
   CheckSquare,
   Clock,
   DollarSign,
+  Ellipsis,
+  ExternalLink,
   FileText,
+  Image as ImageIcon,
   Lock,
   Loader2,
+  Mic,
   Package,
   Pencil,
   Send,
   Upload,
+  Users,
+  Video,
+  X,
 } from 'lucide-react';
 import {
   activitySummary,
   fetchDealDetail,
   fetchSubmissionsForDeliverable,
   formatIsoDate,
+  formatIsoDateOnly,
   patchContractStatus,
   patchDealStatus,
   patchPaymentStatus,
@@ -31,7 +39,6 @@ import {
   requestDealCancellation,
   respondToDealCancellation,
   uploadDealContractFromFile,
-  type ApiDeal,
   type ApiDealDetail,
   type ApiDeliverable,
   type ApiPayment,
@@ -45,57 +52,153 @@ import {
   type DealStageId,
 } from '@/lib/deals/stageProjection';
 import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
+import { labelForDeliverableType } from '@/lib/campaigns/deals/deliverableTypeLabel';
+import { getDisplayInstructions, submissionConfigForDeliverable } from '@/lib/deals/deliverableSubmissionConfig';
+import type { ReactNode } from 'react';
 
+function brandReviewSubmissionFields(sub: ApiSubmission): {
+  summary: string | null;
+  evidenceUrl: string | null;
+  evidenceLabel: string | null;
+} {
+  const textArtifact = sub.artifacts.find((a) => a.kind === 'text' && a.text?.trim());
+  const urlArtifact = sub.artifacts.find((a) => a.kind === 'url' && a.ref?.trim());
+  return {
+    summary: textArtifact?.text?.trim() ?? null,
+    evidenceUrl: urlArtifact?.ref?.trim() ?? null,
+    evidenceLabel: urlArtifact?.label?.trim() ?? null,
+  };
+}
+
+function getDeliverableTypeMetaForReview(type: string): { icon: ReactNode; label: string } {
+  const label = labelForDeliverableType(type);
+  switch (type) {
+    case 'tiktok_video':
+      return { icon: <Video className="h-4 w-4" />, label };
+    case 'appearance_event':
+      return { icon: <Calendar className="h-4 w-4" />, label };
+    case 'meetup':
+      return { icon: <Users className="h-4 w-4" />, label };
+    case 'keynote':
+      return { icon: <Mic className="h-4 w-4" />, label };
+    case 'custom':
+      return { icon: <Package className="h-4 w-4" />, label };
+    default:
+      return { icon: <ImageIcon className="h-4 w-4" />, label };
+  }
+}
+
+function getDeliverableTypeAccentForReview(type: string): { chip: string; iconWrap: string; strip: string } {
+  switch (type) {
+    case 'tiktok_video':
+      return {
+        chip: 'border-pink-200 bg-pink-50 text-pink-700',
+        iconWrap: 'bg-pink-100 text-pink-700',
+        strip: 'from-pink-400/40 to-fuchsia-400/40',
+      };
+    case 'appearance_event':
+    case 'meetup':
+    case 'keynote':
+      return {
+        chip: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+        iconWrap: 'bg-indigo-100 text-indigo-700',
+        strip: 'from-indigo-400/40 to-blue-400/40',
+      };
+    case 'story':
+      return {
+        chip: 'border-purple-200 bg-purple-50 text-purple-700',
+        iconWrap: 'bg-purple-100 text-purple-700',
+        strip: 'from-purple-400/40 to-violet-400/40',
+      };
+    case 'instagram_post':
+      return {
+        chip: 'border-amber-200 bg-amber-50 text-amber-700',
+        iconWrap: 'bg-amber-100 text-amber-700',
+        strip: 'from-amber-400/40 to-orange-400/40',
+      };
+    default:
+      return {
+        chip: 'border-slate-200 bg-slate-50 text-slate-700',
+        iconWrap: 'bg-slate-100 text-slate-700',
+        strip: 'from-slate-300/40 to-slate-400/40',
+      };
+  }
+}
+
+/** Matches athlete deliverable chip palette; `isSelected` tints the filled state. */
+function getBrandDeliverableChipStyle(status: string, isSelected: boolean, type: string): string {
+  if (['approved', 'published', 'completed'].includes(status)) {
+    return isSelected
+      ? 'border-green-500 bg-green-500 text-white'
+      : 'border-green-200 bg-green-50 text-green-700';
+  }
+  if (['draft_submitted', 'under_review'].includes(status)) {
+    return isSelected
+      ? 'border-yellow-500 bg-yellow-500 text-white'
+      : 'border-yellow-200 bg-yellow-50 text-yellow-700';
+  }
+  if (status === 'revision_requested') {
+    return isSelected
+      ? 'border-amber-500 bg-amber-500 text-white'
+      : 'border-amber-200 bg-amber-50 text-amber-700';
+  }
+  const typeAccent = getDeliverableTypeAccentForReview(type);
+  return isSelected ? typeAccent.chip : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400';
+}
+
+function getDeliverableTypeCtaAccent(type: string): string {
+  switch (type) {
+    case 'tiktok_video':
+      return 'bg-pink-600 hover:bg-pink-500 shadow-[0_8px_20px_rgba(219,39,119,0.28)]';
+    case 'appearance_event':
+    case 'meetup':
+    case 'keynote':
+      return 'bg-indigo-600 hover:bg-indigo-500 shadow-[0_8px_20px_rgba(79,70,229,0.28)]';
+    case 'story':
+      return 'bg-violet-600 hover:bg-violet-500 shadow-[0_8px_20px_rgba(124,58,237,0.28)]';
+    case 'instagram_post':
+      return 'bg-amber-600 hover:bg-amber-500 shadow-[0_8px_20px_rgba(217,119,6,0.28)]';
+    default:
+      return 'bg-nilink-accent hover:bg-nilink-accent-hover shadow-[0_8px_20px_rgba(14,165,233,0.2)]';
+  }
+}
+
+/** Same layout and tokens as `AthleteDealWorkspace` progress stepper. */
 function ProgressTracker({ stageId, cancelled }: { stageId: DealStageId; cancelled?: boolean }) {
   const currentIndex = STAGE_ORDER.indexOf(stageId);
   return (
-    <div className="flex items-start justify-between gap-1.5 sm:gap-2.5">
+    <div className="flex items-start justify-between gap-2 sm:gap-3">
       {STAGE_ORDER.map((step, i) => {
         const isDone = !cancelled && i < currentIndex;
         const isCurrent = !cancelled && i === currentIndex;
-        const circleLg = isCurrent && !cancelled;
         return (
-          <div key={step} className={`flex min-w-0 flex-1 flex-col items-center ${circleLg ? 'gap-2.5' : 'gap-2'}`}>
-            {/* Fixed-height row so connector lines share the same vertical axis across steps (circles vary 7↔10). */}
-            <div className="flex h-10 w-full items-center">
-              {/* Left connector line */}
-              <div className={`h-px flex-1 ${i === 0 ? 'invisible' : isDone || isCurrent ? 'bg-nilink-accent' : 'bg-white/20'}`} />
-              {/* Circle */}
+          <div key={step} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+            <div className="flex h-8 w-full items-center">
+              <div className={`h-px flex-1 ${i === 0 ? 'invisible' : isDone || isCurrent ? 'bg-sky-300' : 'bg-slate-200'}`} />
               <div
-                className={`flex shrink-0 items-center justify-center rounded-full font-bold ${
-                  circleLg ? 'h-10 w-10 text-base ring-[3px] ring-nilink-accent/25' : 'h-7 w-7 text-xs'
-                } ${
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
                   cancelled
-                    ? 'bg-white/10 text-white/30'
-                    : isDone
-                      ? 'bg-nilink-accent text-white'
-                      : isCurrent
-                        ? 'bg-nilink-accent text-white'
-                        : 'bg-white/10 text-white/40'
-                }`}
+                    ? 'border-slate-200 bg-slate-100 text-slate-400'
+                    : isCurrent
+                      ? 'border-nilink-accent bg-nilink-accent text-white shadow-[0_4px_10px_rgba(14,165,233,0.2)]'
+                      : isDone
+                        ? 'border-sky-200 bg-sky-50 text-sky-700'
+                        : 'border-slate-200 bg-white text-slate-400'
+                } ${cancelled ? '' : isCurrent ? 'ring-2 ring-nilink-accent/20' : ''}`}
               >
                 {cancelled ? '×' : isDone ? (
-                  <svg className={circleLg ? 'h-4 w-4' : 'h-3.5 w-3.5'} viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 ) : (
                   i + 1
                 )}
               </div>
-              {/* Right connector line */}
-              <div className={`h-px flex-1 ${i === STAGE_ORDER.length - 1 ? 'invisible' : isDone ? 'bg-nilink-accent' : 'bg-white/20'}`} />
+              <div className={`h-px flex-1 ${i === STAGE_ORDER.length - 1 ? 'invisible' : isDone ? 'bg-sky-300' : 'bg-slate-200'}`} />
             </div>
-            {/* Label below circle — full text, no truncation, no uppercase */}
             <span
-              className={`text-center leading-tight ${
-                circleLg ? 'text-sm font-bold text-white' : 'text-[11px]'
-              } ${
-                cancelled ? 'text-white/30'
-                  : isCurrent
-                    ? ''
-                    : isDone
-                      ? 'text-white/60'
-                      : 'text-white/30'
+              className={`text-center text-[11px] leading-tight ${
+                cancelled ? 'text-slate-400' : isCurrent ? 'font-semibold text-slate-900' : isDone ? 'text-slate-600' : 'text-slate-400'
               }`}
             >
               {STAGE_LABELS[step]}
@@ -105,32 +208,6 @@ function ProgressTracker({ stageId, cancelled }: { stageId: DealStageId; cancell
       })}
     </div>
   );
-}
-
-function nextTurnHeadline(owner: ApiDeal['nextActionOwner']): { label: string; className: string } {
-  const base = 'rounded-full px-3.5 py-1 text-xs font-semibold tracking-wide';
-  if (owner === 'brand') {
-    return {
-      label: 'Your turn',
-      className: `${base} border border-emerald-400/30 bg-emerald-500/20 text-emerald-200`,
-    };
-  }
-  if (owner === 'athlete') {
-    return {
-      label: 'Waiting on athlete',
-      className: `${base} border border-white/20 bg-white/10 text-white/60`,
-    };
-  }
-  if (owner === 'system') {
-    return {
-      label: 'Processing',
-      className: `${base} border border-white/20 bg-white/10 text-white/60`,
-    };
-  }
-  return {
-    label: 'Status',
-    className: `${base} border border-white/20 bg-white/10 text-white/60`,
-  };
 }
 
 function stageIconFor(id: DealStageId): React.ReactNode {
@@ -161,8 +238,11 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
   const [contractFile, setContractFile] = useState<File | null>(null);
   const contractFilePrimaryRef = useRef<HTMLInputElement>(null);
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
+  /** When set, revision note + Send UI is open for that submission (Approve is one-click). */
+  const [brandRevisionOpenSubmissionId, setBrandRevisionOpenSubmissionId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState('');
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showFooterMenu, setShowFooterMenu] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [showPayModal, setShowPayModal] = useState(false);
   const [showReplaceContract, setShowReplaceContract] = useState(false);
@@ -198,6 +278,10 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
     void loadDetail(dealId);
   }, [dealId, loadDetail]);
 
+  useEffect(() => {
+    setShowFooterMenu(false);
+  }, [dealId]);
+
   const refreshFromRealtime = useCallback(() => {
     void loadDetail(dealId);
   }, [dealId, loadDetail]);
@@ -216,6 +300,18 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
     return out;
   }, [detail, submissionsByDeliverable]);
 
+  /** Deliverables whose latest submission needs brand review (aligns with brand deliverable projection). */
+  const brandAttentionDeliverableCount = useMemo(() => {
+    if (!detail) return 0;
+    let n = 0;
+    for (const d of detail.deliverables) {
+      const subs = submissionsByDeliverable[d.id] ?? [];
+      const latest = subs.reduce<ApiSubmission | null>((acc, s) => (!acc || s.version > acc.version ? s : acc), null);
+      if (latest && (latest.status === 'submitted' || latest.status === 'viewed')) n += 1;
+    }
+    return n;
+  }, [detail, submissionsByDeliverable]);
+
   const stageProjection = useMemo(() => {
     if (!detail) return null;
     return buildDealStageProjection({
@@ -228,6 +324,20 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
     });
   }, [detail, submissionsByDeliverable]);
 
+  const agreementStageIndex = STAGE_ORDER.indexOf('agreement');
+  const currentStageIndexForFooter = stageProjection ? STAGE_ORDER.indexOf(stageProjection.stageId) : -1;
+  const canViewContractFooter = Boolean(
+    detail?.contract?.fileUrl?.trim() &&
+      agreementStageIndex >= 0 &&
+      currentStageIndexForFooter >= agreementStageIndex,
+  );
+  const canShowCancelFooter = Boolean(detail && !['closed', 'cancelled'].includes(detail.deal.status));
+
+  const canStickyBrandDeliverablesProgress = Boolean(
+    stageProjection &&
+      (stageProjection.stageId === 'work_in_progress' || stageProjection.stageId === 'review_revisions'),
+  );
+
   const cancellationRequester = useMemo(() => {
     if (!detail || detail.deal.status !== 'cancellation_requested') return null;
     const act = [...(detail.activities ?? [])]
@@ -238,17 +348,418 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
 
   const primaryReviewTarget = pendingReviews[0] ?? null;
 
-  const runAction = async (key: string, fn: () => Promise<void>) => {
+  const pendingReviewByDeliverableId = useMemo(() => {
+    const m = new Map<string, { submission: ApiSubmission; deliverable: ApiDeliverable }>();
+    for (const row of pendingReviews) {
+      m.set(row.deliverable.id, row);
+    }
+    return m;
+  }, [pendingReviews]);
+
+  const [selectedReviewDeliverableId, setSelectedReviewDeliverableId] = useState<string | null>(null);
+
+  const firstPendingDeliverableId = pendingReviews[0]?.deliverable.id ?? null;
+
+  useEffect(() => {
+    if (!detail?.deliverables.length) return;
+    const valid = new Set(detail.deliverables.map((d) => d.id));
+    const preferred = firstPendingDeliverableId ?? detail.deliverables[0]?.id ?? null;
+    setSelectedReviewDeliverableId((prev) => {
+      if (prev && valid.has(prev)) return prev;
+      return preferred;
+    });
+  }, [detail?.deal.id, detail?.deliverables, firstPendingDeliverableId]);
+
+  useEffect(() => {
+    setBrandRevisionOpenSubmissionId(null);
+  }, [selectedReviewDeliverableId]);
+
+  const selectedReviewTarget = useMemo(() => {
+    if (!selectedReviewDeliverableId) return null;
+    return pendingReviewByDeliverableId.get(selectedReviewDeliverableId) ?? null;
+  }, [pendingReviewByDeliverableId, selectedReviewDeliverableId]);
+
+  const runAction = async (key: string, fn: () => Promise<void>): Promise<boolean> => {
     setPendingAction(key);
     setActionError(null);
     try {
       await fn();
       await loadDetail(dealId);
+      return true;
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Action failed');
+      return false;
     } finally {
       setPendingAction(null);
     }
+  };
+
+  const renderReviewDeliverableChipRow = () => {
+    if (!detail || detail.deliverables.length === 0) return null;
+    return (
+      <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Deliverables">
+        {detail.deliverables.map((del, idx) => {
+          const isSelected = selectedReviewDeliverableId === del.id;
+          const needsBrandAction = pendingReviewByDeliverableId.has(del.id);
+          const chipStyle = getBrandDeliverableChipStyle(del.status, isSelected, del.type);
+          const attentionClass =
+            needsBrandAction && !isSelected ? ' brand-chip-needs-action' : '';
+          return (
+            <button
+              key={del.id}
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
+              aria-label={
+                needsBrandAction
+                  ? `Deliverable ${idx + 1}, needs your review`
+                  : `Deliverable ${idx + 1}`
+              }
+              onClick={() => setSelectedReviewDeliverableId(del.id)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors duration-180 ${chipStyle}${attentionClass}`}
+            >
+              {['approved', 'published', 'completed'].includes(del.status) ? (
+                <CheckCircle className="h-3 w-3 shrink-0" aria-hidden />
+              ) : null}
+              <span>Deliverable {idx + 1}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderPrimaryReviewPanel = (target: { submission: ApiSubmission; deliverable: ApiDeliverable }) => {
+    const { submission, deliverable } = target;
+    const fields = brandReviewSubmissionFields(submission);
+    const typeAccent = getDeliverableTypeAccentForReview(deliverable.type);
+    const typeMeta = getDeliverableTypeMetaForReview(deliverable.type);
+    const ctaAccent = getDeliverableTypeCtaAccent(deliverable.type);
+    const submissionConfig = submissionConfigForDeliverable(deliverable);
+    const displayInstructions = getDisplayInstructions(deliverable.instructions);
+    const feedbackId = `revision-feedback-${submission.id}`;
+    const fieldLabelClass = 'text-[13px] font-semibold text-nilink-ink';
+    const fieldReadOnlyClass =
+      'mt-3 w-full rounded-xl border border-gray-100 bg-gray-50/90 px-3.5 py-2.5 text-sm text-nilink-ink shadow-[0_1px_2px_rgba(16,24,40,0.04)]';
+    const fieldBaseClass =
+      'mt-3 w-full rounded-xl border border-gray-100 bg-white px-3.5 py-2.5 text-sm text-nilink-ink placeholder:text-gray-300 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors duration-200 focus-nilink focus:border-nilink-accent/40 focus:outline-none';
+    const checklistRowClass = 'flex min-h-12 items-start gap-2.5 py-2.5';
+    const readinessRowClass = 'flex min-h-11 items-center gap-3 py-2';
+    const hasNotes = Boolean(submission.notes?.trim());
+
+    const briefCardBody = (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <FileText className="h-4 w-4" aria-hidden />
+          </div>
+          <p className="text-sm font-semibold text-nilink-ink">Deliverable brief</p>
+        </div>
+        <section className="border-t border-gray-100 pt-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">Brief notes</p>
+          {displayInstructions ? (
+            <p className="mt-2 text-xs leading-relaxed text-gray-600">{displayInstructions}</p>
+          ) : (
+            <p className="mt-2 text-xs leading-relaxed text-gray-400">No additional brief notes on this deliverable.</p>
+          )}
+        </section>
+        {submissionConfig.briefItems.length > 0 ? (
+          <section className="border-t border-gray-100 pt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">Required checks</p>
+            <ul className="mt-2 divide-y divide-gray-100">
+              {submissionConfig.briefItems.map((item) => (
+                <li key={item.label} className={checklistRowClass}>
+                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-50 text-gray-500 ring-1 ring-gray-200">
+                    {item.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-800">{item.label}</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500">From the agreed deliverable scope.</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        <section className="border-t border-gray-100 pt-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Submission received</p>
+          <ul className="mt-2 divide-y divide-gray-100">
+            <li className={readinessRowClass}>
+              <span
+                className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ring-1 ${
+                  fields.evidenceUrl ? 'bg-emerald-50/60 text-emerald-500 ring-emerald-100' : 'bg-rose-50/60 text-rose-300 ring-rose-100'
+                }`}
+              >
+                {fields.evidenceUrl ? (
+                  <CheckCircle className="h-3 w-3 text-emerald-500" aria-hidden />
+                ) : (
+                  <X className="h-3 w-3 text-rose-300" aria-hidden />
+                )}
+              </span>
+              <div className="min-w-0 leading-tight">
+                <p className="text-xs font-medium text-slate-800">Evidence link</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {fields.evidenceUrl ? 'Athlete included a link to review.' : 'No link on file — use summary/notes or request a revision.'}
+                </p>
+              </div>
+            </li>
+            <li className={readinessRowClass}>
+              <span
+                className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ring-1 ${
+                  fields.summary ? 'bg-emerald-50/60 text-emerald-500 ring-emerald-100' : 'bg-rose-50/60 text-rose-300 ring-rose-100'
+                }`}
+              >
+                {fields.summary ? (
+                  <CheckCircle className="h-3 w-3 text-emerald-500" aria-hidden />
+                ) : (
+                  <X className="h-3 w-3 text-rose-300" aria-hidden />
+                )}
+              </span>
+              <div className="min-w-0 leading-tight">
+                <p className="text-xs font-medium text-slate-800">{submissionConfig.descriptionLabel}</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {fields.summary ? 'Athlete summary is present.' : 'No structured summary text on this version.'}
+                </p>
+              </div>
+            </li>
+            <li className={readinessRowClass}>
+              <span
+                className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ring-1 ${
+                  hasNotes ? 'bg-emerald-50/60 text-emerald-500 ring-emerald-100' : 'bg-slate-50/80 text-slate-300 ring-slate-100'
+                }`}
+              >
+                {hasNotes ? (
+                  <CheckCircle className="h-3 w-3 text-emerald-500" aria-hidden />
+                ) : (
+                  <span className="text-[9px] font-bold text-slate-300" aria-hidden>
+                    —
+                  </span>
+                )}
+              </span>
+              <div className="min-w-0 leading-tight">
+                <p className="text-xs font-medium text-slate-800">Note to brand</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {hasNotes ? 'Athlete left additional context.' : 'Optional — not required for every submission.'}
+                </p>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </div>
+    );
+
+    return (
+      <div className="overflow-hidden rounded-2xl border border-gray-100/90 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+        <div className={`h-1 w-full bg-gradient-to-r ${typeAccent.strip}`} aria-hidden />
+        <div className="flex items-start gap-3 border-b border-gray-100 p-6 pb-5">
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${typeAccent.iconWrap} shadow-[0_2px_8px_rgba(15,23,42,0.06)]`}
+            aria-hidden
+          >
+            {typeMeta.icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-bold leading-tight tracking-tight text-nilink-ink sm:text-[1.125rem]">
+              {deliverable.title}
+            </h3>
+            <p className="mt-1 text-sm font-medium text-slate-600">{typeMeta.label}</p>
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+              <span className="text-slate-400">Submitted</span>{' '}
+              <span className="font-medium text-slate-800">{formatIsoDate(submission.submittedAt)}</span>
+              <span className="text-slate-300" aria-hidden>
+                {' '}
+                ·{' '}
+              </span>
+              <span className="text-slate-400">Version</span>{' '}
+              <span className="font-medium text-slate-800">{submission.version}</span>
+              <span className="text-slate-300" aria-hidden>
+                {' '}
+                ·{' '}
+              </span>
+              <span className="text-slate-400">Revisions</span>{' '}
+              <span className="font-medium text-slate-800">
+                {deliverable.revisionCountUsed}/{deliverable.revisionLimit}
+              </span>
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              Your turn
+            </span>
+          </div>
+        </div>
+
+        <div className="px-6 pb-6 pt-5">
+          <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[1.25fr_1fr] lg:gap-8">
+            <div className="flex h-full min-h-0 flex-col gap-5">
+              <section
+                aria-labelledby={`athlete-submission-${submission.id}`}
+                className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-[0_4px_20px_rgba(15,23,42,0.06)] sm:p-6"
+              >
+                <div className="mb-5 flex flex-wrap items-start gap-3 border-b border-slate-200/80 pb-4">
+                  <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200/80">
+                    <Users className="h-4 w-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 id={`athlete-submission-${submission.id}`} className="text-sm font-semibold text-nilink-ink">
+                      Athlete submission
+                    </h4>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                      Evidence, summary, and notes from the athlete.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-7">
+                  {fields.evidenceUrl ? (
+                    <div>
+                      <p className={fieldLabelClass}>View deliverable</p>
+                      <a
+                        href={fields.evidenceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-[transform,filter,box-shadow] duration-180 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 hover:brightness-105 motion-reduce:hover:translate-y-0 ${ctaAccent}`}
+                      >
+                        <ExternalLink className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                        Open evidence
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+                      <div>
+                        <p className="font-semibold">No evidence link on this submission</p>
+                        <p className="mt-0.5 leading-relaxed text-amber-800/90">
+                          Review the summary and notes below. Request a revision if you need a public or shared link to verify the work.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className={fieldLabelClass}>{submissionConfig.descriptionLabel}</p>
+                    {fields.summary ? (
+                      <p className={`${fieldReadOnlyClass} whitespace-pre-wrap leading-relaxed`}>{fields.summary}</p>
+                    ) : (
+                      <p className={`${fieldReadOnlyClass} text-gray-400`}>—</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className={fieldLabelClass}>Note to brand</p>
+                    {hasNotes ? (
+                      <p className={`${fieldReadOnlyClass} whitespace-pre-wrap leading-relaxed text-gray-600`}>{submission.notes!.trim()}</p>
+                    ) : (
+                      <p className={`${fieldReadOnlyClass} text-gray-400`}>—</p>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <div
+                className="mt-auto rounded-xl border border-slate-200/90 bg-white p-5 shadow-[0_4px_20px_rgba(15,23,42,0.06)] ring-1 ring-nilink-accent/15 sm:p-6"
+                aria-labelledby={`brand-review-${submission.id}`}
+              >
+                  <div className="mb-4 min-w-0">
+                    <h4 id={`brand-review-${submission.id}`} className="text-[13px] font-semibold text-nilink-ink">
+                      {brandRevisionOpenSubmissionId === submission.id ? 'Request changes' : 'Accept or request changes'}
+                    </h4>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+                      {brandRevisionOpenSubmissionId === submission.id
+                        ? "Give them enough to go on; they'll see this when they resubmit."
+                        : 'Approve in one tap, or open Revise to explain what should change.'}
+                    </p>
+                  </div>
+
+                  {brandRevisionOpenSubmissionId === submission.id ? (
+                    <>
+                      <label htmlFor={feedbackId} className={fieldLabelClass}>
+                        Revision note
+                      </label>
+                      <textarea
+                        id={feedbackId}
+                        className={`${fieldBaseClass} min-h-[6.5rem] w-full resize-y sm:min-h-[7.5rem]`}
+                        rows={4}
+                        placeholder=""
+                        value={revisionFeedback[submission.id] ?? ''}
+                        onChange={(e) => setRevisionFeedback((prev) => ({ ...prev, [submission.id]: e.target.value }))}
+                      />
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <button
+                          type="button"
+                          disabled={pendingAction === `rv-${submission.id}`}
+                          onClick={() => setBrandRevisionOpenSubmissionId(null)}
+                          className="cursor-pointer text-left text-[12px] font-semibold text-slate-500 underline-offset-2 hover:text-slate-700 hover:underline disabled:opacity-50"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pendingAction === `rv-${submission.id}`}
+                          onClick={() => {
+                            void (async () => {
+                              const ok = await runAction(`rv-${submission.id}`, async () => {
+                                const fb = revisionFeedback[submission.id]?.trim();
+                                await patchSubmission(submission.id, {
+                                  status: 'revision_requested',
+                                  ...(fb ? { feedback: fb } : {}),
+                                });
+                              });
+                              if (ok) setBrandRevisionOpenSubmissionId(null);
+                            })();
+                          }}
+                          className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-300/90 bg-amber-500 px-4 py-2.5 text-xs font-semibold text-white shadow-[0_4px_14px_rgba(217,119,6,0.2)] transition-[transform,background-color,filter] duration-180 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 hover:bg-amber-600 motion-reduce:hover:translate-y-0 disabled:translate-y-0 disabled:opacity-50 sm:ml-auto sm:w-auto sm:min-w-[8.5rem]"
+                        >
+                          {pendingAction === `rv-${submission.id}` ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                          ) : (
+                            <Send className="h-4 w-4" aria-hidden />
+                          )}
+                          Send
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        disabled={pendingAction === `ap-${submission.id}` || pendingAction === `rv-${submission.id}`}
+                        onClick={() => {
+                          void runAction(`ap-${submission.id}`, async () => {
+                            await patchSubmission(submission.id, { status: 'approved' });
+                          });
+                        }}
+                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-[0_4px_14px_rgba(5,150,105,0.25)] transition-[transform,filter,box-shadow] duration-180 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 hover:bg-emerald-700 motion-reduce:hover:translate-y-0 disabled:translate-y-0 disabled:opacity-50"
+                      >
+                        {pendingAction === `ap-${submission.id}` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <CheckCircle className="h-4 w-4" aria-hidden />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pendingAction === `ap-${submission.id}` || pendingAction === `rv-${submission.id}`}
+                        onClick={() => setBrandRevisionOpenSubmissionId(submission.id)}
+                        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-200/90 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-900 transition-[transform,background-color] duration-180 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 hover:bg-amber-100/90 motion-reduce:hover:translate-y-0 disabled:translate-y-0 disabled:opacity-50"
+                      >
+                        <AlertCircle className="h-4 w-4" aria-hidden />
+                        Revise
+                      </button>
+                    </div>
+                  )}
+              </div>
+            </div>
+
+            <aside className="flex h-full min-h-0 flex-col lg:min-h-0">
+              <div className="flex h-full min-h-0 flex-col rounded-xl border border-slate-200/90 bg-white p-5 shadow-[0_4px_20px_rgba(15,23,42,0.06)] sm:p-6">
+                {briefCardBody}
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (detailLoading && !detail) {
@@ -275,8 +786,6 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
     );
   }
 
-  const turn = nextTurnHeadline(detail.deal.nextActionOwner);
-
   // Derive compensation from termsSnapshot
   const compensation = (() => {
     try {
@@ -293,7 +802,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
   const latestActivity = filterMainTimelineActivities(detail.activities ?? [])
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
   const latestActivityLabel = latestActivity
-    ? `${activitySummary(latestActivity)} · ${formatIsoDate(latestActivity.createdAt)}`
+    ? `${activitySummary(latestActivity)} · ${formatIsoDateOnly(latestActivity.createdAt)}`
     : null;
 
   // Contract upload form (shared between "not_added" and "replace" scenarios)
@@ -580,7 +1089,7 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
           <h3 className="text-base font-bold text-emerald-900">Agreement complete</h3>
         </div>
         <p className="mt-1 text-sm text-emerald-700">
-          The agreement is signed. This deal is ready to move into Work in Progress.
+          The agreement is signed. This deal is ready to move into Deliverables.
         </p>
         {stageProjection?.primaryAction?.key === 'activate_deal' && (
           <button
@@ -605,58 +1114,16 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
     <>
       {primaryReviewTarget ? (
         <>
-          <p className="mt-2 text-sm font-semibold text-nilink-ink">
-            Review submission: {primaryReviewTarget.deliverable.title}
-          </p>
-          <p className="mt-1 text-xs text-gray-600">
-            Approve to move this deliverable forward, or request a revision with clear feedback.
-          </p>
-          <p className="text-xs text-gray-500">
-            Version {primaryReviewTarget.submission.version} ·{' '}
-            {formatIsoDate(primaryReviewTarget.submission.submittedAt)}
-          </p>
-          <label htmlFor="revision-feedback-primary" className="sr-only">
-            Revision feedback
-          </label>
-          <textarea
-            id="revision-feedback-primary"
-            className="mt-2 w-full rounded-lg border border-gray-200 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-nilink-accent/30"
-            rows={2}
-            placeholder="Optional feedback when requesting a revision…"
-            value={revisionFeedback[primaryReviewTarget.submission.id] ?? ''}
-            onChange={(e) =>
-              setRevisionFeedback((prev) => ({ ...prev, [primaryReviewTarget.submission.id]: e.target.value }))
-            }
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={pendingAction === `ap-${primaryReviewTarget.submission.id}`}
-              onClick={() =>
-                void runAction(`ap-${primaryReviewTarget.submission.id}`, async () => {
-                  await patchSubmission(primaryReviewTarget.submission.id, { status: 'approved' });
-                })
-              }
-              className="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-            >
-              Approve Submission
-            </button>
-            <button
-              type="button"
-              disabled={pendingAction === `rv-${primaryReviewTarget.submission.id}`}
-              onClick={() =>
-                void runAction(`rv-${primaryReviewTarget.submission.id}`, async () => {
-                  const fb = revisionFeedback[primaryReviewTarget.submission.id]?.trim();
-                  await patchSubmission(primaryReviewTarget.submission.id, {
-                    status: 'revision_requested',
-                    ...(fb ? { feedback: fb } : {}),
-                  });
-                })
-              }
-              className="cursor-pointer rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-            >
-              Request Revision
-            </button>
+          {renderReviewDeliverableChipRow()}
+          <div className="mt-4">
+            {selectedReviewTarget ? (
+              renderPrimaryReviewPanel(selectedReviewTarget)
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center">
+                <p className="text-sm font-medium text-slate-600">No submission awaiting review for this deliverable.</p>
+                <p className="mt-1 text-xs text-slate-500">Choose another deliverable from the row above.</p>
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -824,10 +1291,10 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
 
   return (
     <div className="flex min-h-full min-w-0 flex-1 flex-col bg-nilink-page">
-      <div className="dash-main-gutter-x flex flex-1 flex-col pb-24 pt-8 sm:pb-28">
+      <div className="dash-main-gutter-x flex flex-1 flex-col pb-2 pt-8 sm:pb-3 sm:pt-10">
 
-        {/* 1. BACK LINK + DEAL HEADER */}
-        <div className="mb-6">
+        {/* 1. BACK LINK + DEAL HEADER (spacing matches athlete deal page) */}
+        <div className="mb-7">
           <Link
             href="/dashboard/deals"
             className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
@@ -837,12 +1304,12 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
           </Link>
         </div>
 
-        <div className="mb-4">
-          <h1 className="text-3xl font-black tracking-tight text-nilink-ink">
-            {detail.deal.brandName?.toUpperCase()}
+        <div className="mb-6">
+          <h1 className="text-3xl font-black tracking-tight text-nilink-ink sm:text-[2.1rem]">
+            {(detail.deal.athleteName?.trim() || 'Athlete').toUpperCase()}
             <span className="text-nilink-accent">.</span>
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-500">
             {detail.deal.campaignName}
             {compensation && ` · $${compensation}`}
             {detail.deliverables.length > 0 &&
@@ -858,59 +1325,61 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
           </div>
         ) : null}
 
-        {/* 2. STATUS + PROGRESS CARD */}
+        {/* 2. STATUS + PROGRESS CARD (matches AthleteDealWorkspace) */}
         {stageProjection ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-            className="relative mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-nilink-sidebar via-[#2a2a2d] to-nilink-sidebar shadow-xl shadow-black/25 ring-1 ring-inset ring-white/[0.07]"
-          >
-            <div className="relative px-7 py-8 sm:px-9 sm:py-9">
+          <div className="relative mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+            <div className="relative px-6 py-6 sm:px-8 sm:py-7">
               {detailLoading ? (
                 <div
-                  className="pointer-events-none absolute right-7 top-8 z-10 flex h-6 items-center sm:right-9 sm:top-8"
+                  className="pointer-events-none absolute right-6 top-6 z-10 flex h-6 items-center sm:right-8 sm:top-6"
                   role="status"
                   aria-live="polite"
                 >
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-white/55" aria-hidden />
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400" aria-hidden />
                   <span className="sr-only">Refreshing</span>
                 </div>
               ) : null}
-              {/* Next-action badge (stage name lives on the highlighted stepper step) */}
               <div className="flex flex-wrap items-center justify-start gap-3">
                 {detail.deal.status === 'cancelled' ? (
-                  <p className="text-lg font-bold tracking-tight text-white">Deal cancelled</p>
+                  <p className="text-lg font-semibold tracking-tight text-slate-900">Deal cancelled</p>
                 ) : null}
                 {detail.deal.status !== 'cancelled' ? (
-                  <span className={`shrink-0 ${turn.className}`}>{turn.label}</span>
+                  <span
+                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${
+                      brandAttentionDeliverableCount > 0
+                        ? 'border-red-200 bg-red-50 text-red-800'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    }`}
+                  >
+                    {brandAttentionDeliverableCount > 0
+                      ? `Action needed (${brandAttentionDeliverableCount})`
+                      : 'All caught up'}
+                  </span>
                 ) : null}
               </div>
 
-              {/* Progress stepper */}
-              <div className="mt-8 sm:mt-9">
+              <div className="mt-6">
                 <ProgressTracker stageId={stageProjection.stageId} cancelled={detail.deal.status === 'cancelled'} />
               </div>
 
-              {/* Metadata row — separator line + two columns */}
-              <div className="mt-8 flex flex-col gap-5 border-t border-white/[0.12] pt-7 sm:mt-10 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:pt-8">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug text-white/55">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-nilink-accent ring-2 ring-nilink-accent/25" />
-                  <span className="font-medium text-white/70">Current status</span>
-                  <span className="text-white/90">
+              <div className="mt-6 flex flex-col gap-4 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-snug text-slate-500">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-nilink-accent" />
+                  <span className="font-medium text-slate-600">Current status</span>
+                  <span className="text-slate-800">
                     {detail.deal.status === 'cancelled' ? 'Deal cancelled' : stageProjection.statusLine}
                   </span>
                 </div>
                 {latestActivity && latestActivityLabel && (
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug text-white/55 sm:justify-end">
-                    <Clock className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                    <span className="font-medium text-white/70">Latest activity</span>
-                    <span className="text-white/90">{latestActivityLabel}</span>
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-snug text-slate-500 sm:justify-end">
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                    <span className="font-medium text-slate-600">Latest activity</span>
+                    <span className="text-slate-800">{latestActivityLabel}</span>
                   </div>
                 )}
               </div>
             </div>
-          </motion.div>
+          </div>
         ) : null}
 
         {/* 3. CURRENT-STEP WORKSPACE CARD */}
@@ -942,36 +1411,6 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
               ))}
             </div>
 
-            {/* Latest deliverable — compact row, only if deliverables exist */}
-            {detail.deliverables.length > 0 && (() => {
-              const d = detail.deliverables[0];
-              const subs = submissionsByDeliverable[d.id] ?? [];
-              const latestSub = subs.filter(s => s.status === 'approved').sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0]
-                ?? subs.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
-              return (
-                <div className="mt-5 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Latest deliverable</p>
-                  <p className="text-sm font-semibold text-nilink-ink">{d.title}</p>
-                  {latestSub && (
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      {latestSub.status.charAt(0).toUpperCase() + latestSub.status.slice(1).replace(/_/g, ' ')}
-                      {' · '}
-                      {new Date(latestSub.submittedAt).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                        hour: 'numeric', minute: '2-digit'
-                      })}
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* View activity link */}
-            <div className="mt-4">
-              <button className="text-sm text-nilink-accent hover:underline">
-                View activity
-              </button>
-            </div>
           </div>
         ) : detail.deal.status === 'cancelled' ? (
           /* === CANCELLED STATE === */
@@ -1068,101 +1507,86 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                 )}
               </div>
             ) : stageProjection?.stageId === 'review_revisions' ? (
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-bold text-nilink-ink">Review submission</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Review the athlete&apos;s work and approve or request changes.
-                </p>
-                <div className="mt-5">
-                  {primaryReviewTarget ? (
-                    <>
-                      <p className="text-sm font-semibold text-nilink-ink">
-                        Review submission: {primaryReviewTarget.deliverable.title}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-600">
-                        Approve to move this deliverable forward, or request a revision with clear feedback.
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Version {primaryReviewTarget.submission.version} ·{' '}
-                        {formatIsoDate(primaryReviewTarget.submission.submittedAt)}
-                      </p>
-                      <label htmlFor="revision-feedback-primary" className="sr-only">
-                        Revision feedback
-                      </label>
-                      <textarea
-                        id="revision-feedback-primary"
-                        className="mt-2 w-full rounded-lg border border-gray-200 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-nilink-accent/30"
-                        rows={2}
-                        placeholder="Optional feedback when requesting a revision…"
-                        value={revisionFeedback[primaryReviewTarget.submission.id] ?? ''}
-                        onChange={(e) =>
-                          setRevisionFeedback((prev) => ({ ...prev, [primaryReviewTarget.submission.id]: e.target.value }))
-                        }
-                      />
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={pendingAction === `ap-${primaryReviewTarget.submission.id}`}
-                          onClick={() =>
-                            void runAction(`ap-${primaryReviewTarget.submission.id}`, async () => {
-                              await patchSubmission(primaryReviewTarget.submission.id, { status: 'approved' });
-                            })
-                          }
-                          className="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          Approve Submission
-                        </button>
-                        <button
-                          type="button"
-                          disabled={pendingAction === `rv-${primaryReviewTarget.submission.id}`}
-                          onClick={() =>
-                            void runAction(`rv-${primaryReviewTarget.submission.id}`, async () => {
-                              const fb = revisionFeedback[primaryReviewTarget.submission.id]?.trim();
-                              await patchSubmission(primaryReviewTarget.submission.id, {
-                                status: 'revision_requested',
-                                ...(fb ? { feedback: fb } : {}),
-                              });
-                            })
-                          }
-                          className="cursor-pointer rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                        >
-                          Request Revision
-                        </button>
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_6px_20px_rgba(15,23,42,0.05)] sm:p-8">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div>
+                    <h3 className="text-base font-bold text-nilink-ink">Review submission</h3>
+                    <p className="mt-1.5 max-w-2xl text-sm text-gray-500">
+                      Review the athlete&apos;s work, then approve or request a revision with clear feedback.
+                    </p>
+                  </div>
+                </div>
+                {renderReviewDeliverableChipRow()}
+                <div className="mt-6">
+                  {selectedReviewTarget ? (
+                    renderPrimaryReviewPanel(selectedReviewTarget)
+                  ) : pendingReviews.length === 0 ? (
+                    detail?.deliverables.some((d) => d.status === 'approved' && d.publishRequired) ? (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-10 text-center">
+                        <p className="text-sm font-medium text-emerald-800">All submissions approved — awaiting publication.</p>
+                        <p className="mt-1 text-xs text-emerald-700">The athlete will mark deliverables as published once they&apos;re live.</p>
                       </div>
-                    </>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+                        <p className="text-sm font-medium text-slate-600">No submissions pending review right now.</p>
+                        <p className="mt-1 text-xs text-slate-500">When an athlete submits new work, it will appear here.</p>
+                      </div>
+                    )
                   ) : (
-                    <p className="text-sm text-gray-500">No submissions pending review right now.</p>
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+                      <p className="text-sm font-medium text-slate-600">No submission awaiting review for this deliverable.</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Select a deliverable with a pulsing highlight if you need to approve or request changes.
+                      </p>
+                    </div>
                   )}
                 </div>
-                {detail.deliverables.length > 0 && (
-                  <div className="mt-6 border-t border-gray-100 pt-5">
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">All deliverables</p>
-                    <div className="space-y-3">
-                      {detail.deliverables.map((del) => {
-                        const subs = submissionsByDeliverable[del.id] ?? [];
-                        const latest = subs.reduce<ApiSubmission | null>(
-                          (acc, s) => (!acc || s.version > acc.version ? s : acc),
-                          null
-                        );
-                        return (
-                          <div key={del.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                            <p className="text-sm font-semibold text-nilink-ink">{del.title}</p>
-                            <span className="rounded-full bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-600">
-                              {latest ? latest.status.replace(/_/g, ' ') : 'Not submitted'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             ) : stageProjection?.stageId === 'completed' ? (
               <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h3 className="text-base font-bold text-nilink-ink">Ready for payout</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  All deliverables have been approved. Initiate the payout to complete the deal.
+                  All deliverables have been delivered. Review the published content below, then initiate payout.
                 </p>
+                {detail.deliverables.some((d) => d.publishRequired) ? (
+                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
+                    <p className="text-sm font-semibold text-slate-800">Published content</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Verify each deliverable is live before releasing payout.</p>
+                    <ul className="mt-3 space-y-2">
+                      {detail.deliverables
+                        .filter((d) => d.publishRequired)
+                        .map((d) => {
+                          const isPublished = d.status === 'completed' || d.status === 'published';
+                          const tone = isPublished
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-amber-50 text-amber-800 border-amber-200';
+                          const label = isPublished ? 'Published' : 'Awaiting publication';
+                          return (
+                            <li key={d.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-slate-800">{d.title}</p>
+                                <p className="text-xs text-slate-500">{labelForDeliverableType(d.type)}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}>{label}</span>
+                                {isPublished && d.publishedUrl ? (
+                                  <a
+                                    href={d.publishedUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+                                  >
+                                    View post
+                                    <ExternalLink className="h-3 w-3" aria-hidden />
+                                  </a>
+                                ) : null}
+                              </div>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </div>
+                ) : null}
                 <div className="mt-5">
                   {stageProjection.primaryAction?.key === 'move_to_payment' ? (
                     <button
@@ -1176,9 +1600,12 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                           }
                         })
                       }
-                      className="cursor-pointer rounded-lg bg-nilink-accent px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-nilink-accent-hover disabled:opacity-50"
+                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-nilink-accent px-4 py-2.5 text-xs font-semibold text-white shadow-[0_4px_14px_rgba(14,165,233,0.25)] transition-[transform,filter,box-shadow] duration-180 motion-reduce:transition-none motion-safe:hover:-translate-y-0.5 hover:bg-nilink-accent-hover motion-reduce:hover:translate-y-0 disabled:translate-y-0 disabled:opacity-50"
                     >
-                      Move To Payout
+                      {pendingAction === 'deal-payment' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      ) : null}
+                      Move to Payout
                     </button>
                   ) : (
                     <p className="text-sm text-gray-500">
@@ -1241,35 +1668,83 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
 
       </div>
 
-      <div
-        className="pointer-events-none fixed bottom-0 left-20 right-0 z-20"
-        role="contentinfo"
-        aria-label="Deal shortcuts"
-      >
-        <div className="pointer-events-auto dash-main-gutter-x flex flex-wrap items-center justify-end gap-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
-          <button
-            type="button"
-            className="rounded-md border-2 border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 opacity-65 shadow-md ring-1 ring-black/5 transition-all hover:opacity-100 hover:border-gray-300 hover:text-gray-700 hover:shadow-lg"
-          >
-            View full deal terms
-          </button>
-          <button
-            type="button"
-            className="rounded-md border-2 border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 opacity-65 shadow-md ring-1 ring-black/5 transition-all hover:opacity-100 hover:border-gray-300 hover:text-gray-700 hover:shadow-lg"
-          >
-            View activity
-          </button>
-          {!['closed', 'cancelled'].includes(detail.deal.status) && (
-            <button
-              type="button"
-              onClick={() => setShowCancelModal(true)}
-              className="rounded-md border-2 border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-500 opacity-65 shadow-md ring-1 ring-black/5 transition-all hover:opacity-100 hover:border-red-300 hover:text-red-600 hover:shadow-lg"
-            >
-              Cancel this deal
-            </button>
-          )}
+      {(canShowCancelFooter || canViewContractFooter || canStickyBrandDeliverablesProgress) && (
+        <div className="pointer-events-none sticky bottom-0 z-20" role="contentinfo" aria-label="Deal shortcuts">
+          <div className="pointer-events-auto dash-main-gutter-x pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
+            <div className="rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_10px_28px_rgba(15,23,42,0.1)] backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <div className="relative">
+                  {(canShowCancelFooter || canViewContractFooter) && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="More actions"
+                        aria-haspopup="menu"
+                        aria-expanded={showFooterMenu}
+                        onClick={() => setShowFooterMenu((prev) => !prev)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors duration-180 hover:bg-slate-100 hover:text-slate-500"
+                      >
+                        <Ellipsis className="h-4 w-4" />
+                      </button>
+                      {showFooterMenu ? (
+                        <div className="absolute bottom-full left-0 mb-2 min-w-[130px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          {canViewContractFooter ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setShowFooterMenu(false);
+                                const url = detail.contract?.fileUrl?.trim();
+                                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                              }}
+                              className="block w-full rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium leading-4 text-slate-500 transition-colors duration-180 hover:bg-slate-50 hover:text-slate-700"
+                            >
+                              View contract
+                            </button>
+                          ) : null}
+                          {canShowCancelFooter ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setShowFooterMenu(false);
+                                setShowCancelModal(true);
+                              }}
+                              className="block w-full rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium leading-4 text-red-400 transition-colors duration-180 hover:bg-red-50 hover:text-red-500"
+                            >
+                              Cancel deal
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+                  {canStickyBrandDeliverablesProgress ? (
+                    <div className="inline-flex max-w-[min(100%,14rem)] items-start gap-1.5 rounded-md border border-slate-200/90 bg-slate-50/90 px-2 py-1.5 text-left text-slate-700 sm:max-w-[16rem]">
+                      <Clock className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" aria-hidden />
+                      <div className="min-w-0">
+                        {detail?.deliverables.every((d) => ['approved', 'published', 'completed'].includes(d.status)) ? (
+                          <>
+                            <p className="text-[11px] font-semibold leading-tight text-slate-800">Awaiting publication</p>
+                            <p className="mt-0.5 text-[10px] leading-tight text-slate-600">Athlete is publishing approved content</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-[11px] font-semibold leading-tight text-slate-800">Deliverables in progress</p>
+                            <p className="mt-0.5 text-[10px] leading-tight text-slate-600">Every deliverable should be approved</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Payment confirmation modal */}
       {showPayModal && detail.payment ? (() => {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Calendar, ChevronRight, Handshake, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, Calendar, ChevronRight, Handshake, RefreshCw } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import {
   fetchDealsList,
@@ -482,9 +482,8 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                               </span>
                               <div>
                               {yourTurn(deal) ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-nilink-accent/15 px-3 py-1 text-xs font-bold text-nilink-accent">
-                                  <Sparkles className="h-3.5 w-3.5" />
-                                  Your Turn
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                  Your turn
                                 </span>
                               ) : (
                                 <span className="text-xs font-semibold text-gray-400">

@@ -41,6 +41,7 @@ export type ApiDeliverable = {
   disclosureRequired: boolean;
   revisionLimit: number;
   revisionCountUsed: number;
+  publishedUrl?: string | null;
 };
 
 export type SubmissionArtifact = { kind: 'file' | 'url' | 'text'; ref?: string; text?: string; label?: string };
@@ -385,7 +386,7 @@ export async function patchSubmission(
 
 export async function patchDeliverable(
   deliverableId: string,
-  body: { status?: string; title?: string; description?: string }
+  body: { status?: string; title?: string; description?: string; publishedUrl?: string }
 ): Promise<ApiDeliverable> {
   const res = await authFetch(`/api/deliverables/${deliverableId}`, {
     method: 'PATCH',
@@ -546,6 +547,14 @@ export function formatIsoDate(iso: string | null | undefined): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/** Date only (no time), for compact timeline labels. */
+export function formatIsoDateOnly(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { dateStyle: 'medium' });
 }
 
 export type ParsedTerms = {

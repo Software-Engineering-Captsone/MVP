@@ -30,6 +30,7 @@ import type {
   SubmissionStatus,
   SubmissionType,
 } from './types';
+import { isPublishableDeliverableType } from './types';
 
 /**
  * Phase-1 Supabase-backed read API for deals.
@@ -182,6 +183,7 @@ interface DbDeliverableRow {
   disclosure_required: boolean;
   revision_limit: number;
   revision_count_used: number;
+  published_url: string | null;
 }
 
 interface DbSubmissionRow {
@@ -226,6 +228,7 @@ export interface ApiDeliverableRow {
   disclosureRequired: boolean;
   revisionLimit: number;
   revisionCountUsed: number;
+  publishedUrl: string | null;
 }
 
 export interface ApiSubmissionRow {
@@ -247,7 +250,7 @@ const CONTRACT_SELECT = 'id, deal_id, file_url, status, signed_at';
 const PAYMENT_SELECT =
   'id, deal_id, amount, currency, status, provider, provider_reference, release_condition, paid_at';
 const DELIVERABLE_SELECT =
-  'id, deal_id, title, order_index, type, instructions, status, due_at, draft_required, publish_required, proof_required, disclosure_required, revision_limit, revision_count_used';
+  'id, deal_id, title, order_index, type, instructions, status, due_at, draft_required, publish_required, proof_required, disclosure_required, revision_limit, revision_count_used, published_url';
 const SUBMISSION_SELECT =
   'id, deliverable_id, deal_id, version, submitted_by_profile_id, submitted_at, submission_type, artifacts, notes, status, reviewed_by_profile_id, reviewed_at, feedback';
 const ACTIVITY_SELECT =
@@ -292,6 +295,7 @@ function dbDeliverableToApi(row: DbDeliverableRow): ApiDeliverableRow {
     disclosureRequired: row.disclosure_required,
     revisionLimit: row.revision_limit,
     revisionCountUsed: row.revision_count_used,
+    publishedUrl: row.published_url ?? null,
   };
 }
 
@@ -581,6 +585,18 @@ async function progressDealAfterSubmissionReview(
   }
 
   if (rows.some((d) => d.status === 'draft_submitted' || d.status === 'under_review')) {
+    return 'review';
+  }
+
+  // Some deliverables are 'approved' (publish_required=true, waiting on publish).
+  // Only keep the deal in review if every deliverable is past the athlete-work phase —
+  // i.e. no 'not_started' or other pending states remain.
+  const DONE_STATUSES = new Set(['approved', 'completed', 'published']);
+  if (
+    rows.some((d) => d.status === 'approved') &&
+    rows.every((d) => DONE_STATUSES.has(d.status))
+  ) {
+    await transitionDealStatusForWorkflow(supabase, dealId, 'under_review');
     return 'review';
   }
 
@@ -1364,6 +1380,12 @@ export async function createSubmissionForDeliverable(
   if (!notes && artifacts.length === 0) {
     throw new Error('Provide notes and/or artifacts (or legacy body)');
   }
+  if (notes && notes.length > 5000) {
+    throw new Error('Notes must be 5,000 characters or fewer');
+  }
+  if (legacyBody && legacyBody.length > 10000) {
+    throw new Error('Submission description must be 10,000 characters or fewer');
+  }
 
   const { data: deliverable, error: deliverableErr } = await supabase
     .from('deal_deliverables')
@@ -1376,6 +1398,25 @@ export async function createSubmissionForDeliverable(
 
   await assertProfileIsDealAthlete(supabase, deliverableRow.deal_id, submittedByProfileId);
 
+  // Fix 2a — deal-status guard: only accept submissions when the deal is in an active work state.
+  const { data: dealForGuard, error: dealForGuardErr } = await supabase
+    .from('deals')
+    .select('status')
+    .eq('id', deliverableRow.deal_id)
+    .maybeSingle();
+  if (dealForGuardErr) throw new Error(dealForGuardErr.message);
+  if (!dealForGuard) throw new Error('Deal not found');
+  const dealStatus = (dealForGuard as { status: string }).status as DealStatus;
+  const validDealStatusesForSubmission: DealStatus[] = [
+    'active',
+    'submission_in_progress',
+    'under_review',
+    'revision_requested',
+  ];
+  if (!validDealStatusesForSubmission.includes(dealStatus)) {
+    throw new Error('Submissions are not accepted for this deal in its current state');
+  }
+
   assertDeliverableStatusTransition(deliverableRow.status as DeliverableStatus, 'draft_submitted');
 
   const { data: latestSubmission, error: latestErr } = await supabase
@@ -1387,6 +1428,16 @@ export async function createSubmissionForDeliverable(
     .maybeSingle();
   if (latestErr) throw new Error(latestErr.message);
   const nextVersion = ((latestSubmission as { version?: number } | null)?.version ?? 0) + 1;
+
+  // Fix 2b — revision limit guard: prevent resubmission when the athlete has exhausted their allowed revision rounds.
+  // revision_limit === 0 means unlimited; version > 1 means this is a resubmission (not the initial draft).
+  if (
+    nextVersion > 1 &&
+    deliverableRow.revision_limit !== 0 &&
+    deliverableRow.revision_count_used >= deliverableRow.revision_limit
+  ) {
+    throw new Error('Revision limit reached — no further submissions can be made on this deliverable');
+  }
 
   const hasFile = artifacts.some((a) => a.kind === 'file');
   const hasUrl = artifacts.some((a) => a.kind === 'url');
@@ -1455,7 +1506,7 @@ export async function createSubmissionForDeliverable(
 
 export async function updateDeliverable(
   deliverableId: string,
-  patch: { status?: DeliverableStatus; title?: string; description?: string },
+  patch: { status?: DeliverableStatus; title?: string; description?: string; publishedUrl?: string },
   actor: DealMutationActor,
 ): Promise<ApiDeliverableRow> {
   const supabase = await createClient();
@@ -1484,6 +1535,20 @@ export async function updateDeliverable(
     if (!row.publish_required) {
       throw new Error('This deliverable does not require publication');
     }
+    if (!isPublishableDeliverableType(row.type)) {
+      throw new Error('This deliverable type does not support publication');
+    }
+  }
+
+  const trimmedPublishedUrl =
+    typeof patch.publishedUrl === 'string' ? patch.publishedUrl.trim() : undefined;
+  if (trimmedPublishedUrl !== undefined && trimmedPublishedUrl.length > 0) {
+    if (!/^https?:\/\//i.test(trimmedPublishedUrl)) {
+      throw new Error('Published URL must start with http:// or https://');
+    }
+  }
+  if (patch.status === 'published' && (!trimmedPublishedUrl || trimmedPublishedUrl.length === 0)) {
+    throw new Error('Published URL is required when marking content as published');
   }
 
   const updatePatch: Record<string, unknown> = {};
@@ -1497,6 +1562,9 @@ export async function updateDeliverable(
   if (patch.status) {
     assertDeliverableStatusTransition(row.status as DeliverableStatus, patch.status);
     updatePatch.status = patch.status;
+  }
+  if (trimmedPublishedUrl !== undefined) {
+    updatePatch.published_url = trimmedPublishedUrl.length > 0 ? trimmedPublishedUrl : null;
   }
   if (Object.keys(updatePatch).length === 0) {
     return dbDeliverableToApi(row);
@@ -1539,7 +1607,7 @@ export async function updateDeliverable(
       eventType: 'deliverable_completed',
       actorType: roleToActorType(actor.role),
       actorId: actor.userId,
-      metadata: {},
+      metadata: trimmedPublishedUrl ? { publishedUrl: trimmedPublishedUrl } : {},
     });
     notifyDealPlaceholder('deliverable_completed', { dealId: row.deal_id, deliverableId });
   }

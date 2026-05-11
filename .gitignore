@@ -49,3 +49,8 @@ next-env.d.ts
 
 # supabase CLI scratch state (project ref, pooler URL, version pins) — local only
 supabase/.temp/
+
+.agent/
+.claude/
+.codex/
+.next/

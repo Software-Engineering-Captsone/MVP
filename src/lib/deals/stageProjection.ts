@@ -49,7 +49,7 @@ export type DeliverableProjection = {
 
 export const STAGE_LABELS: Record<DealStageId, string> = {
   agreement: 'Agreement',
-  work_in_progress: 'Work in Progress',
+  work_in_progress: 'Deliverables',
   review_revisions: 'Review & Revisions',
   completed: 'Deliverables Complete',
   payment: 'Payout',

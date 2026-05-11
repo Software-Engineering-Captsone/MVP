@@ -28,13 +28,10 @@ export async function GET(request: NextRequest) {
   const limit = clampNumber(searchParams.get('limit'), 1, 100, 100);
   const offset = clampNumber(searchParams.get('offset'), 0, 10_000, 0);
 
-  // Note: profiles uses `city`+`state` (no `hometown` column). Athlete content
-  // (photos/videos feed) is not yet modeled in the DB, so this endpoint omits it
-  // and the discovery UI handles empty contentItems gracefully.
   const { data, error } = await supabase
     .from('profiles')
     .select(`
-      id, full_name, avatar_url, banner_url, bio, city, state, verified,
+      id, full_name, avatar_url, banner_url, bio, city, state, hometown, verified,
       athlete_sports(sport, position, jersey_number, is_primary),
       athlete_academics(school, major, current_year),
       athlete_socials(
@@ -43,7 +40,8 @@ export async function GET(request: NextRequest) {
         facebook, facebook_followers,
         total_followers, engagement_rate, posts_per_month, total_views, estimated_impressions
       ),
-      athlete_achievements(title, year, display_order)
+      athlete_achievements(title, year, display_order),
+      athlete_content(content_type, media_url, thumbnail_url, caption, overlay_text, views, likes, posted_at, display_order)
     `)
     .eq('role', 'athlete')
     .not('onboarding_completed_at', 'is', null);
@@ -142,6 +140,7 @@ type Row = {
   bio: string | null;
   city: string | null;
   state: string | null;
+  hometown: string | null;
   verified: boolean | null;
   athlete_sports: Array<{ sport: string; position: string; jersey_number: string; is_primary: boolean }>;
   athlete_academics: Array<{ school: string; major: string; current_year: string }>;
@@ -153,6 +152,17 @@ type Row = {
     total_views: number; estimated_impressions: number;
   }>;
   athlete_achievements: Array<{ title: string; year: number | null; display_order: number }>;
+  athlete_content: Array<{
+    content_type: string | null;
+    media_url: string | null;
+    thumbnail_url: string | null;
+    caption: string | null;
+    overlay_text: string | null;
+    views: number | null;
+    likes: number | null;
+    posted_at: string | null;
+    display_order: number | null;
+  }>;
 };
 
 function mapRowToAthlete(row: Row): Athlete {
@@ -185,8 +195,18 @@ function mapRowToAthlete(row: Row): Athlete {
     },
   };
 
-  // Content feed not yet modeled in the DB — empty until that lands.
-  const contentItems: ContentItem[] = [];
+  const contentItems: ContentItem[] = [...(row.athlete_content ?? [])]
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    .filter((item) => !!item.media_url)
+    .map((item, index) => ({
+      id: `${row.id}-content-${index}`,
+      type: item.content_type === 'video' ? 'video' : 'image',
+      thumbnailUrl: item.thumbnail_url || item.media_url || '',
+      views: fmtCount(item.views),
+      caption: item.caption ?? '',
+      datePosted: item.posted_at ?? '',
+      overlayText: item.overlay_text ?? undefined,
+    }));
 
   const achievements = [...(row.athlete_achievements ?? [])]
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
@@ -223,7 +243,7 @@ function mapRowToAthlete(row: Row): Athlete {
     bannerImage: row.banner_url || row.avatar_url || '',
     position: primarySport?.position || '',
     academicYear: academics?.current_year || '',
-    hometown: [row.city, row.state].filter(Boolean).join(', '),
+    hometown: row.hometown?.trim() || [row.city, row.state].filter(Boolean).join(', '),
     major: academics?.major || '',
     heightWeight: '',
     jerseyNumber: primarySport?.jersey_number ? `#${primarySport.jersey_number}` : '',

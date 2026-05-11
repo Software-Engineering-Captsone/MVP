@@ -38,8 +38,21 @@ export const DELIVERABLE_TYPES = [
 ] as const;
 export type DeliverableType = (typeof DELIVERABLE_TYPES)[number];
 
+/** Deliverable types that produce a publishable artifact (a live social post/video).
+ *  Appearance-style types do not have a publish step. */
+export const PUBLISHABLE_DELIVERABLE_TYPES: ReadonlySet<DeliverableType> = new Set([
+  'instagram_post',
+  'tiktok_video',
+  'story',
+]);
+
+export function isPublishableDeliverableType(type: string): boolean {
+  return PUBLISHABLE_DELIVERABLE_TYPES.has(type as DeliverableType);
+}
+
 export const SUBMISSION_STATUSES = [
   'submitted',
+  // TODO: 'viewed' is reserved for future read-receipt feature — no code path sets this yet
   'viewed',
   'approved',
   'revision_requested',
@@ -174,6 +187,8 @@ export interface StoredDeliverable {
   disclosureRequired: boolean;
   revisionLimit: number;
   revisionCountUsed: number;
+  /** URL of the published content, set by the athlete on `mark_published`. */
+  publishedUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

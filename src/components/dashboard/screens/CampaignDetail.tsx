@@ -9,6 +9,7 @@ import {
   XCircle, UserPlus, Zap, MessageSquare, Loader2, ChevronLeft,
 } from 'lucide-react';
 import { authFetch } from '@/lib/authFetch';
+import { labelForDeliverableType } from '@/lib/campaigns/deals/deliverableTypeLabel';
 import { useDashboard } from '@/components/dashboard/DashboardShell';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
@@ -910,14 +911,18 @@ export function CampaignDetail({
                     >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
-                          {deliverable.type.includes('Reel') || deliverable.type.includes('Video') || deliverable.type.includes('TikTok') ? (
+                          {deliverable.type === 'tiktok_video' ? (
                             <Video className="w-4 h-4 text-gray-400" />
-                          ) : deliverable.type.includes('Story') ? (
+                          ) : deliverable.type === 'story' ? (
                             <FileText className="w-4 h-4 text-gray-400" />
+                          ) : deliverable.type === 'appearance_event' || deliverable.type === 'meetup' ? (
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                          ) : deliverable.type === 'keynote' ? (
+                            <Users className="w-4 h-4 text-gray-400" />
                           ) : (
                             <Image className="w-4 h-4 text-gray-400" />
                           )}
-                          <span className="font-bold text-gray-900">{deliverable.type}</span>
+                          <span className="font-bold text-gray-900">{labelForDeliverableType(deliverable.type)}</span>
                         </div>
                       </td>
                       <td className="px-5 py-4 text-gray-600 max-w-xs truncate">{deliverable.description}</td>

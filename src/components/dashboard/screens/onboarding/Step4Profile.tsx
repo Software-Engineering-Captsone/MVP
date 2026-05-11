@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -9,7 +9,6 @@ import {
   AlertCircle,
   UserCircle2,
   ImagePlus,
-  X,
 } from 'lucide-react';
 import type { OnboardingProfile } from '@/hooks/useOnboardingStorage';
 import { uploadAvatar } from '@/lib/avatarUpload';
@@ -33,30 +32,15 @@ const InstagramIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const YouTubeIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-  </svg>
-);
-
-/* ── Types ── */
-interface ConnectedPlatform {
-  platform: string;
-  handle: string;
-  followerCount: number;
-}
-
-const PLATFORMS: { id: string; label: string; Icon: React.FC<{ className?: string }>; color: string; comingSoon?: boolean }[] = [
-  { id: 'youtube',   label: 'YouTube',   Icon: YouTubeIcon,   color: 'text-red-500' },
-  { id: 'instagram', label: 'Instagram', Icon: InstagramIcon, color: 'text-pink-500', comingSoon: true },
-  { id: 'tiktok',    label: 'TikTok',    Icon: TiktokIcon,    color: 'text-nilink-ink', comingSoon: true },
-];
-
 const AVAILABILITY: { value: NonNullable<OnboardingProfile['availabilityStatus']>; label: string; color: string }[] = [
   { value: 'available',   label: 'Open to Deals',        color: 'emerald' },
   { value: 'busy',        label: 'Limited Availability', color: 'amber' },
   { value: 'not_looking', label: 'Not Looking',          color: 'gray' },
 ];
+
+function followerValue(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 9);
+}
 
 interface Step4Props {
   data: OnboardingProfile;
@@ -66,47 +50,15 @@ interface Step4Props {
   onComplete: () => void;
 }
 
-export function Step4Profile({ data, userId: _userId, onChange, onBack, onComplete }: Step4Props) {
+export function Step4Profile({ data, onChange, onBack, onComplete }: Step4Props) {
   /* ── Upload states ── */
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [bannerError, setBannerError] = useState<string | null>(null);
 
-  /* ── Social connection states ── */
-  const [connected, setConnected] = useState<ConnectedPlatform[]>([]);
-  const [disconnecting, setDisconnecting] = useState<string | null>(null);
-  const [connectError, setConnectError] = useState<string | null>(null);
-
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
-
-  /* ── Load connected platforms on mount + after OAuth return ── */
-  useEffect(() => {
-    const fetchConnected = async () => {
-      try {
-        const res = await fetch('/api/social/tokens');
-        if (!res.ok) return;
-        const json = await res.json() as { platforms?: ConnectedPlatform[] };
-        setConnected(json.platforms ?? []);
-      } catch { /* non-fatal */ }
-    };
-
-    fetchConnected();
-
-    // If returning from OAuth callback, refresh connection status
-    const params = new URLSearchParams(window.location.search);
-    const connectedPlatform = params.get('connected');
-    const oauthError = params.get('error');
-    if (connectedPlatform || oauthError) {
-      // Clean up URL params without navigating
-      const url = new URL(window.location.href);
-      url.searchParams.delete('connected');
-      url.searchParams.delete('error');
-      window.history.replaceState({}, '', url.toString());
-      if (oauthError) setConnectError(`Connection failed. Please try again.`);
-    }
-  }, []);
 
   /* ── Avatar upload ── */
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,20 +93,6 @@ export function Step4Profile({ data, userId: _userId, onChange, onBack, onComple
       if (bannerInputRef.current) bannerInputRef.current.value = '';
     }
   };
-
-  /* ── Disconnect platform ── */
-  const handleDisconnect = async (platform: string) => {
-    setDisconnecting(platform);
-    try {
-      await fetch(`/api/social/tokens/${platform}`, { method: 'DELETE' });
-      setConnected((prev) => prev.filter((p) => p.platform !== platform));
-      onChange({ socials: { ...data.socials, [platform]: '' } });
-    } catch { /* non-fatal */ }
-    setDisconnecting(null);
-  };
-
-  const getConnected = (platform: string) =>
-    connected.find((c) => c.platform === platform);
 
   return (
     <motion.div
@@ -276,74 +214,78 @@ export function Step4Profile({ data, userId: _userId, onChange, onBack, onComple
         </p>
       </div>
 
-      {/* Social Media Connections */}
+      {/* Social Media */}
       <div className="rounded-2xl border border-gray-100 bg-white p-5">
-        <h3 className="mb-1 text-sm font-bold text-gray-900">Social Media Connections</h3>
+        <h3 className="mb-1 text-sm font-bold text-gray-900">Social media reach</h3>
         <p className="mb-4 text-xs text-gray-500">
-          Connect your accounts to verify your handles and show brands your reach.
+          Add your Instagram and TikTok metrics so brands can evaluate campaign fit.
         </p>
 
-        {connectError && (
-          <p className="mb-3 flex items-center gap-1.5 text-xs text-red-500">
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {connectError}
-          </p>
-        )}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <InstagramIcon className="h-4 w-4 text-pink-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Instagram</span>
+            </div>
+            <label className={labelClass} htmlFor="ob-instagram">
+              Handle
+            </label>
+            <input
+              id="ob-instagram"
+              value={data.socials.instagram}
+              onChange={(e) => onChange({ socials: { ...data.socials, instagram: e.target.value } })}
+              className={inputClass}
+              placeholder="@yourhandle"
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+            <label className={`${labelClass} mt-3`} htmlFor="ob-instagram-followers">
+              Followers
+            </label>
+            <input
+              id="ob-instagram-followers"
+              inputMode="numeric"
+              value={data.socials.instagramFollowers}
+              onChange={(e) => onChange({ socials: { ...data.socials, instagramFollowers: followerValue(e.target.value) } })}
+              className={inputClass}
+              placeholder="12500"
+            />
+          </div>
 
-        <div className="space-y-3">
-          {PLATFORMS.map(({ id, label, Icon, color, comingSoon }) => {
-            const conn = getConnected(id);
-            return (
-              <div
-                key={id}
-                className={`flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-4 py-3 ${comingSoon ? 'bg-gray-50/40 opacity-60' : 'bg-gray-50/60'}`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon className={`h-4 w-4 shrink-0 ${comingSoon ? 'text-gray-400' : color}`} />
-                  <span className="text-xs font-semibold text-gray-700">{label}</span>
-                  {conn && !comingSoon && (
-                    <span className="truncate text-xs text-gray-500">
-                      @{conn.handle}
-                      {conn.followerCount > 0 && (
-                        <> · {conn.followerCount.toLocaleString()} followers</>
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                {comingSoon ? (
-                  <span className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                    Coming soon
-                  </span>
-                ) : conn ? (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
-                    <button
-                      type="button"
-                      onClick={() => handleDisconnect(id)}
-                      disabled={disconnecting === id}
-                      className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-gray-500 transition hover:border-red-200 hover:text-red-500 disabled:opacity-40"
-                    >
-                      {disconnecting === id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <X className="h-3 w-3" />
-                      )}
-                      Disconnect
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { window.location.href = `/api/social/connect/${id}`; }}
-                    className="shrink-0 rounded-xl bg-nilink-accent px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition hover:bg-nilink-accent-hover"
-                  >
-                    Connect
-                  </button>
-                )}
-              </div>
-            );
-          })}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <TiktokIcon className="h-4 w-4 text-nilink-ink" />
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-500">TikTok</span>
+            </div>
+            <label className={labelClass} htmlFor="ob-tiktok">
+              Handle
+            </label>
+            <input
+              id="ob-tiktok"
+              value={data.socials.tiktok}
+              onChange={(e) => onChange({ socials: { ...data.socials, tiktok: e.target.value } })}
+              className={inputClass}
+              placeholder="@yourhandle"
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+            <label className={`${labelClass} mt-3`} htmlFor="ob-tiktok-followers">
+              Followers
+            </label>
+            <input
+              id="ob-tiktok-followers"
+              inputMode="numeric"
+              value={data.socials.tiktokFollowers}
+              onChange={(e) => onChange({ socials: { ...data.socials, tiktokFollowers: followerValue(e.target.value) } })}
+              className={inputClass}
+              placeholder="48000"
+            />
+          </div>
         </div>
+
+        <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
+          OAuth verification can be added later; these launch fields are self-reported and editable.
+        </p>
       </div>
 
       {/* Availability */}

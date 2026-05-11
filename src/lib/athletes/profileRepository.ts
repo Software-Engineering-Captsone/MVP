@@ -5,10 +5,11 @@ import type { Athlete, PlatformMetrics, ContentItem } from '@/lib/mockData';
  * Public-facing athlete profile aggregate.
  *
  * Stitches profiles + athlete_sports (primary) + athlete_academics + athlete_socials +
- * athlete_achievements into the `Athlete` shape the dashboard already renders.
+ * athlete_achievements + athlete_content into the `Athlete` shape the dashboard
+ * already renders.
  *
- * Fields with no DB column today (heightWeight, nilScore, contentItems, compatibilityScore)
- * are returned as safe defaults so the UI degrades gracefully.
+ * Fields with no DB column today (heightWeight, nilScore, compatibilityScore) are
+ * returned as safe defaults so the UI degrades gracefully.
  */
 
 type ProfileRow = {
@@ -19,6 +20,7 @@ type ProfileRow = {
   bio: string | null;
   city: string | null;
   state: string | null;
+  hometown: string | null;
   verified: boolean | null;
   role: string | null;
 };
@@ -59,6 +61,20 @@ type SocialRow = {
 type AchievementRow = {
   athlete_id: string;
   title: string | null;
+  year: number | null;
+  display_order: number | null;
+};
+
+type ContentRow = {
+  athlete_id: string;
+  content_type: string | null;
+  media_url: string | null;
+  thumbnail_url: string | null;
+  caption: string | null;
+  overlay_text: string | null;
+  views: number | null;
+  likes: number | null;
+  posted_at: string | null;
   display_order: number | null;
 };
 
@@ -96,14 +112,14 @@ export async function getAthleteProfile(athleteId: string): Promise<Athlete | nu
 
   const { data: profile, error: profileErr } = await supabase
     .from('profiles')
-    .select('id, full_name, avatar_url, banner_url, bio, city, state, verified, role')
+    .select('id, full_name, avatar_url, banner_url, bio, city, state, hometown, verified, role')
     .eq('id', athleteId)
     .maybeSingle<ProfileRow>();
 
   if (profileErr || !profile || profile.role !== 'athlete') return null;
 
   // Fan-out: small per-athlete tables — fine to run in parallel.
-  const [sportsRes, academicsRes, socialsRes, achievementsRes] = await Promise.all([
+  const [sportsRes, academicsRes, socialsRes, achievementsRes, contentRes] = await Promise.all([
     supabase
       .from('athlete_sports')
       .select('athlete_id, sport, position, jersey_number, is_primary')
@@ -123,7 +139,12 @@ export async function getAthleteProfile(athleteId: string): Promise<Athlete | nu
       .maybeSingle<SocialRow>(),
     supabase
       .from('athlete_achievements')
-      .select('athlete_id, title, display_order')
+      .select('athlete_id, title, year, display_order')
+      .eq('athlete_id', athleteId)
+      .order('display_order', { ascending: true, nullsFirst: false }),
+    supabase
+      .from('athlete_content')
+      .select('athlete_id, content_type, media_url, thumbnail_url, caption, overlay_text, views, likes, posted_at, display_order')
       .eq('athlete_id', athleteId)
       .order('display_order', { ascending: true, nullsFirst: false }),
   ]);
@@ -133,10 +154,25 @@ export async function getAthleteProfile(athleteId: string): Promise<Athlete | nu
   const academics = academicsRes.data ?? null;
   const socials = socialsRes.data ?? null;
   const achievements = ((achievementsRes.data ?? []) as AchievementRow[])
-    .map((r) => r.title?.trim())
+    .map((r) => {
+      const title = r.title?.trim();
+      if (!title) return '';
+      return r.year ? `${r.year} ${title}` : title;
+    })
     .filter((t): t is string => !!t);
+  const contentItems = ((contentRes.data ?? []) as ContentRow[])
+    .filter((row) => !!row.media_url)
+    .map((row): ContentItem => ({
+      id: `${row.athlete_id}-${row.display_order ?? row.media_url}`,
+      type: row.content_type === 'video' ? 'video' : 'image',
+      thumbnailUrl: row.thumbnail_url || row.media_url || '',
+      views: formatCount(row.views),
+      caption: row.caption ?? '',
+      datePosted: row.posted_at ?? '',
+      overlayText: row.overlay_text ?? undefined,
+    }));
 
-  const hometown = [profile.city, profile.state].filter(Boolean).join(', ');
+  const hometown = profile.hometown?.trim() || [profile.city, profile.state].filter(Boolean).join(', ');
 
   const igHandle = socials?.instagram ?? '';
   const ttHandle = socials?.tiktok ?? '';
@@ -195,7 +231,7 @@ export async function getAthleteProfile(athleteId: string): Promise<Athlete | nu
       estimatedImpressions: formatCount(socials?.estimated_impressions),
     },
     achievements,
-    contentItems: [] as ContentItem[], // content feed not modeled yet
+    contentItems,
     openToDeals: true,
     compatibilityScore: 0, // brand-side derived value
   };

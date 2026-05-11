@@ -108,6 +108,14 @@ declare
   uid  uuid  := auth.uid();
   prof jsonb := coalesce(payload -> 'profile', '{}'::jsonb);
   socs jsonb := coalesce(payload -> 'socials',  '{}'::jsonb);
+  instagram_followers integer := greatest(
+    0,
+    coalesce(nullif(regexp_replace(coalesce(socs ->> 'instagram_followers', ''), '\D', '', 'g'), '')::integer, 0)
+  );
+  tiktok_followers integer := greatest(
+    0,
+    coalesce(nullif(regexp_replace(coalesce(socs ->> 'tiktok_followers', ''), '\D', '', 'g'), '')::integer, 0)
+  );
 begin
   if uid is null then
     raise exception 'Not authenticated';
@@ -120,19 +128,23 @@ begin
   where id = uid;
 
   insert into public.athlete_socials (
-    athlete_id, instagram, tiktok, twitter, youtube
+    athlete_id, instagram, instagram_followers, tiktok, tiktok_followers, twitter, youtube
   ) values (
     uid,
     coalesce(socs ->> 'instagram', ''),
+    instagram_followers,
     coalesce(socs ->> 'tiktok',    ''),
+    tiktok_followers,
     coalesce(socs ->> 'twitter',   ''),
     coalesce(socs ->> 'youtube',   '')
   )
   on conflict (athlete_id) do update set
-    instagram = excluded.instagram,
-    tiktok    = excluded.tiktok,
-    twitter   = excluded.twitter,
-    youtube   = excluded.youtube;
+    instagram           = excluded.instagram,
+    instagram_followers = excluded.instagram_followers,
+    tiktok              = excluded.tiktok,
+    tiktok_followers    = excluded.tiktok_followers,
+    twitter             = excluded.twitter,
+    youtube             = excluded.youtube;
 end;
 $$;
 
@@ -214,7 +226,9 @@ begin
     'socials', (
       select jsonb_build_object(
         'instagram', s.instagram,
+        'instagram_followers', s.instagram_followers,
         'tiktok',    s.tiktok,
+        'tiktok_followers', s.tiktok_followers,
         'twitter',   s.twitter,
         'youtube',   s.youtube
       )

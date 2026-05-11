@@ -20,6 +20,14 @@ function supabase() {
   return createClient();
 }
 
+function followerCount(value: string): number {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return 0;
+  const parsed = Number.parseInt(digits, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
 export async function persistBasics(b: OnboardingBasics): Promise<void> {
   const { error } = await supabase().rpc('upsert_athlete_basics', {
     payload: {
@@ -74,7 +82,8 @@ export async function persistCompliance(c: OnboardingCompliance): Promise<void> 
 }
 
 export async function persistProfileSection(p: OnboardingProfile): Promise<void> {
-  const { error } = await supabase().rpc('upsert_athlete_profile_section', {
+  const client = supabase();
+  const { error } = await client.rpc('upsert_athlete_profile_section', {
     payload: {
       profile: {
         bio: p.bio,
@@ -83,13 +92,37 @@ export async function persistProfileSection(p: OnboardingProfile): Promise<void>
       },
       socials: {
         instagram: p.socials.instagram,
+        instagram_followers: p.socials.instagramFollowers,
         tiktok: p.socials.tiktok,
+        tiktok_followers: p.socials.tiktokFollowers,
         twitter: p.socials.twitter,
         youtube: p.socials.youtube,
       },
     },
   });
   if (error) throw new Error(error.message);
+
+  // Keep launch social metrics working even if an environment still has the
+  // older RPC definition that saved handles but ignored follower counts.
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  const userId = authData.user?.id;
+  if (!userId) throw new Error('Not authenticated');
+
+  const { error: socialsError } = await client
+    .from('athlete_socials')
+    .upsert(
+      {
+        athlete_id: userId,
+        instagram: p.socials.instagram,
+        instagram_followers: followerCount(p.socials.instagramFollowers),
+        tiktok: p.socials.tiktok,
+        tiktok_followers: followerCount(p.socials.tiktokFollowers),
+        twitter: p.socials.twitter,
+      },
+      { onConflict: 'athlete_id' },
+    );
+  if (socialsError) throw new Error(socialsError.message);
 }
 
 export async function markOnboardingComplete(): Promise<string> {

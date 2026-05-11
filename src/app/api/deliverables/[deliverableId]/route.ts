@@ -17,7 +17,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Missing deliverableId' }, { status: 400 });
   }
 
-  let body: { status?: unknown; title?: unknown; description?: unknown } = {};
+  let body: { status?: unknown; title?: unknown; description?: unknown; publishedUrl?: unknown } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -36,6 +36,7 @@ export async function PATCH(
         status: status as DeliverableStatus | undefined,
         title: typeof body.title === 'string' ? body.title : undefined,
         description: typeof body.description === 'string' ? body.description : undefined,
+        publishedUrl: typeof body.publishedUrl === 'string' ? body.publishedUrl : undefined,
       },
       { userId: user.userId, role: user.role },
     );

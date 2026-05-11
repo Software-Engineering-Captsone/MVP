@@ -218,7 +218,7 @@ export function prefillWizardFromCampaignHandoff(
       offerName: base.basics.offerName || `${args.campaignName} — ${args.athleteName}`,
       details:
         base.basics.details ||
-        `Campaign context (read-only): ${args.campaignName}\n\nBrief excerpt:\n${snippet || '—'}`,
+        (snippet ? `${snippet}` : ''),
     },
   };
 }

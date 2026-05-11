@@ -60,7 +60,9 @@ interface DbProfile {
 
 interface DbSocials {
   instagram?: Maybe<string>;
+  instagram_followers?: Maybe<number>;
   tiktok?: Maybe<string>;
+  tiktok_followers?: Maybe<number>;
   twitter?: Maybe<string>;
   youtube?: Maybe<string>;
 }
@@ -186,7 +188,9 @@ export function hydrateOnboardingDraft(state: OnboardingDbState | null): Onboard
       bio: str(p.bio),
       socials: {
         instagram: str(s.instagram),
+        instagramFollowers: num(s.instagram_followers),
         tiktok: str(s.tiktok),
+        tiktokFollowers: num(s.tiktok_followers),
         twitter: str(s.twitter),
         youtube: str(s.youtube),
       },

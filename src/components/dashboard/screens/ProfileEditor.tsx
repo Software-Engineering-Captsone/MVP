@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Save, Eye, Loader2,
   Plus, X, ShieldCheck, BadgeCheck, ImagePlus, AlertCircle, Camera, Pencil,
+  Award, LinkIcon, Trash2, Video,
 } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
@@ -19,6 +20,16 @@ import { authFetch } from '@/lib/authFetch';
 import { uploadAvatar } from '@/lib/avatarUpload';
 import { uploadBanner } from '@/lib/bannerUpload';
 import { loadOnboardingState, hydrateOnboardingDraft } from '@/lib/onboardingHydrate';
+import {
+  createAchievementDraft,
+  createContentDraft,
+  createProfileDetailsDraft,
+  loadAthleteProfileDetails,
+  saveAthleteProfileDetails,
+  type AthleteContentDraft,
+  type AthleteContentDraftType,
+  type AthleteProfileDetailsDraft,
+} from '@/lib/athleteProfileDetails';
 import {
   persistBasics,
   persistAthletic,
@@ -47,20 +58,6 @@ const InstagramIcon = ({ className }: { className?: string }) => (
     <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
   </svg>
 );
-const YouTubeIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-  </svg>
-);
-
-interface ConnectedPlatform { platform: string; handle: string; followerCount: number }
-
-const SOCIAL_PLATFORMS: { id: string; label: string; Icon: React.FC<{ className?: string }>; color: string; comingSoon?: boolean }[] = [
-  { id: 'youtube',   label: 'YouTube',   Icon: YouTubeIcon,   color: 'text-red-500' },
-  { id: 'instagram', label: 'Instagram', Icon: InstagramIcon, color: 'text-pink-500', comingSoon: true },
-  { id: 'tiktok',    label: 'TikTok',    Icon: TiktokIcon,    color: 'text-nilink-ink', comingSoon: true },
-];
-
 const SPORTS = [
   'Basketball', 'Football', 'Baseball', 'Soccer', 'Volleyball',
   'Track & Field', 'Swimming', 'Tennis', 'Softball', 'Cheerleading',
@@ -89,6 +86,14 @@ const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const inputClass =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-nilink-ink outline-none transition placeholder:text-gray-400 focus:border-nilink-accent-border focus:ring-1 focus:ring-nilink-accent/30';
 const labelClass = 'mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400';
+
+function followerValue(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 9);
+}
+
+function yearValue(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 4);
+}
 
 function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -123,6 +128,8 @@ export function ProfileEditor() {
   const [academic,   setAcademic]   = useState<OnboardingAcademic>(defaultDraft.academic);
   const [compliance, setCompliance] = useState<OnboardingCompliance>(defaultDraft.compliance);
   const [profile,    setProfile]    = useState<OnboardingProfile>(defaultDraft.profile);
+  const [profileDetails, setProfileDetails] =
+    useState<AthleteProfileDetailsDraft>(() => createProfileDetailsDraft());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bioEditableRef = useRef<HTMLDivElement>(null);
@@ -141,16 +148,13 @@ export function ProfileEditor() {
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyInfo, setVerifyInfo] = useState<string | null>(null);
 
-  const [connected, setConnected] = useState<ConnectedPlatform[]>([]);
-  const [disconnecting, setDisconnecting] = useState<string | null>(null);
-  const [connectError, setConnectError] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       const state = await loadOnboardingState();
       const draft = hydrateOnboardingDraft(state);
+      const details = await loadAthleteProfileDetails();
 
       // One-time migration: if DB has no name yet, the user completed onboarding
       // before per-step DB sync was added (steps 1-4 were only in localStorage).
@@ -180,6 +184,7 @@ export function ProfileEditor() {
             setAcademic(migratedDraft.academic);
             setCompliance(migratedDraft.compliance);
             setProfile(migratedDraft.profile);
+            setProfileDetails(await loadAthleteProfileDetails());
             return;
           }
         } catch { /* silent — show whatever DB has */ }
@@ -190,6 +195,7 @@ export function ProfileEditor() {
       setAcademic(draft.academic);
       setCompliance(draft.compliance);
       setProfile(draft.profile);
+      setProfileDetails(details);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Could not load profile');
     } finally {
@@ -199,32 +205,13 @@ export function ProfileEditor() {
 
   useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => {
-    const fetchConnected = async () => {
-      try {
-        const res = await fetch('/api/social/tokens');
-        if (!res.ok) return;
-        const json = await res.json() as { platforms?: ConnectedPlatform[] };
-        setConnected(json.platforms ?? []);
-      } catch { /* non-fatal */ }
-    };
-    fetchConnected();
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('connected') || params.get('error')) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('connected');
-      url.searchParams.delete('error');
-      window.history.replaceState({}, '', url.toString());
-      if (params.get('error')) setConnectError('Connection failed. Please try again.');
-      else fetchConnected();
-    }
-  }, []);
-
   /* ── Section field updaters ── */
   const patchBasics     = (p: Partial<OnboardingBasics>)     => setBasics(b => ({ ...b, ...p }));
   const patchAcademic   = (p: Partial<OnboardingAcademic>)   => setAcademic(a => ({ ...a, ...p }));
   const patchCompliance = (p: Partial<OnboardingCompliance>) => setCompliance(c => ({ ...c, ...p }));
   const patchProfile    = (p: Partial<OnboardingProfile>)    => setProfile(pr => ({ ...pr, ...p }));
+  const patchProfileDetails = (p: Partial<AthleteProfileDetailsDraft>) =>
+    setProfileDetails((d) => ({ ...d, ...p }));
   const patchSocial = (key: keyof OnboardingProfile['socials'], value: string) =>
     setProfile(pr => ({ ...pr, socials: { ...pr.socials, [key]: value } }));
 
@@ -248,6 +235,29 @@ export function ProfileEditor() {
     setSports(s => s.map(row => row.id === id ? { ...row, ...patch } : row));
   const removeSport = (id: string) =>
     setSports(s => s.filter(row => row.id !== id));
+
+  const addAchievement = () =>
+    setProfileDetails((d) => ({ ...d, achievements: [...d.achievements, createAchievementDraft()] }));
+  const updateAchievement = (
+    id: string,
+    patch: Partial<AthleteProfileDetailsDraft['achievements'][number]>,
+  ) =>
+    setProfileDetails((d) => ({
+      ...d,
+      achievements: d.achievements.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    }));
+  const removeAchievement = (id: string) =>
+    setProfileDetails((d) => ({ ...d, achievements: d.achievements.filter((item) => item.id !== id) }));
+
+  const addContentItem = (type: AthleteContentDraftType = 'image') =>
+    setProfileDetails((d) => ({ ...d, contentItems: [...d.contentItems, createContentDraft(type)] }));
+  const updateContentItem = (id: string, patch: Partial<AthleteContentDraft>) =>
+    setProfileDetails((d) => ({
+      ...d,
+      contentItems: d.contentItems.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    }));
+  const removeContentItem = (id: string) =>
+    setProfileDetails((d) => ({ ...d, contentItems: d.contentItems.filter((item) => item.id !== id) }));
 
   /* ── Photo upload: pick → crop → upload → refreshUser so the sidebar
         picks up the new avatar immediately. ── */
@@ -306,16 +316,6 @@ export function ProfileEditor() {
       setBannerUploading(false);
       if (bannerInputRef.current) bannerInputRef.current.value = '';
     }
-  };
-
-  const handleDisconnectSocial = async (platform: string) => {
-    setDisconnecting(platform);
-    try {
-      await fetch(`/api/social/tokens/${platform}`, { method: 'DELETE' });
-      setConnected((prev) => prev.filter((p) => p.platform !== platform));
-      patchSocial(platform as keyof OnboardingProfile['socials'], '');
-    } catch { /* non-fatal */ }
-    setDisconnecting(null);
   };
 
   useEffect(() => {
@@ -396,8 +396,6 @@ export function ProfileEditor() {
     }
   };
 
-  const getConnectedPlatform = (id: string) => connected.find((c) => c.platform === id);
-
   /* ── Save: commit each section in order, sync full_name to user_metadata ── */
   const handleSave = async () => {
     setSaving(true);
@@ -409,6 +407,7 @@ export function ProfileEditor() {
       await persistAcademic(academic);
       await persistCompliance(compliance);
       await persistProfileSection(profile);
+      await saveAthleteProfileDetails(profileDetails);
 
       // Keep the shell's display name in sync (sessionUser.name comes
       // from auth user_metadata, not profiles.full_name).
@@ -431,23 +430,6 @@ export function ProfileEditor() {
     }
   };
 
-  /* ── Re-run onboarding: wipe local cache so wizard hydrates from DB ── */
-  const handleReRunOnboarding = () => {
-    try {
-      // Keep the key so useOnboardingStorage trusts localStorage (skips DB fetch)
-      // but clear completedAt so guards don't redirect away from the wizard.
-      const raw = localStorage.getItem('athlete_onboarding_draft');
-      const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-      // JSON.stringify drops undefined values, so completedAt won't appear in output
-      localStorage.setItem(
-        'athlete_onboarding_draft',
-        JSON.stringify({ ...existing, completedAt: undefined, currentStep: 1 }),
-      );
-    } catch {
-      try { localStorage.removeItem('athlete_onboarding_draft'); } catch { /* ignore */ }
-    }
-    router.push('/dashboard/onboarding');
-  };
 
 
   const avatarSrc =
@@ -561,7 +543,7 @@ export function ProfileEditor() {
               <div className="relative h-20 w-20">
                 <div
                   className="h-20 w-20 cursor-pointer overflow-hidden rounded-full border-4 border-white bg-white shadow-md"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={handlePickPhoto}
                 >
                   {uploading ? (
                     <div className="flex h-full items-center justify-center bg-gray-50">
@@ -573,7 +555,7 @@ export function ProfileEditor() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={handlePickPhoto}
                   className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-nilink-accent text-white ring-2 ring-white shadow-sm transition hover:bg-nilink-accent-hover"
                   aria-label="Change profile photo"
                 >
@@ -690,6 +672,17 @@ export function ProfileEditor() {
                 onChange={(e) => patchBasics({ country: e.target.value })}
               />
             </div>
+            <div>
+              <label className={labelClass} htmlFor="basics-hometown">Hometown</label>
+              <input
+                id="basics-hometown"
+                type="text"
+                className={inputClass}
+                value={profileDetails.hometown}
+                onChange={(e) => patchProfileDetails({ hometown: e.target.value })}
+                placeholder="Caldwell, NJ"
+              />
+            </div>
           </div>
         </SectionCard>
 
@@ -788,6 +781,17 @@ export function ProfileEditor() {
               </select>
             </div>
             <div>
+              <label className={labelClass} htmlFor="acad-major">Major</label>
+              <input
+                id="acad-major"
+                type="text"
+                className={inputClass}
+                value={profileDetails.major}
+                onChange={(e) => patchProfileDetails({ major: e.target.value })}
+                placeholder="Marketing"
+              />
+            </div>
+            <div>
               <label className={labelClass} htmlFor="acad-elig-status">Eligibility status</label>
               <select
                 id="acad-elig-status" className={inputClass}
@@ -807,6 +811,70 @@ export function ProfileEditor() {
               />
             </div>
           </div>
+        </SectionCard>
+
+        {/* ── Achievements ── */}
+        <SectionCard title="Achievements" subtitle="Add honors, awards, milestones, and team leadership brands should see.">
+          {profileDetails.achievements.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-5 text-sm text-gray-500">
+              No achievements yet. Add the strongest proof points from your athletic or academic career.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {profileDetails.achievements.map((item, idx) => (
+                <div key={item.id} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-nilink-accent" aria-hidden />
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        Achievement {idx + 1}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAchievement(item.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition hover:bg-white hover:text-red-500"
+                      aria-label="Remove achievement"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_120px]">
+                    <div>
+                      <label className={labelClass} htmlFor={`achievement-title-${item.id}`}>Title</label>
+                      <input
+                        id={`achievement-title-${item.id}`}
+                        type="text"
+                        className={inputClass}
+                        value={item.title}
+                        onChange={(e) => updateAchievement(item.id, { title: e.target.value })}
+                        placeholder="All-Conference First Team"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass} htmlFor={`achievement-year-${item.id}`}>Year</label>
+                      <input
+                        id={`achievement-year-${item.id}`}
+                        inputMode="numeric"
+                        className={inputClass}
+                        value={item.year}
+                        onChange={(e) => updateAchievement(item.id, { year: yearValue(e.target.value) })}
+                        placeholder="2025"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={addAchievement}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-nilink-ink transition hover:border-nilink-accent hover:bg-nilink-accent-soft"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Add achievement
+          </button>
         </SectionCard>
 
         {/* ── Verification ── */}
@@ -966,63 +1034,230 @@ export function ProfileEditor() {
         </SectionCard>
 
         {/* ── Socials ── */}
-        <SectionCard title="Social media" subtitle="Connect accounts to verify your handles and show brands your reach.">
-          {connectError && (
-            <p className="mb-3 flex items-center gap-1.5 text-xs text-red-500">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {connectError}
-            </p>
-          )}
+        <SectionCard title="Social media" subtitle="Add your Instagram and TikTok reach so brands can evaluate NIL fit.">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <InstagramIcon className="h-4 w-4 text-pink-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Instagram</span>
+              </div>
+              <label className={labelClass} htmlFor="profile-instagram">
+                Handle
+              </label>
+              <input
+                id="profile-instagram"
+                value={profile.socials.instagram}
+                onChange={(e) => patchSocial('instagram', e.target.value)}
+                className={inputClass}
+                placeholder="@yourhandle"
+                autoCapitalize="none"
+                autoCorrect="off"
+              />
+              <label className={`${labelClass} mt-3`} htmlFor="profile-instagram-followers">
+                Followers
+              </label>
+              <input
+                id="profile-instagram-followers"
+                inputMode="numeric"
+                value={profile.socials.instagramFollowers}
+                onChange={(e) => patchSocial('instagramFollowers', followerValue(e.target.value))}
+                className={inputClass}
+                placeholder="12500"
+              />
+            </div>
 
-          {/* OAuth-connected platforms */}
-          <div className="space-y-2 mb-5">
-            {SOCIAL_PLATFORMS.map(({ id, label, Icon, color, comingSoon }) => {
-              const conn = getConnectedPlatform(id);
-              return (
-                <div
-                  key={id}
-                  className={`flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-4 py-3 ${comingSoon ? 'bg-gray-50/40 opacity-60' : 'bg-gray-50/60'}`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Icon className={`h-4 w-4 shrink-0 ${comingSoon ? 'text-gray-400' : color}`} />
-                    <span className="text-xs font-semibold text-gray-700">{label}</span>
-                    {conn && !comingSoon && (
-                      <span className="truncate text-xs text-gray-500">
-                        @{conn.handle}
-                        {conn.followerCount > 0 && <> · {conn.followerCount.toLocaleString()} followers</>}
-                      </span>
-                    )}
-                  </div>
-                  {comingSoon ? (
-                    <span className="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                      Coming soon
-                    </span>
-                  ) : conn ? (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
-                      <button
-                        type="button"
-                        onClick={() => void handleDisconnectSocial(id)}
-                        disabled={disconnecting === id}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-gray-500 transition hover:border-red-200 hover:text-red-500 disabled:opacity-40"
-                      >
-                        {disconnecting === id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
-                        Disconnect
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => { window.location.href = `/api/social/connect/${id}`; }}
-                      className="shrink-0 rounded-xl bg-nilink-accent px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition hover:bg-nilink-accent-hover"
-                    >
-                      Connect
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <TiktokIcon className="h-4 w-4 text-nilink-ink" />
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-500">TikTok</span>
+              </div>
+              <label className={labelClass} htmlFor="profile-tiktok">
+                Handle
+              </label>
+              <input
+                id="profile-tiktok"
+                value={profile.socials.tiktok}
+                onChange={(e) => patchSocial('tiktok', e.target.value)}
+                className={inputClass}
+                placeholder="@yourhandle"
+                autoCapitalize="none"
+                autoCorrect="off"
+              />
+              <label className={`${labelClass} mt-3`} htmlFor="profile-tiktok-followers">
+                Followers
+              </label>
+              <input
+                id="profile-tiktok-followers"
+                inputMode="numeric"
+                value={profile.socials.tiktokFollowers}
+                onChange={(e) => patchSocial('tiktokFollowers', followerValue(e.target.value))}
+                className={inputClass}
+                placeholder="48000"
+              />
+            </div>
           </div>
 
+          <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
+            These launch metrics are self-reported. OAuth verification can be layered back in after platform review.
+          </p>
+        </SectionCard>
+
+        {/* ── Content portfolio ── */}
+        <SectionCard title="Content portfolio" subtitle="Curate posts, reels, clips, or photos that brands should review before sending an offer.">
+          {profileDetails.contentItems.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-5 text-sm text-gray-500">
+              No content added yet. Add media URLs for your strongest brand-safe posts or highlight clips.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {profileDetails.contentItems.map((item, idx) => (
+                <div key={item.id} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      {item.type === 'video' ? (
+                        <Video className="h-4 w-4 text-nilink-accent" aria-hidden />
+                      ) : (
+                        <ImagePlus className="h-4 w-4 text-nilink-accent" aria-hidden />
+                      )}
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        Portfolio item {idx + 1}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 outline-none focus:border-nilink-accent-border focus:ring-1 focus:ring-nilink-accent/30"
+                        value={item.type}
+                        onChange={(e) =>
+                          updateContentItem(item.id, { type: e.target.value as AthleteContentDraftType })
+                        }
+                        aria-label="Content type"
+                      >
+                        <option value="image">Photo</option>
+                        <option value="video">Video</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeContentItem(item.id)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-400 transition hover:bg-white hover:text-red-500"
+                        aria-label="Remove content item"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <label className={labelClass} htmlFor={`content-media-${item.id}`}>
+                        Media URL
+                      </label>
+                      <div className="relative">
+                        <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden />
+                        <input
+                          id={`content-media-${item.id}`}
+                          type="url"
+                          className={`${inputClass} pl-9`}
+                          value={item.mediaUrl}
+                          onChange={(e) => updateContentItem(item.id, { mediaUrl: e.target.value })}
+                          placeholder="https://..."
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                        />
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={labelClass} htmlFor={`content-thumb-${item.id}`}>
+                        Thumbnail URL
+                      </label>
+                      <input
+                        id={`content-thumb-${item.id}`}
+                        type="url"
+                        className={inputClass}
+                        value={item.thumbnailUrl}
+                        onChange={(e) => updateContentItem(item.id, { thumbnailUrl: e.target.value })}
+                        placeholder={item.type === 'video' ? 'Recommended for videos' : 'Defaults to media URL if blank'}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={labelClass} htmlFor={`content-caption-${item.id}`}>Caption</label>
+                      <input
+                        id={`content-caption-${item.id}`}
+                        type="text"
+                        className={inputClass}
+                        value={item.caption}
+                        onChange={(e) => updateContentItem(item.id, { caption: e.target.value })}
+                        placeholder="Game-day fit check, training clip, product post..."
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass} htmlFor={`content-overlay-${item.id}`}>Overlay text</label>
+                      <input
+                        id={`content-overlay-${item.id}`}
+                        type="text"
+                        className={inputClass}
+                        value={item.overlayText}
+                        onChange={(e) => updateContentItem(item.id, { overlayText: e.target.value })}
+                        placeholder="Optional short label"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass} htmlFor={`content-date-${item.id}`}>Posted date</label>
+                      <input
+                        id={`content-date-${item.id}`}
+                        type="date"
+                        className={inputClass}
+                        value={item.postedAt}
+                        onChange={(e) => updateContentItem(item.id, { postedAt: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass} htmlFor={`content-views-${item.id}`}>Views</label>
+                      <input
+                        id={`content-views-${item.id}`}
+                        inputMode="numeric"
+                        className={inputClass}
+                        value={item.views}
+                        onChange={(e) => updateContentItem(item.id, { views: followerValue(e.target.value) })}
+                        placeholder="12000"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass} htmlFor={`content-likes-${item.id}`}>Likes</label>
+                      <input
+                        id={`content-likes-${item.id}`}
+                        inputMode="numeric"
+                        className={inputClass}
+                        value={item.likes}
+                        onChange={(e) => updateContentItem(item.id, { likes: followerValue(e.target.value) })}
+                        placeholder="900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => addContentItem('image')}
+              className="inline-flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-nilink-ink transition hover:border-nilink-accent hover:bg-nilink-accent-soft"
+            >
+              <ImagePlus className="h-4 w-4" aria-hidden />
+              Add photo
+            </button>
+            <button
+              type="button"
+              onClick={() => addContentItem('video')}
+              className="inline-flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-nilink-ink transition hover:border-nilink-accent hover:bg-nilink-accent-soft"
+            >
+              <Video className="h-4 w-4" aria-hidden />
+              Add video
+            </button>
+          </div>
         </SectionCard>
 
         <div className="flex justify-end pb-4">

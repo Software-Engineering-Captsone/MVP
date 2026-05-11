@@ -45,7 +45,7 @@ const PRESETS: { id: OfferWizardPresetId; label: string; hint: string }[] = [
   { id: 'scratch', label: 'Start blank', hint: 'No template' },
   { id: 'ugc_social_bundle', label: 'UGC social bundle', hint: 'Short-form mix' },
   { id: 'ugc_photo_set', label: 'UGC photo set', hint: 'Still assets' },
-  { id: 'appearance_event', label: 'Event appearance', hint: 'In-person' },
+  { id: 'appearance_event', label: 'Appearance Event', hint: 'In-person' },
   { id: 'appearance_media_day', label: 'Media day', hint: 'Hybrid-friendly' },
 ];
 

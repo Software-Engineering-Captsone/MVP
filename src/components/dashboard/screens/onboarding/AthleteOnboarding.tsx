@@ -154,7 +154,7 @@ export function AthleteOnboarding() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease }}
-      className="w-full max-w-2xl"
+      className="mx-auto w-full max-w-2xl"
     >
       {/* ── Card ── */}
       <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/50">
