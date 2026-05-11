@@ -11,7 +11,10 @@ export interface University {
   'state-province': string | null;
 }
 
-const API_URL = 'http://universities.hipolabs.com/search?country=United+States';
+// Use our same-origin proxy so this works on HTTPS deployments (the upstream
+// Hipolabs endpoint is HTTP-only, which browsers block as mixed content on
+// production HTTPS pages). See src/app/api/universities/route.ts.
+const API_URL = '/api/universities';
 
 let cachedData: University[] | null = null;
 

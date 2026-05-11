@@ -202,10 +202,33 @@ export function Step3Academic({ data, sessionEmail, onChange, onNext, onBack }: 
               </div>
             )}
 
-            {uniError && (
-              <p className="mt-1 text-[10px] text-red-500">
-                Could not load university list. You can type your school name manually.
-              </p>
+            {/* Manual fallback — when the list fails to load OR the typed
+                name doesn't match anything, let the user proceed with the
+                name they typed. */}
+            {!data.school && searchQuery.trim().length >= 2 && (uniError || searchResults.length === 0) && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                {uniError ? (
+                  <p>Could not load the university list. You can still continue with your school name.</p>
+                ) : (
+                  <p>No matches found. You can continue with the name as typed.</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const typed = searchQuery.trim();
+                    // Best-effort domain inference from .edu account, else blank.
+                    onChange({
+                      school: typed,
+                      schoolDomain: isEduAccount ? accountDomain : '',
+                      schoolEmail: isEduAccount ? sessionEmail : '',
+                    });
+                    setShowDropdown(false);
+                  }}
+                  className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-amber-700"
+                >
+                  Use “{searchQuery.trim()}”
+                </button>
+              </div>
             )}
           </div>
         )}
