@@ -59,6 +59,9 @@ export type OpportunityCardContent = {
   id: string;
   title: string;
   brandName: string;
+  postedLabel?: string;
+  endDateLabel?: string;
+  categoryLabel?: string;
   /** Empty/falsy => render the monogram fallback. */
   imageSrc: string;
   imageAlt: string;
@@ -93,19 +96,6 @@ export function toOpportunityChips(labels: readonly string[]): OpportunityCardCh
   }));
 }
 
-function deadlineDotClass(urgency?: OpportunityCardDeadline['urgency']): string {
-  if (urgency === 'today') return opportunityCardTokens.deadlineDotToday;
-  if (urgency === 'soon') return opportunityCardTokens.deadlineDotSoon;
-  if (urgency === 'none') return opportunityCardTokens.deadlineDotNone;
-  return opportunityCardTokens.deadlineDotNormal;
-}
-
-const PRICE_LIKE = /[\d$€£¥₹]/;
-function resolveCompensationVariant(c: OpportunityCardCompensation): 'price' | 'note' {
-  if (c.variant) return c.variant;
-  return PRICE_LIKE.test(c.display) ? 'price' : 'note';
-}
-
 /** Deterministic palette index — same input always picks the same gradient. */
 function monogramToneClass(monogram: OpportunityCardMonogram): string {
   if (typeof monogram.tone === 'number') {
@@ -118,16 +108,6 @@ function monogramToneClass(monogram: OpportunityCardMonogram): string {
   return opportunityMonogramTones[hash % opportunityMonogramTones.length]!;
 }
 
-function visibleChips(chips: OpportunityCardChip[]): OpportunityCardChip[] {
-  if (chips.length <= 3) return chips;
-  const overflow = chips.length - 2;
-  return [
-    chips[0]!,
-    chips[1]!,
-    { id: `${chips[0]!.id}-overflow`, label: `+${overflow} more`, lane: 'deliverable' as const },
-  ];
-}
-
 export function OpportunityExploreCard({
   content,
   state,
@@ -137,7 +117,7 @@ export function OpportunityExploreCard({
   interactiveSurfaceClassName = '',
 }: OpportunityCardProps) {
   const focusRing = focusRingClassName;
-  const ctaLabel = content.ctaLabel ?? 'View Deal';
+  const ctaLabel = content.ctaLabel ?? 'View Details';
   const saveAria = state.isSaved ? 'Remove saved campaign' : 'Save campaign';
 
   const rootClassName = [
@@ -165,7 +145,9 @@ export function OpportunityExploreCard({
     );
   }
 
-  const chips = visibleChips(content.chips);
+  const postedLabel = content.postedLabel?.trim() || 'Posted recently';
+  const endDateLabel = content.endDateLabel?.trim() || 'Open ongoing';
+  const categoryLabel = content.categoryLabel?.trim() || 'General';
 
   return (
     <div
@@ -178,7 +160,6 @@ export function OpportunityExploreCard({
       }}
       onKeyDown={onCardKeyDown}
     >
-      {/* min-h on root + flex-1 column; bottomShell mt-auto + pt-3 locks compensation + CTA to card bottom. */}
       <div className={`${opportunityCardTokens.layoutRow} min-h-0 flex-1 motion-reduce:transition-none`}>
         <div className={opportunityCardTokens.mediaWrap}>
           {content.imageSrc ? (
@@ -207,7 +188,11 @@ export function OpportunityExploreCard({
           <div className={opportunityCardTokens.headerRow}>
             <div className="min-w-0 pr-1">
               <h3 className={opportunityCardTokens.title}>{content.title}</h3>
-              <p className={opportunityCardTokens.brand}>{content.brandName}</p>
+              <div className={opportunityCardTokens.brandMetaRow}>
+                <p className={opportunityCardTokens.brand}>{content.brandName}</p>
+                <span className={opportunityCardTokens.postedDot} aria-hidden />
+                <p className={opportunityCardTokens.postedLabel}>{postedLabel}</p>
+              </div>
             </div>
             <button
               type="button"
@@ -227,73 +212,37 @@ export function OpportunityExploreCard({
               <Heart className={`${opportunityCardTokens.saveIcon} ${state.isSaved ? 'fill-current' : ''}`} />
             </button>
           </div>
-
-          {chips.length > 0 ? (
-            <div className={opportunityCardTokens.chipsRow}>
-              {chips.map((chip) => {
-                const isMuted = chip.label.startsWith('+') || chip.lane === 'qualifier';
-                const chipClass = isMuted ? opportunityCardTokens.chipMuted : opportunityCardTokens.chip;
-                return (
-                  <span key={chip.id} className={chipClass} title={chip.title ?? chip.label}>
-                    {chip.label}
-                  </span>
-                );
-              })}
+          <div className={opportunityCardTokens.divider} />
+          <div className={opportunityCardTokens.infoRow}>
+            <div className={opportunityCardTokens.infoItem}>
+              <p className={opportunityCardTokens.infoLabel}>Ends On</p>
+              <p className={opportunityCardTokens.infoValue}>{endDateLabel}</p>
             </div>
-          ) : null}
-
-          <div
-            className={
-              content.deadline.urgency === 'none'
-                ? opportunityCardTokens.deadlineRowMuted
-                : opportunityCardTokens.deadlineRow
-            }
-          >
-            <span className={opportunityCardTokens.deadlineLabel}>
-              <span className={deadlineDotClass(content.deadline.urgency)} aria-hidden />
-              <span className="truncate">{content.deadline.label}</span>
-            </span>
+            <div className={opportunityCardTokens.infoDivider} aria-hidden />
+            <div className={opportunityCardTokens.infoItem}>
+              <p className={opportunityCardTokens.infoLabel}>Category</p>
+              <p className={opportunityCardTokens.infoValue}>{categoryLabel}</p>
+            </div>
             {state.isWithdrawn ? (
-              <span className={opportunityCardTokens.withdrawnTag}>Withdrawn</span>
+              <span className={`${opportunityCardTokens.withdrawnTag} ml-auto`}>Withdrawn</span>
             ) : null}
           </div>
-
-          <div className={opportunityCardTokens.bottomShell}>
-            <div
-              className={
-                content.compensation.display
-                  ? opportunityCardTokens.bottomRow
-                  : opportunityCardTokens.bottomRowCtaOnly
-              }
-            >
-              {content.compensation.display ? (
-                <p
-                  className={
-                    resolveCompensationVariant(content.compensation) === 'note'
-                      ? opportunityCardTokens.compensationNote
-                      : opportunityCardTokens.compensation
-                  }
-                  {...(content.compensation.ariaLabel ? { 'aria-label': content.compensation.ariaLabel } : {})}
-                >
-                  {content.compensation.display}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                aria-label={`View deal for ${content.title}`}
-                disabled={state.isDisabled}
-                className={[opportunityCardTokens.cta, focusRing].join(' ')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (state.isDisabled) return;
-                  callbacks.onOpen();
-                }}
-              >
-                {ctaLabel}
-              </button>
-            </div>
-          </div>
         </div>
+      </div>
+      <div className={opportunityCardTokens.bottomShell}>
+        <button
+          type="button"
+          aria-label={`View deal for ${content.title}`}
+          disabled={state.isDisabled}
+          className={[opportunityCardTokens.cta, focusRing].join(' ')}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (state.isDisabled) return;
+            callbacks.onOpen();
+          }}
+        >
+          {ctaLabel}
+        </button>
       </div>
     </div>
   );
@@ -310,26 +259,27 @@ export function OpportunityExploreCardSkeleton() {
         <div className={`${opportunityCardTokens.headerWrap} flex min-h-0 flex-1 flex-col`}>
           <div className={opportunityCardTokens.headerRow}>
             <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-6 w-full max-w-[220px] rounded bg-gray-200" />
-              <div className="h-4 w-32 rounded bg-gray-200" />
+              <div className="h-8 w-full max-w-[280px] rounded bg-gray-200" />
+              <div className="h-4 w-48 rounded bg-gray-200" />
             </div>
             <div className="h-9 w-9 shrink-0 rounded-full bg-gray-100" />
           </div>
-          <div className={opportunityCardTokens.chipsRow}>
-            <div className="h-5 w-20 rounded-md border border-gray-100 bg-gray-100" />
-            <div className="h-5 w-16 rounded-md border border-gray-100 bg-gray-100" />
-          </div>
-          <div className={opportunityCardTokens.deadlineRow}>
-            <div className="h-3.5 w-28 rounded bg-gray-100" />
-            <span className="sr-only">Loading</span>
-          </div>
-          <div className={opportunityCardTokens.bottomShell}>
-            <div className={opportunityCardTokens.bottomRow}>
-              <div className="h-8 w-24 rounded bg-gray-200" />
-              <div className="h-10 w-[104px] shrink-0 rounded-xl bg-gray-200" />
+          <div className={opportunityCardTokens.divider} />
+          <div className={opportunityCardTokens.infoRow}>
+            <div className="w-full min-w-0 space-y-2">
+              <div className="h-3 w-16 rounded bg-gray-100" />
+              <div className="h-5 w-24 rounded bg-gray-200" />
+            </div>
+            <div className="h-9 w-px shrink-0 bg-gray-100" />
+            <div className="w-full min-w-0 space-y-2">
+              <div className="h-3 w-16 rounded bg-gray-100" />
+              <div className="h-5 w-28 rounded bg-gray-200" />
             </div>
           </div>
         </div>
+      </div>
+      <div className={opportunityCardTokens.bottomShell}>
+        <div className="h-12 w-full rounded-xl bg-gray-200" />
       </div>
     </div>
   );

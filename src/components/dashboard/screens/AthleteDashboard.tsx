@@ -349,7 +349,10 @@ export function AthleteDashboard() {
             >
               ACTIVE DEALS
             </h2>
-            <Link href="/dashboard/deals" className="text-sm font-bold text-nilink-accent transition-colors hover:text-nilink-ink">
+            <Link
+              href="/dashboard/deals"
+              className="inline-flex items-center justify-center rounded-xl bg-nilink-accent px-4 py-2.5 text-xs font-black uppercase tracking-widest !text-white transition-colors hover:bg-nilink-accent-hover"
+            >
               VIEW ALL
             </Link>
           </div>
@@ -422,7 +425,7 @@ export function AthleteDashboard() {
             ) : offersError ? (
               <p className="text-sm text-red-700">{offersError}</p>
             ) : pendingOfferPreview.length === 0 ? (
-              <p className="py-5 text-sm text-gray-500">No pending offers right now.</p>
+              <p className="py-5 text-sm font-medium text-gray-500">No pending offers right now.</p>
             ) : (
               <div className="space-y-3">
                 {pendingOfferPreview.map((offer) => (
@@ -444,7 +447,7 @@ export function AthleteDashboard() {
 
             <Link
               href="/dashboard/offers"
-              className="mt-4 inline-flex items-center justify-center rounded-xl bg-nilink-accent px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-nilink-accent-hover"
+              className="mt-4 inline-flex items-center justify-center rounded-xl bg-nilink-accent px-4 py-2.5 text-xs font-black uppercase tracking-widest !text-white transition-colors hover:bg-nilink-accent-hover"
             >
               Open offers center
             </Link>
@@ -452,24 +455,29 @@ export function AthleteDashboard() {
 
           {/* Campaigns live under Campaigns in the nav — keep home focused on deals & profile */}
           <div className="flex flex-col justify-center rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-nilink-accent-soft text-nilink-accent">
-              <Megaphone className="h-6 w-6" strokeWidth={2.25} />
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-nilink-accent-soft text-nilink-accent">
+                <Megaphone className="h-6 w-6" strokeWidth={2.25} />
+              </div>
+              <div>
+                <h2
+                  className="text-xl font-black tracking-wide text-nilink-ink"
+                  style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                >
+                  BRAND CAMPAIGNS
+                </h2>
+                <p className="text-xs text-gray-500">Find opportunities that fit your profile</p>
+              </div>
             </div>
-            <h2
-              className="mb-2 text-3xl tracking-wide text-nilink-ink"
-              style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-            >
-              BRAND CAMPAIGNS
-            </h2>
             <p className="mb-6 text-sm font-medium text-gray-500">
               Browse open brand deals and submit your application in one place. Creating and managing campaigns is for brand
               accounts only.
             </p>
             <Link
               href="/dashboard/campaigns"
-              className="inline-flex w-fit items-center justify-center rounded-xl bg-nilink-accent px-6 py-3 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-nilink-accent-hover"
+              className="inline-flex w-fit items-center justify-center rounded-xl bg-nilink-accent px-6 py-3 text-sm font-black uppercase tracking-widest !text-white transition-colors hover:bg-nilink-accent-hover"
             >
-              Browse open campaigns
+              Browse Campaigns
             </Link>
           </div>
         </div>
