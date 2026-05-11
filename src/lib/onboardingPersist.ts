@@ -20,6 +20,28 @@ function supabase() {
   return createClient();
 }
 
+/**
+ * Make sure a profiles row exists for the current user before we write
+ * anything that has a foreign key into it (athlete_academics, sports,
+ * socials, etc.). Idempotent — safe to call repeatedly.
+ *
+ * Backs up the `on_auth_user_created` trigger: if that trigger ever
+ * failed or wasn't installed when this user signed up, the user can
+ * authenticate but has no profiles row, and the first child-table
+ * insert blows up with a FK violation.
+ */
+async function ensureProfile(): Promise<void> {
+  const { error } = await supabase().rpc('ensure_athlete_profile');
+  if (error) {
+    // Surface a clearer message than the raw Postgres FK error the caller
+    // would otherwise hit a millisecond later.
+    throw new Error(
+      `Could not initialize your profile: ${error.message}. ` +
+        'Try signing out and back in, or contact support.',
+    );
+  }
+}
+
 function followerCount(value: string): number {
   const digits = value.replace(/\D/g, '');
   if (!digits) return 0;
@@ -29,6 +51,7 @@ function followerCount(value: string): number {
 }
 
 export async function persistBasics(b: OnboardingBasics): Promise<void> {
+  await ensureProfile();
   const { error } = await supabase().rpc('upsert_athlete_basics', {
     payload: {
       full_name: b.fullName,
@@ -42,6 +65,7 @@ export async function persistBasics(b: OnboardingBasics): Promise<void> {
 }
 
 export async function persistAthletic(a: OnboardingAthletic): Promise<void> {
+  await ensureProfile();
   const { error } = await supabase().rpc('upsert_athlete_sports', {
     payload: a.sports.map((s, i) => ({
       sport: s.sport,
@@ -56,6 +80,7 @@ export async function persistAthletic(a: OnboardingAthletic): Promise<void> {
 }
 
 export async function persistAcademic(a: OnboardingAcademic): Promise<void> {
+  await ensureProfile();
   const { error } = await supabase().rpc('upsert_athlete_academic', {
     payload: {
       school: a.school,
@@ -70,6 +95,7 @@ export async function persistAcademic(a: OnboardingAcademic): Promise<void> {
 }
 
 export async function persistCompliance(c: OnboardingCompliance): Promise<void> {
+  await ensureProfile();
   const { error } = await supabase().rpc('upsert_athlete_compliance', {
     payload: {
       school_email_verified: c.schoolEmailVerified,
@@ -82,6 +108,7 @@ export async function persistCompliance(c: OnboardingCompliance): Promise<void> 
 }
 
 export async function persistProfileSection(p: OnboardingProfile): Promise<void> {
+  await ensureProfile();
   const client = supabase();
   const { error } = await client.rpc('upsert_athlete_profile_section', {
     payload: {
