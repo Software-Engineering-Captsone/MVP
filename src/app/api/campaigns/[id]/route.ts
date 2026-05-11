@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { deriveCampaignStatusFromSubmission } from '@/lib/campaigns/campaignStatusDerivation';
-import { campaignBriefV2ToLegacy } from '@/lib/campaigns/campaignBriefV2Mapper';
+import { campaignBriefV2ToLegacy, normalizeCampaignBriefV2 } from '@/lib/campaigns/campaignBriefV2Mapper';
 import {
   CampaignUpdatePatch,
   deleteDraftCampaign,
@@ -28,8 +28,9 @@ function hasOwn(record: Record<string, unknown>, key: string): boolean {
 }
 
 function normalizeCampaignPatch(body: Record<string, unknown>): CampaignUpdatePatch {
-  const legacyFromBrief = isRecord(body.campaignBriefV2)
-    ? campaignBriefV2ToLegacy(body.campaignBriefV2 as Parameters<typeof campaignBriefV2ToLegacy>[0])
+  const normalizedBrief = isRecord(body.campaignBriefV2) ? normalizeCampaignBriefV2(body.campaignBriefV2) : null;
+  const legacyFromBrief = normalizedBrief
+    ? campaignBriefV2ToLegacy(normalizedBrief)
     : {};
   const merged = { ...legacyFromBrief, ...body };
   const patch: CampaignUpdatePatch = {};
@@ -64,7 +65,7 @@ function normalizeCampaignPatch(body: Record<string, unknown>): CampaignUpdatePa
     patch.image = typeof merged.image === 'string' && merged.image.trim() ? merged.image.trim() : '';
   }
   if (hasOwn(body, 'campaignBriefV2')) {
-    patch.campaignBriefV2 = isRecord(body.campaignBriefV2) ? body.campaignBriefV2 : null;
+    patch.campaignBriefV2 = normalizedBrief;
   }
   if (hasOwn(merged, 'budgetHint') || hasOwn(merged, 'budget')) {
     patch.budget = String(merged.budgetHint ?? merged.budget ?? '');
@@ -143,13 +144,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const patch = normalizeCampaignPatch(body);
-
-  if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: 'No valid fields' }, { status: 400 });
-  }
-
   try {
+    const patch = normalizeCampaignPatch(body);
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: 'No valid fields' }, { status: 400 });
+    }
+
     const updated = await updateCampaign(id, user.userId, patch);
     if (!updated) {
       return NextResponse.json({ error: 'Not found or forbidden' }, { status: 404 });

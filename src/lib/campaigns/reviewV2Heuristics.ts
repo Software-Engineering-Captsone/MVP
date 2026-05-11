@@ -79,13 +79,6 @@ export function computeV2ReviewRiskFlags(input: {
   if (lowConfidence) {
     flags.push('Broad match estimate — confidence is low');
   }
-  if (!input.secondaryKpi || String(input.secondaryKpi).trim() === '') {
-    flags.push('No secondary KPI defined');
-  }
-  const creatorExclusionsText = typeof input.creatorExclusionsText === 'string' ? input.creatorExclusionsText : '';
-  if (!creatorExclusionsText.trim()) {
-    flags.push('No creator exclusions set');
-  }
   if (p?.status === 'broad_estimate') {
     flags.push('Wide audience — match pool may be very large');
   }

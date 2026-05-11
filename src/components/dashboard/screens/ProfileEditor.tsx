@@ -431,6 +431,25 @@ export function ProfileEditor() {
     }
   };
 
+  /* ── Re-run onboarding: wipe local cache so wizard hydrates from DB ── */
+  const handleReRunOnboarding = () => {
+    try {
+      // Keep the key so useOnboardingStorage trusts localStorage (skips DB fetch)
+      // but clear completedAt so guards don't redirect away from the wizard.
+      const raw = localStorage.getItem('athlete_onboarding_draft');
+      const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      // JSON.stringify drops undefined values, so completedAt won't appear in output
+      localStorage.setItem(
+        'athlete_onboarding_draft',
+        JSON.stringify({ ...existing, completedAt: undefined, currentStep: 1 }),
+      );
+    } catch {
+      try { localStorage.removeItem('athlete_onboarding_draft'); } catch { /* ignore */ }
+    }
+    router.push('/dashboard/onboarding');
+  };
+
+
   const avatarSrc =
     profile.profilePictureUrl?.trim().length > 0
       ? profile.profilePictureUrl.trim()

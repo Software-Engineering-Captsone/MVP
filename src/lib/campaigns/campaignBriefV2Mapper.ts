@@ -225,13 +225,29 @@ function mergeBriefText(summary: string, pillars: string[], extra: string): stri
   return parts.join('\n\n').trim();
 }
 
-/** Human-readable campaign goal labels (legacy `goal` field + V2 objective picker). */
+/** Human-readable objective labels for the V2 wizard. */
 export const OBJECTIVE_TYPE_LABELS: Record<ObjectiveTypeV2, string> = {
   awareness: 'Brand awareness',
   consideration: 'Consideration and traffic',
   conversion: 'Conversions and sales',
   ugc_library: 'UGC and content library',
 };
+
+/**
+ * Values accepted by the legacy `campaigns.goal` check constraint.
+ * Keep the richer objective type in `campaign_brief_v2`; write this normalized
+ * label to the legacy column so older Supabase schemas can still launch.
+ */
+export const LEGACY_CAMPAIGN_GOAL_LABELS: Record<ObjectiveTypeV2, string> = {
+  awareness: 'Brand Awareness',
+  consideration: 'Engagement',
+  conversion: 'Sales',
+  ugc_library: 'UGC Focus',
+};
+
+export function objectiveTypeToLegacyCampaignGoal(objectiveType: ObjectiveTypeV2): string {
+  return LEGACY_CAMPAIGN_GOAL_LABELS[objectiveType] ?? LEGACY_CAMPAIGN_GOAL_LABELS.awareness;
+}
 
 function pickIsoOrRawDate(raw: string): string {
   const t = raw.trim();
@@ -528,7 +544,7 @@ export function campaignBriefV2ToLegacy(briefV2: CampaignBriefV2): Record<string
 
   const legacy: Record<string, unknown> = {
     name: strategy.campaignName,
-    goal: OBJECTIVE_TYPE_LABELS[strategy.objectiveType] ?? strategy.objectiveType,
+    goal: objectiveTypeToLegacyCampaignGoal(strategy.objectiveType),
     opportunityContext:
       strategy.campaignSummary?.trim() ||
       audienceCreatorFit.audiencePersona ||

@@ -1,5 +1,5 @@
-import { AthleteOnboarding } from '@/components/dashboard/screens/onboarding/AthleteOnboarding';
+import { redirect } from 'next/navigation';
 
 export default function OnboardingPage() {
-  return <AthleteOnboarding />;
+  redirect('/dashboard/onboarding');
 }

@@ -475,9 +475,9 @@ export function BusinessOverview() {
             </div>
             <Link
               href="/dashboard/campaigns"
-              className="text-sm font-semibold text-nilink-accent hover:text-nilink-accent-hover hover:underline"
+              className="inline-flex items-center justify-center rounded-lg bg-nilink-accent px-4 py-1.5 font-sans text-sm font-semibold leading-5 !text-white visited:!text-white hover:!text-white transition-all hover:scale-[1.02] hover:bg-nilink-accent-hover"
             >
-              Manage all
+              Manage All
             </Link>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white px-5">
@@ -510,6 +510,7 @@ export function BusinessOverview() {
               campaignRows.length > 0 &&
               campaignRows.map((c, i) => {
                 const posted = formatCampaignRelativePosted(c.createdAt ?? null);
+                const first = i === 0;
                 const last = i === campaignRows.length - 1;
                 return (
                   <div
@@ -520,7 +521,7 @@ export function BusinessOverview() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') router.push('/dashboard/campaigns');
                     }}
-                    className={`flex cursor-pointer flex-col gap-1 py-4 transition-colors hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between ${!last ? 'border-b border-gray-100' : ''}`}
+                    className={`-mx-5 flex cursor-pointer flex-col gap-1 px-5 py-4 transition-colors hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between ${first ? 'rounded-t-xl' : ''} ${last ? 'rounded-b-xl' : ''} ${!last ? 'border-b border-gray-100' : ''}`}
                   >
                     <div className="min-w-0">
                       <p className="font-bold text-gray-900 truncate">{c.name}</p>
@@ -553,7 +554,7 @@ export function BusinessOverview() {
             <motion.button
               type="button"
               onClick={() => router.push('/dashboard/search')}
-              className="px-4 py-1.5 bg-nilink-accent text-white text-sm font-semibold rounded-lg hover:bg-nilink-accent-hover transition-colors"
+              className="px-4 py-1.5 bg-nilink-accent text-white font-sans text-sm font-semibold leading-5 rounded-lg hover:bg-nilink-accent-hover transition-colors"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

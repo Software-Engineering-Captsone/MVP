@@ -163,7 +163,7 @@ const STEP_INFO: Record<number, { title: string; subtitle: string }> = {
   },
   5: {
     title: 'Sourcing & Visibility',
-    subtitle: 'Applications, marketplace visibility, and where athletes should be relevant.',
+    subtitle: 'Marketplace visibility controls where athletes can discover this campaign.',
   },
   6: {
     title: 'Review & Launch',
@@ -371,6 +371,7 @@ export type SubmitCampaignArgs = {
 export type DraftResumeSession = {
   campaignId: string;
   prefill: CampaignDraftOverlayPrefill;
+  resumeMode?: 'draft' | 'campaign';
 };
 
 interface Props {
@@ -406,6 +407,7 @@ export function CreateCampaignOverlay({
   onPersistedCampaignIdChange,
 }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const isCampaignEdit = draftResume?.resumeMode === 'campaign';
   const [step, setStep] = useState(() => clampWizardStep(initialStep));
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [submitKind, setSubmitKind] = useState<null | 'draft' | 'publish'>(null);
@@ -473,6 +475,12 @@ export function CreateCampaignOverlay({
   const [templateSelection, setTemplateSelection] = useState<WizardV2TemplateSelection>({ source: 'blank' });
   /** Step 1: strategy fields show only after user picks Start blank or a saved template card. */
   const [strategyTemplatePathConfirmed, setStrategyTemplatePathConfirmed] = useState(false);
+
+  useEffect(() => {
+    const applicationsOpen = visibilityV2 === 'public';
+    setAcceptApplications(applicationsOpen);
+    setVisibility(applicationsOpen ? 'Public' : 'Private');
+  }, [visibilityV2]);
 
   const [templates, setTemplates] = useState<CampaignTemplateListItem[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -927,13 +935,18 @@ export function CreateCampaignOverlay({
 
   const handleSaveDraft = async () => {
     if (!canSaveDraft || busy) return;
-    const result = await runSubmit('draft');
+    const result = await runSubmit(isCampaignEdit ? 'publish' : 'draft');
     if (result) setSaveDraftButtonState('saved');
   };
 
   const handleDiscardOrAbandon = useCallback(async () => {
     const persistedId = campaignId;
     const title = campaignName.trim() || 'Untitled campaign';
+    if (isCampaignEdit) {
+      const ok = window.confirm(`Close campaign editor for "${title}"? Unsaved changes will be lost.`);
+      if (ok) onClose();
+      return;
+    }
     const message = persistedId
       ? `Discard draft "${title}"? It will be permanently removed from your account.`
       : 'Leave campaign creation? Nothing has been saved yet and your entries will be lost.';
@@ -957,7 +970,7 @@ export function CreateCampaignOverlay({
       return;
     }
     onClose();
-  }, [campaignId, campaignName, onClose, onDiscardPersistedDraft]);
+  }, [campaignId, campaignName, isCampaignEdit, onClose, onDiscardPersistedDraft]);
 
   const handleLaunch = () => {
     if (!canPublish || busy) return;
@@ -965,6 +978,7 @@ export function CreateCampaignOverlay({
   };
 
   useEffect(() => {
+    if (isCampaignEdit) return;
     if (!campaignName.trim()) return;
     const id = window.setTimeout(() => {
       void (async () => {
@@ -977,7 +991,7 @@ export function CreateCampaignOverlay({
       })();
     }, 3000);
     return () => window.clearTimeout(id);
-  }, [campaignName, runSubmit]);
+  }, [campaignName, isCampaignEdit, runSubmit]);
 
   useEffect(() => {
     if (saveDraftButtonState !== 'saved') return;
@@ -1229,7 +1243,7 @@ export function CreateCampaignOverlay({
           >
             {draftResume && (
               <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-nilink-accent">
-                Editing saved draft
+                {isCampaignEdit ? 'Editing campaign' : 'Editing saved draft'}
               </p>
             )}
             <h2
@@ -1237,13 +1251,15 @@ export function CreateCampaignOverlay({
               className="text-2xl font-black uppercase tracking-wide sm:text-3xl"
               style={{ fontFamily: "'Bebas Neue', sans-serif" }}
             >
-              Create campaign
+              {isCampaignEdit ? 'Edit campaign' : 'Create campaign'}
             </h2>
             <p
               id="campaign-wizard-subtitle"
               className="mb-6 mt-3 text-sm leading-relaxed text-gray-500 sm:mb-7 sm:mt-4"
             >
-              Guided setup — save anytime as a draft. Use the checklist to see what is left before launch.
+              {isCampaignEdit
+                ? 'Update campaign details and save changes when ready.'
+                : 'Guided setup — save anytime as a draft. Use the checklist to see what is left before launch.'}
             </p>
             <WizardStepChecklistRail currentStep={step} steps={STEPS} />
           </aside>
@@ -1843,32 +1859,7 @@ export function CreateCampaignOverlay({
 
             {showSourcingVisibilityV2 && (
               <div className="space-y-10">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-5">
-                    <div className="mb-3 flex items-start justify-between">
-                      <Zap className="h-6 w-6 text-nilink-accent-bright" />
-                      <button
-                        type="button"
-                        onClick={() => setAcceptApplications(!acceptApplications)}
-                        role="switch"
-                        aria-checked={acceptApplications}
-                        aria-label="Accept applications"
-                        className={`relative h-6 w-11 rounded-full transition-colors ${
-                          acceptApplications ? 'bg-nilink-accent' : 'bg-gray-200'
-                        }`}
-                      >
-                        <div
-                          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                            acceptApplications ? 'left-[22px]' : 'left-0.5'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    <h3 className="mb-1 text-base font-semibold text-gray-900">Accept applications</h3>
-                    <p className="text-xs leading-relaxed text-gray-500">
-                      Let athletes discover and apply from the marketplace.
-                    </p>
-                  </div>
+                <div className="grid grid-cols-1 gap-4">
                   <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-5">
                     <div className="mb-3 flex items-start gap-2">
                       {visibilityV2 === 'public' ? (
@@ -1894,7 +1885,6 @@ export function CreateCampaignOverlay({
                           type="button"
                           onClick={() => {
                             setVisibilityV2(v);
-                            setVisibility(v === 'public' ? 'Public' : 'Private');
                           }}
                           className={`min-w-[5.5rem] flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent focus-visible:ring-offset-1 ${
                             visibilityV2 === v
@@ -2108,7 +2098,7 @@ export function CreateCampaignOverlay({
                     )}
                     {v2ReviewRiskFlags.length > 0 && (
                       <div className="mt-4 border-t border-amber-100 pt-4">
-                        <p className="text-sm font-bold text-amber-950/90">Campaign quality signals</p>
+                        <p className="text-sm font-bold text-amber-950/90">Match Quality Notes</p>
                         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-950/85">
                           {v2ReviewRiskFlags.map((msg) => (
                             <li key={msg}>{msg}</li>
@@ -2140,7 +2130,7 @@ export function CreateCampaignOverlay({
                     <div className="mt-6 border-t border-gray-100/90 pt-4">
                       <p className="text-sm font-semibold text-gray-900">Save as reusable template</p>
                       <p className="mt-1 text-xs text-gray-500">
-                        Saves the current brief defaults from this campaign (requires a saved draft / campaign id).
+                        Saves these campaign choices as a template for repeat use.
                       </p>
                       <div className="mt-3 grid max-w-lg gap-2">
                         <input
@@ -2169,167 +2159,6 @@ export function CreateCampaignOverlay({
                         )}
                       </div>
                     </div>
-                </div>
-
-                <div className="rounded-lg border border-nilink-accent-border/70 bg-nilink-accent-soft/25 px-5 py-5">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-nilink-accent">
-                    Match preview
-                  </p>
-                  {!campaignId && (
-                    <p className="text-sm text-gray-600">
-                      Save a draft first to create a campaign id. Then we can load an estimated athlete range
-                      from the server.
-                    </p>
-                  )}
-                  {campaignId && previewLoading && (
-                    <p className="text-sm text-gray-500">Loading match estimate…</p>
-                  )}
-                  {campaignId && previewError && (
-                    <p className="text-sm text-red-700">{previewError}</p>
-                  )}
-                  {campaignId && previewData && (
-                    <div className="space-y-3" data-preview-age-tick={previewAgeTick}>
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-sm font-bold text-nilink-ink">
-                          {matchPreviewStatusLabel(previewData.status)}
-                        </p>
-                        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-                          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-700">
-                            <input
-                              type="checkbox"
-                              className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-nilink-accent focus:ring-nilink-accent"
-                              checked={previewAutoRefresh}
-                              onChange={(e) => setPreviewAutoRefresh(e.target.checked)}
-                            />
-                            Auto-refresh
-                          </label>
-                          <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                            <span className="shrink-0 font-semibold">Every</span>
-                            <input
-                              type="number"
-                              min={1}
-                              max={60}
-                              value={previewAutoRefreshMinutes}
-                              disabled={!previewAutoRefresh}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                if (!Number.isFinite(v)) return;
-                                setPreviewAutoRefreshMinutes(Math.min(60, Math.max(1, Math.round(v))));
-                              }}
-                              className="w-14 rounded border border-gray-200 px-1.5 py-1 text-center text-xs font-bold disabled:bg-gray-100 disabled:text-gray-400"
-                              aria-label="Auto-refresh interval in minutes"
-                            />
-                            <span className="shrink-0">min</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleMatchPreviewRefresh}
-                            disabled={previewLoading}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-nilink-accent-border bg-white px-3 py-1.5 text-xs font-bold text-nilink-accent shadow-sm transition hover:bg-nilink-accent-soft/50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <RefreshCw className={`h-3.5 w-3.5 ${previewLoading ? 'animate-spin' : ''}`} />
-                            Refresh estimate
-                          </button>
-                        </div>
-                      </div>
-                      {(() => {
-                        const staleAfterMs =
-                          typeof previewData.staleAfterMs === 'number' &&
-                          Number.isFinite(previewData.staleAfterMs) &&
-                          previewData.staleAfterMs > 0
-                            ? previewData.staleAfterMs
-                            : MATCH_PREVIEW_DEFAULT_STALE_AFTER_MS;
-                        const nowMs = Date.now();
-                        const timeStale =
-                          typeof previewData.computedAt === 'string' &&
-                          isMatchPreviewStale(previewData.computedAt, staleAfterMs, nowMs);
-                        const isStale = previewData.status === 'stale' || timeStale;
-                        return isStale && previewData.status !== 'refreshing' ? (
-                          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-                            Stale
-                            {previewData.computedAt ? (
-                              <>
-                                {' '}
-                                · {formatEstimateAgeShort(previewData.computedAt, nowMs)}
-                              </>
-                            ) : null}
-                            {previewData.staleness?.strategy ? (
-                              <span className="mt-1 block font-normal text-amber-800/90">
-                                Rule: {previewData.staleness.strategy} (age of{' '}
-                                {previewData.staleness.referenceField ?? 'computedAt'} ≥{' '}
-                                {Math.round(staleAfterMs / 1000)}s)
-                              </span>
-                            ) : null}
-                          </p>
-                        ) : null;
-                      })()}
-                      {previewData.status !== 'refreshing' && (
-                        <p className="text-2xl font-black text-nilink-ink">
-                          {previewData.range.min.toLocaleString()} – {previewData.range.max.toLocaleString()}{' '}
-                          <span className="text-sm font-semibold text-gray-500">athletes (est.)</span>
-                        </p>
-                      )}
-                      {(previewData.confidence || previewData.confidenceScore != null) && (
-                        <p className="text-xs text-gray-500">
-                          {previewData.confidence ? (
-                            <>
-                              Confidence: {previewData.confidence}
-                              {previewData.confidenceScore != null
-                                ? ` (${previewData.confidenceScore.toFixed(2)} score)`
-                                : null}
-                            </>
-                          ) : previewData.confidenceScore != null ? (
-                            <>Confidence score: {previewData.confidenceScore.toFixed(2)}</>
-                          ) : null}
-                        </p>
-                      )}
-                      {(previewData.inputHash || previewData.modelVersion) && (
-                        <div className="rounded-lg border border-gray-100 bg-white/60 px-3 py-2 text-[11px] text-gray-600">
-                          {previewData.inputHash ? (
-                            <p className="break-all font-mono text-[10px] leading-relaxed">
-                              <span className="font-sans font-semibold text-gray-500">Input hash: </span>
-                              {previewData.inputHash}
-                            </p>
-                          ) : null}
-                          {previewData.modelVersion ? (
-                            <p className="mt-1 font-medium">
-                              Model:{' '}
-                              <span className="font-mono text-gray-800">{previewData.modelVersion}</span>
-                            </p>
-                          ) : null}
-                        </div>
-                      )}
-                      {previewData.confidenceReason && (
-                        <p className="text-xs text-gray-600">{previewData.confidenceReason}</p>
-                      )}
-                      {previewData.computedAt && (
-                        <p className="text-xs text-gray-500">
-                          Computed at: {new Date(previewData.computedAt).toLocaleString()}
-                          {previewData.status !== 'refreshing' ? (
-                            <>
-                              {' '}
-                              · Age {formatEstimateAgeShort(previewData.computedAt, Date.now())}
-                            </>
-                          ) : null}
-                        </p>
-                      )}
-                      {(previewData.version || previewData.recommendedRefreshSec != null) && (
-                        <p className="text-[11px] text-gray-400">
-                          {previewData.version ? <>Estimator {previewData.version}</> : null}
-                          {previewData.version && previewData.recommendedRefreshSec != null ? ' · ' : null}
-                          {previewData.recommendedRefreshSec != null ? (
-                            <>
-                              Suggested manual refresh cadence: every{' '}
-                              {Math.max(1, Math.round(previewData.recommendedRefreshSec / 60))} min
-                            </>
-                          ) : null}
-                        </p>
-                      )}
-                      {previewData.disclaimer && (
-                        <p className="text-xs text-gray-500">{previewData.disclaimer}</p>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200/90 bg-gray-50/40 px-4 py-3.5 text-sm text-gray-800">
@@ -2369,14 +2198,6 @@ export function CreateCampaignOverlay({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-5 rounded-lg border border-gray-100 bg-gray-50/50 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                      Marketplace flow
-                    </p>
-                    <p className="mt-1 text-xs text-gray-600">
-                      Campaign {'->'} Applications {'->'} Business review/selection {'->'} Offer creation {'->'} Athlete acceptance
-                    </p>
-                  </div>
                 </div>
               </div>
             )}
@@ -2414,7 +2235,9 @@ export function CreateCampaignOverlay({
                   ? 'Saving…'
                   : saveDraftButtonState === 'saved'
                     ? 'Saved'
-                    : 'Save draft'}
+                    : isCampaignEdit
+                      ? 'Save changes'
+                      : 'Save draft'}
               </button>
               <button
                 type="button"
@@ -2426,7 +2249,7 @@ export function CreateCampaignOverlay({
                     : 'cursor-not-allowed border-gray-100 text-gray-300'
                 }`}
               >
-                {discardBusy ? 'Discarding…' : campaignId ? 'Discard draft' : 'Discard'}
+                {discardBusy ? 'Discarding…' : isCampaignEdit ? 'Close editor' : campaignId ? 'Discard draft' : 'Discard'}
               </button>
             </div>
 
@@ -2457,7 +2280,7 @@ export function CreateCampaignOverlay({
                   }`}
                 >
                   <Zap className="h-4 w-4 shrink-0" aria-hidden />
-                  {submitKind === 'publish' ? 'Publishing…' : 'Launch campaign'}
+                  {submitKind === 'publish' ? (isCampaignEdit ? 'Saving…' : 'Publishing…') : isCampaignEdit ? 'Save and close' : 'Launch campaign'}
                 </button>
               )}
             </div>

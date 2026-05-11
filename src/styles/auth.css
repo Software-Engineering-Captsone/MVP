@@ -24,7 +24,7 @@
     --radius-xl: 24px;
     --radius-full: 999px;
 
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-sora), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: var(--bg);
     color: var(--text-primary);
     line-height: 1.6;
@@ -103,9 +103,11 @@
 }
 
 .auth-left-logo-text {
-    font-weight: 600;
+    font-family: 'Bebas Neue', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
     font-size: 18px;
-    letter-spacing: -0.3px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 .auth-left-content {
@@ -114,17 +116,19 @@
 }
 
 .auth-left-content h1 {
-    font-family: 'Instrument Serif', serif;
-    font-size: clamp(36px, 3.5vw, 52px);
+    font-family: 'Bebas Neue', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: clamp(42px, 4vw, 64px);
     font-weight: 400;
-    line-height: 1.1;
-    letter-spacing: -1.5px;
+    line-height: 0.98;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     margin-bottom: 20px;
 }
 
 .auth-left-content h1 em {
-    font-style: italic;
-    opacity: 0.7;
+    font-style: normal;
+    color: var(--nilink-accent-bright);
+    opacity: 1;
 }
 
 .auth-left-content p {
@@ -243,17 +247,20 @@
 }
 
 .auth-header h2 {
-    font-family: 'Instrument Serif', serif;
-    font-size: 32px;
+    font-family: 'Bebas Neue', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 42px;
     font-weight: 400;
-    letter-spacing: -0.8px;
+    line-height: 0.95;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
     margin-bottom: 8px;
 }
 
 .auth-header p {
     font-size: 14px;
     color: var(--text-secondary);
-    font-weight: 300;
+    font-weight: 500;
+    letter-spacing: 0.01em;
 }
 
 /* Google Button */

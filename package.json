@@ -6,6 +6,7 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
+    "seed:demo-athletes": "node scripts/seed-demo-athletes.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -46,7 +46,33 @@ type WizardSessionPayloadV1 = {
   open: true;
   step: number;
   draftCampaignId: string | null;
+  mode?: 'draft' | 'campaign';
 };
+
+type CampaignMutationResponse = {
+  campaign?: { id: string };
+  error?: string;
+  details?: {
+    blockingIssues?: CampaignPublishValidationIssue[];
+    warningIssues?: CampaignPublishValidationIssue[];
+    completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
+  };
+  blockingIssues?: CampaignPublishValidationIssue[];
+  warningIssues?: CampaignPublishValidationIssue[];
+  completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
+};
+
+async function readCampaignMutationResponse(res: Response): Promise<CampaignMutationResponse> {
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return (await res.json()) as CampaignMutationResponse;
+  }
+  const text = await res.text().catch(() => '');
+  const fallback = res.ok
+    ? 'Campaign saved, but the server returned an unexpected response.'
+    : text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || `Request failed with status ${res.status}`;
+  return { error: fallback };
+}
 
 function clampWizardSessionStep(step: number): number {
   return Math.min(6, Math.max(1, Math.round(step)));
@@ -64,7 +90,8 @@ function parseWizardSession(raw: string | null): WizardSessionPayloadV1 | null {
         : typeof o.draftCampaignId === 'string'
           ? o.draftCampaignId
           : null;
-    return { v: 1, open: true, step, draftCampaignId };
+    const mode = o.mode === 'campaign' ? 'campaign' : 'draft';
+    return { v: 1, open: true, step, draftCampaignId, mode };
   } catch {
     return null;
   }
@@ -219,7 +246,7 @@ export function BusinessCampaigns() {
             }
             const apiRow = data.campaign;
             const remoteStatus = (apiRow.status || 'Draft') as CampaignStatus;
-            if (remoteStatus !== 'Draft') {
+            if (parsed.mode !== 'campaign' && remoteStatus !== 'Draft') {
               finishOpen(
                 null,
                 'Saved session pointed to a campaign that is no longer a draft. Open it from the list if you need to continue.'
@@ -230,6 +257,7 @@ export function BusinessCampaigns() {
             finishOpen({
               campaignId: apiRow.id,
               prefill: apiCampaignRowToDraftOverlayPrefill(apiRow),
+              resumeMode: remoteStatus === 'Draft' ? 'draft' : 'campaign',
             });
           } catch {
             if (!cancelled) {
@@ -263,12 +291,19 @@ export function BusinessCampaigns() {
         open: true,
         step: clampWizardSessionStep(wizardPersistedStep),
         draftCampaignId: wizardPersistedDraftId ?? draftResumeSession?.campaignId ?? null,
+        mode: draftResumeSession?.resumeMode ?? 'draft',
       };
       sessionStorage.setItem(WIZARD_SESSION_KEY, JSON.stringify(payload));
     } catch {
       /* ignore */
     }
-  }, [showCreateOverlay, wizardPersistedStep, wizardPersistedDraftId, draftResumeSession?.campaignId]);
+  }, [
+    showCreateOverlay,
+    wizardPersistedStep,
+    wizardPersistedDraftId,
+    draftResumeSession?.campaignId,
+    draftResumeSession?.resumeMode,
+  ]);
 
 
   const closeCreateWizard = useCallback(() => {
@@ -292,9 +327,9 @@ export function BusinessCampaigns() {
     setWizardPersistedDraftId(id);
   }, []);
 
-  const openDraftInWizard = useCallback(async (row: Campaign) => {
+  const openCampaignInWizard = useCallback(async (row: Campaign, options?: { draftOnly?: boolean }) => {
     wizardRestoreGenerationRef.current += 1;
-    if (row.status !== 'Draft') {
+    if (options?.draftOnly && row.status !== 'Draft') {
       setListError('Only draft campaigns can be opened in the campaign editor.');
       return;
     }
@@ -311,7 +346,7 @@ export function BusinessCampaigns() {
       }
       const apiRow = data.campaign;
       const remoteStatus = (apiRow.status || 'Draft') as CampaignStatus;
-      if (remoteStatus !== 'Draft') {
+      if (options?.draftOnly && remoteStatus !== 'Draft') {
         setListError(
           'This campaign is no longer a draft. Use the row to open details, or refresh the list.'
         );
@@ -321,16 +356,25 @@ export function BusinessCampaigns() {
       setDraftResumeSession({
         campaignId: apiRow.id,
         prefill: apiCampaignRowToDraftOverlayPrefill(apiRow),
+        resumeMode: remoteStatus === 'Draft' ? 'draft' : 'campaign',
       });
       setWizardInitialStep(1);
       setWizardPersistedStep(1);
       setWizardPersistedDraftId(apiRow.id);
       setWizardInstanceKey((k) => k + 1);
+      setSelectedCampaign(null);
       setShowCreateOverlay(true);
     } catch {
       setListError('Network error');
     }
   }, [mutateCampaigns]);
+
+  const openDraftInWizard = useCallback(
+    async (row: Campaign) => {
+      await openCampaignInWizard(row, { draftOnly: true });
+    },
+    [openCampaignInWizard]
+  );
 
   const openEditDraft = useCallback(
     async (e: MouseEvent, row: Campaign) => {
@@ -430,18 +474,7 @@ export function BusinessCampaigns() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(jsonBody),
         });
-        const data = (await res.json()) as {
-          campaign?: { id: string };
-          error?: string;
-          details?: {
-            blockingIssues?: CampaignPublishValidationIssue[];
-            warningIssues?: CampaignPublishValidationIssue[];
-            completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
-          };
-          blockingIssues?: CampaignPublishValidationIssue[];
-          warningIssues?: CampaignPublishValidationIssue[];
-          completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
-        };
+        const data = await readCampaignMutationResponse(res);
         if (!res.ok) {
           const blockingIssues =
             data.details?.blockingIssues ?? data.blockingIssues;
@@ -472,18 +505,7 @@ export function BusinessCampaigns() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(jsonBody),
       });
-      const data = (await res.json()) as {
-        campaign?: { id: string };
-        error?: string;
-        details?: {
-          blockingIssues?: CampaignPublishValidationIssue[];
-          warningIssues?: CampaignPublishValidationIssue[];
-          completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
-        };
-        blockingIssues?: CampaignPublishValidationIssue[];
-        warningIssues?: CampaignPublishValidationIssue[];
-        completenessBySection?: CampaignPublishValidationResult['completenessBySection'];
-      };
+      const data = await readCampaignMutationResponse(res);
       if (!res.ok) {
         const blockingIssues = data.details?.blockingIssues ?? data.blockingIssues;
         if (Array.isArray(blockingIssues) && blockingIssues.length > 0) {
@@ -882,6 +904,7 @@ export function BusinessCampaigns() {
               handleCreateOfferDrafts(selectedCampaign.id, applicationIds)
             }
             onApplicationsUpdated={refreshSelectedCampaign}
+            onEditCampaign={() => void openCampaignInWizard(selectedCampaign)}
           />
         )}
       </AnimatePresence>
