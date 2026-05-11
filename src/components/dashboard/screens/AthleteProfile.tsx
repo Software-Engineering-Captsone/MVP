@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Award,
   Eye,
-  Facebook,
   FileText,
   Heart,
   Instagram,
@@ -36,7 +35,6 @@ const OfferWizard = dynamic(
 import { trackAnalyticsEvent } from '@/lib/analytics';
 import {
   COPY_INVITE_TO_CAMPAIGN,
-  COPY_MESSAGE_ATHLETE,
   COPY_REFERRAL,
   COPY_SEND_OFFER,
 } from '@/lib/productCopy';
@@ -146,7 +144,7 @@ function MessageAthleteButton({
       >
         {loading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden /> : null}
         {!loading ? <MessageSquare className="h-4 w-4 shrink-0" aria-hidden /> : null}
-        {loading ? 'Opening…' : COPY_MESSAGE_ATHLETE}
+        {loading ? 'Opening…' : 'Message'}
       </button>
       {error ? (
         <p
@@ -795,58 +793,60 @@ export function AthleteProfile() {
 
         {/* Full hero */}
         <div ref={heroRef} className="mb-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <div className="relative h-40 sm:h-48">
+          <div className="relative h-48 sm:h-56">
             <ImageWithFallback src={athlete.bannerImage} alt="" className="h-full w-full object-cover" />
+            {showSaveForBrand ? <SaveAthleteControl athleteId={athlete.id} floating /> : null}
           </div>
 
-          <div className="relative px-5 pb-6 pt-0 sm:px-8">
+          <div className="relative min-h-[156px] px-5 pb-6 pt-0 sm:min-h-[176px] sm:px-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end">
-                <div className="relative -mt-16 shrink-0 sm:-mt-20">
-                  <div className="relative h-28 w-28 overflow-hidden rounded-full border-4 border-white shadow-md sm:h-32 sm:w-32">
+                <div className="relative -mt-14 shrink-0 sm:-mt-16">
+                  <div className="relative h-52 w-52 overflow-hidden rounded-full border-4 border-white shadow-md">
                     <ImageWithFallback src={athlete.image} alt={athlete.name} className="h-full w-full object-cover" />
                   </div>
-                  <div
-                    className="absolute -right-0.5 -top-0.5 flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-emerald-500 text-xs font-bold text-white shadow-sm"
-                    title="Brand fit score"
-                  >
-                    {athlete.nilScore}
-                  </div>
                 </div>
 
-                <div className="min-w-0 flex-1 pb-0 sm:pb-1">
+                <div className="min-w-0 flex-1 pb-0 pt-1 sm:-mt-20 sm:pb-0 sm:pt-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">{athlete.name}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-[30px] sm:leading-[1.15]">
+                      {athlete.name}
+                    </h1>
                     {athlete.verified ? <VerifiedBadge className="h-6 w-6 text-nilink-accent" /> : null}
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {athlete.sport} | {athlete.school}
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+                    <span className="font-semibold text-gray-800">{athlete.sport}</span>
+                    <span aria-hidden className="h-1 w-1 shrink-0 rounded-full bg-gray-300" />
+                    <span className="text-gray-600">{athlete.school}</span>
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-700">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Instagram className="h-4 w-4 text-pink-600" />
-                      {athlete.stats.instagram}
+                  <div className="mt-3.5 flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700">
+                      <Instagram className="h-3.5 w-3.5 text-pink-600" />
+                      <span className="tabular-nums">{athlete.stats.instagram}</span>
                     </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <TiktokIcon className="h-4 w-4 text-nilink-ink" />
-                      {athlete.stats.tiktok}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Facebook className="h-4 w-4 text-blue-600" />
-                      {athlete.stats.facebook}
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700">
+                      <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" />
+                      <span className="tabular-nums">{athlete.stats.tiktok}</span>
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                {showSaveForBrand ? (
-                  <MessageAthleteButton athleteUserId={athlete.id} athleteName={athlete.name} />
-                ) : null}
-                {showSaveForBrand ? (
-                  <SendOfferButton athleteUserId={athlete.id} athleteName={athlete.name} />
-                ) : null}
-              </div>
+              {showSaveForBrand ? (
+                <div className="flex flex-col items-start gap-2 sm:items-end sm:gap-3">
+                  <span
+                    className={`inline-flex w-fit rounded-full px-4 py-2 text-xs font-bold ${
+                      athlete.openToDeals ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {athlete.openToDeals ? 'Open to deals' : 'Unavailable'}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <MessageAthleteButton athleteUserId={athlete.id} athleteName={athlete.name} />
+                    <SendOfferButton athleteUserId={athlete.id} athleteName={athlete.name} />
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -941,25 +941,6 @@ export function AthleteProfile() {
               </ul>
             </section>
 
-            <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="font-bold text-gray-900">Deal availability</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {athlete.openToDeals
-                      ? 'This athlete is accepting new sponsorship conversations.'
-                      : 'Not accepting new deals at the moment.'}
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex w-fit rounded-full px-4 py-2 text-xs font-bold ${
-                    athlete.openToDeals ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {athlete.openToDeals ? 'Open to deals' : 'Unavailable'}
-                </span>
-              </div>
-            </section>
           </div>
         )}
 
