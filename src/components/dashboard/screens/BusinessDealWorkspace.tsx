@@ -851,6 +851,13 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
             }}
           />
         </div>
+        <p className="mt-2 text-xs text-gray-500">PDF or Word document, max 50 MB.</p>
+        {contractFile ? (
+          <p className="mt-2 truncate text-xs text-gray-600">
+            Selected: <span className="font-semibold text-gray-800">{contractFile.name}</span>{' '}
+            <span className="text-gray-500">({(contractFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+          </p>
+        ) : null}
       </div>
 
       {contractUrlError ? (
