@@ -14,32 +14,29 @@
 export const opportunityCardTokens = {
   root: [
     'group rounded-3xl border border-gray-200 bg-white p-4 text-left shadow-[0_1px_3px_rgba(15,23,42,0.06)]',
-    // Floor sized just above the sparsest natural content (~166px) with a small comfort margin,
-    // not the rich case. Rich cards naturally extend the row; sparse cards now sit close to
-    // their natural height instead of carrying ~30–120px of dead air below the deadline.
-    // 8pt grid: 176 = 8×22, mobile 160 = 8×20.
-    'min-h-[176px] md:min-h-[176px] min-[0px]:min-h-[160px]',
+    'min-h-[200px]',
     'transition-[box-shadow,border-color,transform,background-color] duration-200 ease-out',
     'hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]',
     'active:translate-y-0 active:shadow-sm motion-reduce:hover:translate-y-0',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nilink-accent/30 focus-visible:ring-offset-2',
   ].join(' '),
 
-  /** gap-3 = 12px between media and text column */
-  layoutRow: 'flex items-stretch gap-3',
-  mediaWrap: 'h-[88px] w-[88px] shrink-0 self-start overflow-hidden rounded-2xl border border-gray-100 bg-gray-50',
+  layoutRow: 'flex items-stretch gap-4',
+  mediaWrap:
+    'h-40 w-40 shrink-0 self-start overflow-hidden rounded-[28px] border border-gray-100 bg-gray-50',
   mediaImage:
     'h-full w-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.03] motion-reduce:group-hover:scale-100',
   /** Monogram fallback when no real image: deterministic gradient + initials, replaces the orange placeholder pattern. */
   mediaMonogram:
     'flex h-full w-full items-center justify-center text-2xl font-bold tracking-tight text-white transition-transform duration-200 ease-out group-hover:scale-[1.03] motion-reduce:group-hover:scale-100',
 
-  headerWrap: 'min-w-0 flex-1',
-  /** No min-height: avoids dead zone under short titles; save aligns top with title block */
+  headerWrap: 'min-w-0 flex-1 pt-1',
   headerRow: 'flex items-start justify-between gap-3',
-  title: 'line-clamp-2 text-xl font-bold leading-snug tracking-tight text-gray-900 sm:text-[22px] sm:leading-[1.08]',
-  /** 8px below title — stronger secondary than body, still subordinate to price */
-  brand: 'mt-2 truncate text-[13px] font-semibold leading-snug text-gray-700',
+  title: 'line-clamp-2 text-[17px] font-bold leading-tight tracking-tight text-gray-900 sm:text-[20px] sm:leading-tight',
+  brandMetaRow: 'mt-2 flex min-w-0 items-center gap-2',
+  brand: 'truncate text-[13px] font-semibold text-gray-700',
+  postedDot: 'h-2 w-2 shrink-0 rounded-full bg-emerald-500',
+  postedLabel: 'truncate text-[13px] font-medium text-gray-500',
 
   saveButtonBase: 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 ease-out',
   saveButtonSaved: 'border-blue-200/90 bg-blue-50 text-blue-600',
@@ -54,7 +51,14 @@ export const opportunityCardTokens = {
   /** Muted overflow / secondary lane */
   chipMuted: 'inline-flex max-w-full items-center truncate rounded-md border border-dashed border-gray-200 bg-white px-2 py-1 text-[11px] font-medium leading-none text-gray-500',
 
-  /** 12px below chips; deadline slightly more prominent */
+  divider: 'mt-4 h-px w-full bg-gray-100',
+  infoRow: 'mt-3 flex min-h-0 items-center gap-3',
+  infoItem: 'min-w-0 flex-1',
+  infoLabel: 'text-[11px] font-medium uppercase tracking-wide text-gray-500',
+  infoValue: 'mt-1 truncate text-[14px] font-semibold leading-tight tracking-tight text-gray-900',
+  infoDivider: 'h-9 w-px shrink-0 bg-gray-100',
+
+  /** Legacy fields retained for compatibility in older layouts. */
   deadlineRow: 'mt-3 flex min-h-0 items-center justify-between gap-2 text-[13px] font-medium text-gray-700',
   deadlineLabel: 'inline-flex min-w-0 items-center gap-2',
   deadlineDotNormal: 'h-2 w-2 shrink-0 rounded-full bg-amber-400',
@@ -70,8 +74,7 @@ export const opportunityCardTokens = {
   withdrawnTag:
     'shrink-0 rounded-md border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800',
 
-  /** pt-3 = 12px above compensation row after flex grow */
-  bottomShell: 'mt-auto flex w-full min-w-0 flex-col pt-3',
+  bottomShell: 'mt-4 flex w-full min-w-0 flex-col',
   /** items-center keeps CTA visually centered against the comp slot whether the slot is a single-line price or a 2-line note. */
   bottomRow: 'flex w-full min-w-0 items-center justify-between gap-3 sm:gap-4',
   /** Used when the compensation slot is hidden (no real price). CTA right-aligns alone. */
@@ -87,7 +90,7 @@ export const opportunityCardTokens = {
    */
   compensationNote:
     'min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-gray-500',
-  cta: 'inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-nilink-accent px-5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-nilink-accent/90',
+  cta: 'flex h-12 w-full shrink-0 items-center justify-center rounded-xl bg-[#2796b7] px-5 text-[15px] font-semibold leading-none text-white shadow-sm transition-colors hover:bg-[#2287a5]',
 } as const;
 
 /** Shared focus ring for nested controls (matches contract root ring token). */

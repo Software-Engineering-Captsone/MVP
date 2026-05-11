@@ -81,7 +81,7 @@ function formatOpenUntil(value?: string): string | null {
   if (!value) return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 /**
@@ -125,6 +125,24 @@ function brandMonogramInitials(name: string): string {
     return (single.length >= 2 ? single.slice(0, 2) : single).toUpperCase();
   }
   return ((parts[0]![0] ?? '') + (parts[parts.length - 1]![0] ?? '')).toUpperCase();
+}
+
+function normalizeBrandName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolveEndsOnLabel(campaign: ApiCampaignRow): string {
+  return (
+    formatOpenUntil(campaign.endDate) ??
+    formatOpenUntil(campaign.startDate) ??
+    formatOpenUntil(campaign.createdAt) ??
+    formatDate(campaign.endDate || campaign.startDate || campaign.createdAt)
+  );
 }
 
 function condensedDeliverableChips(campaign: ApiCampaignRow): DeliverableChipsResult {
@@ -521,9 +539,15 @@ export function AthleteExploreMarketplace() {
 
   const findBrandForCampaign = useCallback(
     (campaign: ApiCampaignRow): Brand | null => {
-      const name = String(campaign.brandDisplayName ?? '').trim().toLowerCase();
+      const name = normalizeBrandName(String(campaign.brandDisplayName ?? ''));
       if (!name) return null;
-      return brands.find((b) => b.name.trim().toLowerCase() === name) ?? null;
+      return (
+        brands.find((b) => {
+          const brandName = normalizeBrandName(String(b.name ?? ''));
+          if (!brandName) return false;
+          return brandName === name || brandName.includes(name) || name.includes(brandName);
+        }) ?? null
+      );
     },
     [brands]
   );
@@ -910,14 +934,9 @@ export function AthleteExploreMarketplace() {
                             const isWithdrawn = isWithdrawnApplication(app);
                             const isSaved = savedCampaignIds.includes(String(campaign.id));
                             const deliverables = condensedDeliverableChips(campaign);
-                            const openUntil = formatOpenUntil(campaign.endDate);
+                            const endsOnLabel = resolveEndsOnLabel(campaign);
                             const postedRecency = formatPostedRecency(campaign.createdAt);
-                            const deadline = openUntil
-                              ? { label: `Closes ${openUntil}` }
-                              : {
-                                  label: postedRecency ?? 'Always open',
-                                  urgency: 'none' as const,
-                                };
+                            const deadline = { label: `Closes ${endsOnLabel}` };
                             const rawCompensation =
                               campaign.budgetHint || campaign.budget || '';
                             const compensation = rawCompensation
@@ -929,6 +948,8 @@ export function AthleteExploreMarketplace() {
                             const brandName = String(
                               campaign.brandDisplayName ?? brand?.name ?? 'Brand'
                             );
+                            const categoryLabel =
+                              (typeof brand?.industry === 'string' && brand.industry.trim()) || 'Other';
                             return (
                               <OpportunityExploreCard
                                 key={String(campaign.id)}
@@ -936,13 +957,16 @@ export function AthleteExploreMarketplace() {
                                   id: String(campaign.id),
                                   title: String(campaign.name ?? 'Campaign'),
                                   brandName,
+                                  postedLabel: postedRecency ?? 'Posted recently',
+                                  endDateLabel: endsOnLabel,
+                                  categoryLabel,
                                   imageSrc: image,
                                   imageAlt: String(campaign.name ?? 'Campaign'),
                                   mediaMonogram: { initials: brandMonogramInitials(brandName) },
                                   chips: chipObjects,
                                   deadline,
                                   compensation,
-                                  ctaLabel: 'View',
+                                  ctaLabel: 'View Details',
                                 }}
                                 state={{ isSaved, isWithdrawn }}
                                 callbacks={{
@@ -1019,14 +1043,9 @@ export function AthleteExploreMarketplace() {
                   const brand = findBrandForCampaign(campaign);
                   const image = campaignImageForCard(campaign);
                   const deliverables = condensedDeliverableChips(campaign);
-                  const openUntil = formatOpenUntil(campaign.endDate);
+                  const endsOnLabel = resolveEndsOnLabel(campaign);
                   const postedRecency = formatPostedRecency(campaign.createdAt);
-                  const deadline = openUntil
-                    ? { label: `Closes ${openUntil}` }
-                    : {
-                        label: postedRecency ?? 'Always open',
-                        urgency: 'none' as const,
-                      };
+                  const deadline = { label: `Closes ${endsOnLabel}` };
                   const rawCompensation = campaign.budgetHint || campaign.budget || '';
                   const compensation = rawCompensation
                     ? { display: String(rawCompensation), variant: 'price' as const }
@@ -1037,6 +1056,8 @@ export function AthleteExploreMarketplace() {
                   const brandName = String(
                     campaign.brandDisplayName ?? brand?.name ?? 'Brand'
                   );
+                  const categoryLabel =
+                    (typeof brand?.industry === 'string' && brand.industry.trim()) || 'Other';
                   return (
                     <OpportunityExploreCard
                       key={String(campaign.id)}
@@ -1044,13 +1065,16 @@ export function AthleteExploreMarketplace() {
                         id: String(campaign.id),
                         title: String(campaign.name ?? 'Campaign'),
                         brandName,
+                        postedLabel: postedRecency ?? 'Posted recently',
+                        endDateLabel: endsOnLabel,
+                        categoryLabel,
                         imageSrc: image,
                         imageAlt: String(campaign.name ?? 'Campaign'),
                         mediaMonogram: { initials: brandMonogramInitials(brandName) },
                         chips: chipObjects,
                         deadline,
                         compensation,
-                        ctaLabel: 'View',
+                        ctaLabel: 'View Details',
                       }}
                       state={{ isSaved: true }}
                       callbacks={{
@@ -1398,16 +1422,6 @@ export function AthleteExploreMarketplace() {
                     <p className="mt-4 text-sm leading-relaxed text-slate-200">
                       {selectedBrand.bio || 'No overview available for this brand yet.'}
                     </p>
-                    <dl className="mt-4 flex flex-col gap-3 text-sm sm:flex-row sm:flex-wrap sm:gap-x-14 sm:gap-y-2">
-                      <div className="flex flex-col gap-0.5">
-                        <dt className={explorePanelLabelDark}>Category</dt>
-                        <dd className="font-semibold text-slate-100">{selectedBrand.industry}</dd>
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                        <dt className={explorePanelLabelDark}>Location</dt>
-                        <dd className="font-semibold text-slate-100">{selectedBrand.location}</dd>
-                      </div>
-                    </dl>
                   </section>
 
                   <section
