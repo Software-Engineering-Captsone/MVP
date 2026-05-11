@@ -263,7 +263,10 @@ describe('deal flow integration: brand approve → offer send → athlete accept
       new Request('http://test/api/deliverables/' + seededDeliverable!.id, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status: 'published' }),
+        body: JSON.stringify({
+          status: 'published',
+          publishedUrl: 'https://example.com/integration-test-published-content',
+        }),
       }) as never,
       { params: Promise.resolve({ deliverableId: seededDeliverable!.id as string }) },
     );
