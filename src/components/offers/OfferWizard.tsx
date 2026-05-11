@@ -2,7 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Loader2, X, CheckCircle2 } from 'lucide-react';
+import {
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  FileText,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { authFetch } from '@/lib/authFetch';
 import { trackAnalyticsEvent } from '@/lib/analytics';
 import { COPY_SEND_OFFER } from '@/lib/productCopy';
@@ -39,6 +50,37 @@ const PRESETS: { id: OfferWizardPresetId; label: string; hint: string }[] = [
 ];
 
 const UGC_PLATFORMS = ['Instagram', 'TikTok', 'YouTube', 'X / Twitter'] as const;
+
+function humanizeToken(value: string): string {
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function readableOrigin(value: ApiOfferRow['offerOrigin'] | undefined): string {
+  if (!value) return 'Offer draft';
+  if (value === 'campaign_handoff') return 'Campaign handoff';
+  if (value === 'direct_profile') return 'Direct profile outreach';
+  return 'Chat-negotiated offer';
+}
+
+function FieldRow({ label, value }: { label: string; value: string | number | boolean | null | undefined }) {
+  const display =
+    typeof value === 'boolean'
+      ? value
+        ? 'Yes'
+        : 'No'
+      : value === null || value === undefined || String(value).trim() === ''
+        ? 'Not set'
+        : String(value);
+
+  return (
+    <div className="rounded-lg border border-gray-100 bg-white px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-gray-800">{display}</p>
+    </div>
+  );
+}
 
 type ApiOfferRow = {
   id: string;
@@ -855,51 +897,137 @@ export function OfferWizard({ offerId, onClose, onSubmitted }: Props) {
                 )}
 
                 {step === 5 && (
-                  <section className="space-y-3 text-sm text-gray-700">
-                    <p className="font-semibold text-nilink-ink">Review structured offer</p>
-                    <ul className="space-y-2 rounded-xl border border-gray-100 bg-gray-50/80 p-4 text-xs leading-relaxed">
-                      <li>
-                        <span className="font-bold text-gray-500">Name:</span> {draft.wizard.basics.offerName}
-                      </li>
-                      <li>
-                        <span className="font-bold text-gray-500">Type:</span>{' '}
-                        {draft.wizard.basics.dealType.toUpperCase()}
-                      </li>
-                      <li>
-                        <span className="font-bold text-gray-500">Due:</span>{' '}
-                        {draft.wizard.basics.dueDate || '—'}
-                      </li>
-                      <li>
-                        <span className="font-bold text-gray-500">Amount hint:</span>{' '}
-                        {draft.wizard.basics.amount?.trim() || '—'}
-                      </li>
-                      <li>
-                        <span className="font-bold text-gray-500">Origin:</span> {offer?.offerOrigin}
-                      </li>
-                    </ul>
+                  <section className="space-y-4 text-sm text-gray-700">
+                    <div className="rounded-2xl border border-nilink-accent-border bg-nilink-accent-soft/30 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-nilink-accent shadow-sm">
+                          <Sparkles className="h-5 w-5" aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-nilink-accent">
+                            Final review
+                          </p>
+                          <h3 className="mt-1 text-lg font-black leading-tight text-nilink-ink">
+                            {draft.wizard.basics.offerName || 'Untitled offer'}
+                          </h3>
+                          <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                            Review the terms below. When you submit, the athlete will see this offer in a clear,
+                            readable format.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <FieldRow label="Offer type" value={humanizeToken(draft.wizard.basics.dealType)} />
+                      <FieldRow label="Source" value={readableOrigin(offer?.offerOrigin)} />
+                      <FieldRow label="Due date" value={draft.wizard.basics.dueDate} />
+                      <FieldRow label="Compensation hint" value={draft.wizard.basics.amount} />
+                    </div>
+
+                    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                      <div className="mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-nilink-accent" aria-hidden />
+                        <p className="font-bold text-nilink-ink">Offer details</p>
+                      </div>
+                      <p className="whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-sm leading-relaxed text-gray-700">
+                        {draft.wizard.basics.details?.trim() || 'No extra notes added.'}
+                      </p>
+                    </div>
+
                     {draft.wizard.basics.dealType === 'ugc' ? (
-                      <pre className="max-h-40 overflow-auto rounded-lg border border-gray-100 bg-white p-3 text-[11px] text-gray-600">
-                        {JSON.stringify(draft.wizard.ugc, null, 2)}
-                      </pre>
+                      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div className="mb-3 flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4 text-nilink-accent" aria-hidden />
+                          <p className="font-bold text-nilink-ink">Content package</p>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <FieldRow
+                            label="Platforms"
+                            value={
+                              draft.wizard.ugc.primaryPlatforms.length
+                                ? draft.wizard.ugc.primaryPlatforms.join(', ')
+                                : 'Not set'
+                            }
+                          />
+                          <FieldRow label="Asset count" value={draft.wizard.ugc.assetCount} />
+                          <FieldRow label="Organic usage" value={`${draft.wizard.ugc.organicUsageMonths} months`} />
+                          <FieldRow label="Paid ads allowed" value={draft.wizard.ugc.paidAdsAllowed} />
+                        </div>
+                        <div className="mt-3">
+                          <FieldRow label="Hooks or talking points" value={draft.wizard.ugc.hookOrTalkingPoints} />
+                        </div>
+                      </div>
                     ) : (
-                      <pre className="max-h-40 overflow-auto rounded-lg border border-gray-100 bg-white p-3 text-[11px] text-gray-600">
-                        {JSON.stringify(draft.wizard.appearance, null, 2)}
-                      </pre>
+                      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div className="mb-3 flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4 text-nilink-accent" aria-hidden />
+                          <p className="font-bold text-nilink-ink">Appearance details</p>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <FieldRow label="Event or series" value={draft.wizard.appearance.eventOrSeriesName} />
+                          <FieldRow
+                            label="Format"
+                            value={humanizeToken(draft.wizard.appearance.appearanceFormat)}
+                          />
+                          <FieldRow label="Estimated hours" value={draft.wizard.appearance.estimatedHours} />
+                          <FieldRow label="Travel" value={humanizeToken(draft.wizard.appearance.travelIncluded)} />
+                        </div>
+                        <div className="mt-3">
+                          <FieldRow label="Wardrobe or look notes" value={draft.wizard.appearance.wardrobeNotes} />
+                        </div>
+                      </div>
                     )}
-                    <pre className="max-h-32 overflow-auto rounded-lg border border-gray-100 bg-white p-3 text-[11px] text-gray-600">
-                      {JSON.stringify(
-                        {
-                          contentControl: draft.wizard.contentControl,
-                          sourcing: draft.wizard.sourcing,
-                        },
-                        null,
-                        2
-                      )}
-                    </pre>
+
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div className="mb-3 flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-nilink-accent" aria-hidden />
+                          <p className="font-bold text-nilink-ink">Approval rules</p>
+                        </div>
+                        <div className="space-y-2">
+                          <FieldRow
+                            label="Brand approval required"
+                            value={draft.wizard.contentControl.brandApprovalRequired}
+                          />
+                          <FieldRow label="Revision rounds" value={draft.wizard.contentControl.revisionRounds} />
+                          <FieldRow
+                            label="Response window"
+                            value={`${draft.wizard.contentControl.responseWindowDays} days`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div className="mb-3 flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-nilink-accent" aria-hidden />
+                          <p className="font-bold text-nilink-ink">Negotiation terms</p>
+                        </div>
+                        <div className="space-y-2">
+                          <FieldRow
+                            label="Exclusivity"
+                            value={humanizeToken(draft.wizard.sourcing.categoryExclusivity)}
+                          />
+                          <FieldRow
+                            label="Competitor exclusions"
+                            value={draft.wizard.sourcing.competitorExclusions}
+                          />
+                          <FieldRow
+                            label="Negotiation style"
+                            value={humanizeToken(draft.wizard.sourcing.negotiationStyle)}
+                          />
+                          <FieldRow
+                            label="Counter terms allowed"
+                            value={draft.wizard.sourcing.allowCounterTerms}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     {draft.meta?.submitted && (
-                      <div className="flex items-center gap-2 text-emerald-700">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Submitted {draft.meta.submittedAt}
+                      <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span className="text-sm font-semibold">Submitted {draft.meta.submittedAt}</span>
                       </div>
                     )}
                   </section>
