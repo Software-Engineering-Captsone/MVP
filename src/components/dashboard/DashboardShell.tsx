@@ -179,19 +179,43 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (booting || !sessionUser) return;
     if (sessionUser.role !== 'athlete') return;
 
-    try {
-      const raw = localStorage.getItem('athlete_onboarding_draft');
-      if (raw) {
-        const draft = JSON.parse(raw) as { completedAt?: string };
-        if (draft.completedAt) return; // already onboarded
+    let cancelled = false;
+
+    const enforceOnboardingGate = async () => {
+      // Authoritative source: DB completion flag.
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('onboarding_completed_at')
+          .eq('id', sessionUser.id)
+          .maybeSingle<{ onboarding_completed_at: string | null }>();
+        if (!cancelled && !error && data?.onboarding_completed_at) return;
+      } catch {
+        // Fall back to local draft check below.
       }
-      // No draft or no completedAt → redirect to dedicated onboarding
-      router.replace('/onboarding');
-    } catch {
-      // Malformed JSON — treat as not onboarded
-      router.replace('/onboarding');
-    }
-  }, [booting, sessionUser, pathname, router]);
+
+      // Fallback source for local-only draft progress.
+      try {
+        const raw = localStorage.getItem('athlete_onboarding_draft');
+        if (raw) {
+          const draft = JSON.parse(raw) as { completedAt?: string };
+          if (draft.completedAt) return;
+        }
+      } catch {
+        // Ignore malformed local cache and use redirect below.
+      }
+
+      if (!cancelled) {
+        router.replace('/onboarding');
+      }
+    };
+
+    void enforceOnboardingGate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [booting, sessionUser, pathname, router, supabase]);
 
   const offersKey = sessionUser?.role === 'athlete' ? '/api/offers' : null;
   const { data: offersData } = useSWR<OffersListResponse>(offersKey, apiFetcher, {

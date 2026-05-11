@@ -3,6 +3,15 @@ import { getAuthUser } from '@/lib/campaigns/getAuthUser';
 import { assertStoragePathBelongsToDeal } from '@/lib/campaigns/deals/contractStorage';
 import { createDealContract } from '@/lib/campaigns/deals/supabaseRepository';
 
+function isValidHttpUrl(raw: string): boolean {
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ dealId: string }> }
@@ -45,6 +54,12 @@ export async function POST(
         : typeof body.fileRef === 'string' && body.fileRef.trim()
           ? body.fileRef.trim()
           : null;
+    if (fileUrl && !isValidHttpUrl(fileUrl)) {
+      return NextResponse.json(
+        { error: 'Contract URL must be a full http(s) URL. Use file upload for stored documents.' },
+        { status: 400 }
+      );
+    }
   }
   if (!fileUrl) {
     return NextResponse.json({ error: 'Contract document is required' }, { status: 400 });

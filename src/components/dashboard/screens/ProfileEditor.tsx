@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
-  Save, Eye, Loader2, RotateCcw,
+  Save, Eye, Loader2,
   Plus, X, ShieldCheck, BadgeCheck, ImagePlus, AlertCircle, Camera, Pencil,
 } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
@@ -110,7 +109,6 @@ function SectionCard({ title, subtitle, children }: { title: string; subtitle?: 
 
 export function ProfileEditor() {
   const { refreshUser } = useDashboard();
-  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -433,24 +431,6 @@ export function ProfileEditor() {
     }
   };
 
-  /* ── Re-run onboarding: wipe local cache so wizard hydrates from DB ── */
-  const handleReRunOnboarding = () => {
-    try {
-      // Keep the key so useOnboardingStorage trusts localStorage (skips DB fetch)
-      // but clear completedAt so guards don't redirect away from the wizard.
-      const raw = localStorage.getItem('athlete_onboarding_draft');
-      const existing = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-      // JSON.stringify drops undefined values, so completedAt won't appear in output
-      localStorage.setItem(
-        'athlete_onboarding_draft',
-        JSON.stringify({ ...existing, completedAt: undefined, currentStep: 1 }),
-      );
-    } catch {
-      try { localStorage.removeItem('athlete_onboarding_draft'); } catch { /* ignore */ }
-    }
-    router.push('/onboarding');
-  };
-
   const avatarSrc =
     profile.profilePictureUrl?.trim().length > 0
       ? profile.profilePictureUrl.trim()
@@ -501,14 +481,6 @@ export function ProfileEditor() {
             className="min-w-0 flex-1"
           />
           <div className="flex shrink-0 flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleReRunOnboarding}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-nilink-ink shadow-sm transition hover:bg-gray-50"
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden />
-              Re-run onboarding
-            </button>
             <Link
               href="/dashboard/profile/view"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-nilink-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nilink-accent-hover"

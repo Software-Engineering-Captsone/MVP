@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Calendar, ChevronRight, Loader2, XCircle } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
 import { useOffersList, type ApiOfferRow, type AthleteOfferStatus } from '@/hooks/api/useOffersList';
@@ -70,11 +70,12 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
   const [declineReason, setDeclineReason] = useState<(typeof declineReasonOptions)[number]['id']>('not_interested');
   const [declineNote, setDeclineNote] = useState('');
 
-  // Auto-select the first offer (or initialOfferId) once the list loads
+  // Auto-select: initialOfferId if valid, else first pending, else first offer
   useEffect(() => {
     if (!selectedOfferId && offers.length > 0) {
       const preferred = initialOfferId ? offers.find((r) => r.id === initialOfferId) : null;
-      setSelectedOfferId((preferred ?? offers[0]).id);
+      const firstPending = offers.find((r) => r.athleteOfferStatus === 'pending');
+      setSelectedOfferId((preferred ?? firstPending ?? offers[0]).id);
     }
   }, [offers, initialOfferId, selectedOfferId]);
 
@@ -119,6 +120,20 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
     }
     return out;
   }, [offers]);
+
+  const activeOffers = grouped.pending;
+  const pastOffers = useMemo(() => {
+    const byDate = (a: ApiOfferRow, b: ApiOfferRow) =>
+      (b.createdAt ?? '').localeCompare(a.createdAt ?? '');
+    return [
+      ...[...grouped.accepted].sort(byDate),
+      ...[...grouped.declined].sort(byDate),
+      ...[...grouped.expired].sort(byDate),
+    ];
+  }, [grouped.accepted, grouped.declined, grouped.expired]);
+
+  const [activeSectionOpen, setActiveSectionOpen] = useState(true);
+  const [pastSectionOpen, setPastSectionOpen] = useState(false);
 
   const activeOfferStatus = detail?.offer.athleteOfferStatus ?? 'pending';
 
@@ -200,11 +215,9 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
       </div>
 
       <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4 dash-main-gutter-x">
-        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-700">
-            Offers ({offers.length})
-          </div>
-          <div className="scrollbar-hide h-full overflow-y-auto">
+        <div className="flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="shrink-0 border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-700">Offers</div>
+          <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto">
             {loading ? (
               <div className="animate-pulse divide-y divide-gray-100">
                 {[0, 1, 2, 3].map((i) => (
@@ -223,40 +236,121 @@ export function AthleteOffers({ initialOfferId = null }: { initialOfferId?: stri
             ) : offers.length === 0 ? (
               <div className="p-6 text-center text-sm text-gray-500">No offers yet.</div>
             ) : (
-              (['pending', 'accepted', 'declined', 'expired'] as const).map((group) =>
-                grouped[group].length ? (
-                  <div key={group}>
-                    <p className="px-4 pb-2 pt-4 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                      {group.replace('_', ' ')} ({grouped[group].length})
-                    </p>
-                    {grouped[group].map((offer) => (
-                      <button
-                        key={offer.id}
-                        type="button"
-                        onClick={() => setSelectedOfferId(offer.id)}
-                        className={`w-full border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
-                          selectedOfferId === offer.id ? 'bg-gray-50' : ''
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-gray-900">{offer.brandName}</p>
-                            <p className="truncate text-xs text-gray-500">{offer.campaignName ?? 'Direct offer'}</p>
-                          </div>
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadge(offer.athleteOfferStatus)}`}>
-                            {offer.athleteOfferStatus}
-                          </span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-gray-600">{offer.shortDescription || 'No description provided.'}</p>
-                        <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
-                          <span>{offer.compensationSummary}</span>
-                          <span>{fmtDate(offer.createdAt)}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : null
-              )
+              <>
+                <div className="border-b border-gray-100">
+                  <button
+                    type="button"
+                    id="offers-active-trigger"
+                    aria-expanded={activeSectionOpen}
+                    aria-controls="offers-active-panel"
+                    onClick={() => setActiveSectionOpen((o) => !o)}
+                    className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition-colors hover:bg-gray-50"
+                  >
+                    <span className="text-sm font-semibold text-gray-700">
+                      Active offers{' '}
+                      <span className="font-normal text-gray-500">({activeOffers.length})</span>
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${activeSectionOpen ? 'rotate-180' : ''}`}
+                      aria-hidden
+                    />
+                  </button>
+                  {activeSectionOpen ? (
+                    <div id="offers-active-panel" role="region" aria-labelledby="offers-active-trigger">
+                      {activeOffers.length === 0 ? (
+                        <p className="border-t border-gray-100 px-4 py-4 text-sm text-gray-500">No active offers…</p>
+                      ) : (
+                        activeOffers.map((offer) => (
+                          <button
+                            key={offer.id}
+                            type="button"
+                            onClick={() => setSelectedOfferId(offer.id)}
+                            className={`w-full border-t border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
+                              selectedOfferId === offer.id ? 'bg-gray-50' : ''
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-gray-900">{offer.brandName}</p>
+                                <p className="truncate text-xs text-gray-500">{offer.campaignName ?? 'Direct offer'}</p>
+                              </div>
+                              <span
+                                className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadge(offer.athleteOfferStatus)}`}
+                              >
+                                {offer.athleteOfferStatus}
+                              </span>
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-xs text-gray-600">
+                              {offer.shortDescription || 'No description provided.'}
+                            </p>
+                            <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                              <span>{offer.compensationSummary}</span>
+                              <span>{fmtDate(offer.createdAt)}</span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="border-b border-gray-100">
+                  <button
+                    type="button"
+                    id="offers-past-trigger"
+                    aria-expanded={pastSectionOpen}
+                    aria-controls="offers-past-panel"
+                    onClick={() => setPastSectionOpen((o) => !o)}
+                    className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition-colors hover:bg-gray-50"
+                  >
+                    <span className="text-sm font-semibold text-gray-700">
+                      Past offers{' '}
+                      <span className="font-normal text-gray-500">({pastOffers.length})</span>
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${pastSectionOpen ? 'rotate-180' : ''}`}
+                      aria-hidden
+                    />
+                  </button>
+                  {pastSectionOpen ? (
+                    <div id="offers-past-panel" role="region" aria-labelledby="offers-past-trigger">
+                      {pastOffers.length === 0 ? (
+                        <p className="border-t border-gray-100 px-4 py-4 text-sm text-gray-500">No past offers yet.</p>
+                      ) : (
+                        pastOffers.map((offer) => (
+                          <button
+                            key={offer.id}
+                            type="button"
+                            onClick={() => setSelectedOfferId(offer.id)}
+                            className={`w-full border-t border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
+                              selectedOfferId === offer.id ? 'bg-gray-50' : ''
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-gray-900">{offer.brandName}</p>
+                                <p className="truncate text-xs text-gray-500">{offer.campaignName ?? 'Direct offer'}</p>
+                              </div>
+                              <span
+                                className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadge(offer.athleteOfferStatus)}`}
+                              >
+                                {offer.athleteOfferStatus}
+                              </span>
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-xs text-gray-600">
+                              {offer.shortDescription || 'No description provided.'}
+                            </p>
+                            <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                              <span>{offer.compensationSummary}</span>
+                              <span>{fmtDate(offer.createdAt)}</span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </>
             )}
           </div>
         </div>

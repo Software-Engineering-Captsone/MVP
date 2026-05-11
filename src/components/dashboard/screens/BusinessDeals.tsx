@@ -8,13 +8,14 @@ import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader'
 import {
   fetchDealsList,
   formatIsoDate,
-  humanizeDealStatus,
   parseTermsSnapshot,
   type ApiDeal,
 } from '@/lib/deals/dashboardDealsClient';
 import { DEAL_STATUSES } from '@/lib/campaigns/deals/types';
 import {
+  dealStatusCopy,
   stageProgress,
+  STAGE_LABELS,
   STAGE_ORDER,
 } from '@/lib/deals/stageProjection';
 import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
@@ -37,21 +38,9 @@ function DealStatusBadge({ status }: { status: string }) {
           : 'bg-gray-50 text-gray-700 border-gray-200';
   return (
     <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${soft}`}>
-      {humanizeDealStatus(status)}
+      {dealStatusCopy(status)}
     </span>
   );
-}
-
-function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
-  const map: Record<(typeof STAGE_ORDER)[number], string> = {
-    agreement: 'AGREEMENT',
-    work_in_progress: 'WORK IN PROGRESS',
-    review_revisions: 'REVIEW REVISIONS',
-    completed: 'DELIVERABLES DONE',
-    payment: 'PAYOUT',
-    closed: 'CLOSED',
-  };
-  return map[step];
 }
 
 function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] }) {
@@ -75,7 +64,7 @@ function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] })
               {done ? '✓' : i + 1}
             </span>
             <span className={`text-[11px] font-bold uppercase leading-tight tracking-wide ${current ? 'text-nilink-ink' : done ? 'text-emerald-700' : 'text-gray-500'}`}>
-              {stageStepLabel(step)}
+              {STAGE_LABELS[step]}
             </span>
           </li>
         );
@@ -170,7 +159,7 @@ export function BusinessDeals() {
                 <option value="">All statuses</option>
                 {DEAL_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {humanizeDealStatus(s).toUpperCase()}
+                    {dealStatusCopy(s).toUpperCase()}
                   </option>
                 ))}
               </select>

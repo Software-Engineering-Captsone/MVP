@@ -1060,9 +1060,9 @@ export function AthleteExploreMarketplace() {
                 </button>
               ))}
               <div className="col-span-full mt-4 border-t border-gray-100 pt-8">
-                <p className="text-center text-sm font-semibold text-gray-800">End of directory</p>
+                <p className="text-center text-sm font-semibold text-gray-800">You are up to date.</p>
                 <p className="mx-auto mt-2 max-w-md text-center text-xs leading-relaxed text-gray-500">
-                  Refine search to narrow partners, or switch tabs to browse live opportunities.
+                  Adjust filters or refresh to get different results.
                 </p>
               </div>
             </div>

@@ -24,6 +24,13 @@ export type ApplicationWithCampaign = {
     canViewThread: boolean;
     canSend: boolean;
   } | null;
+  /** Linked offer/deal for post-application navigation (Offer Sent and beyond). */
+  handoff?: {
+    offerId: string;
+    dealId: string | null;
+    dealStatus: string | null;
+    offerStatus: string | null;
+  } | null;
 };
 
 export interface ApplicationsListResponse {

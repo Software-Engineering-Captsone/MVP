@@ -63,18 +63,44 @@ export default function OnboardingShell({ children }: { children: React.ReactNod
   // If already onboarded, send them to dashboard
   useEffect(() => {
     if (booting || !user) return;
-    try {
-      const raw = localStorage.getItem('athlete_onboarding_draft');
-      if (raw) {
-        const draft = JSON.parse(raw) as { completedAt?: string };
-        if (draft.completedAt) {
+
+    let cancelled = false;
+
+    const redirectIfAlreadyCompleted = async () => {
+      // Authoritative source: DB completion flag.
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('onboarding_completed_at')
+          .eq('id', user.id)
+          .maybeSingle<{ onboarding_completed_at: string | null }>();
+        if (!cancelled && !error && data?.onboarding_completed_at) {
           router.replace('/dashboard');
+          return;
         }
+      } catch {
+        // Fall back to local draft check below.
       }
-    } catch {
-      /* ignore */
-    }
-  }, [booting, user, router]);
+
+      try {
+        const raw = localStorage.getItem('athlete_onboarding_draft');
+        if (raw) {
+          const draft = JSON.parse(raw) as { completedAt?: string };
+          if (draft.completedAt) {
+            router.replace('/dashboard');
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    void redirectIfAlreadyCompleted();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [booting, user, router, supabase]);
 
   /* ── Boot screen ── */
   if (booting) {

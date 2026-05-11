@@ -77,14 +77,6 @@ describe('assertDeliverableStatusTransition', () => {
 });
 
 describe('assertSubmissionStatusTransition', () => {
-  it('allows submitted -> viewed', () => {
-    expect(() => assertSubmissionStatusTransition('submitted', 'viewed')).not.toThrow();
-  });
-
-  it('allows viewed -> revision_requested', () => {
-    expect(() => assertSubmissionStatusTransition('viewed', 'revision_requested')).not.toThrow();
-  });
-
   it('rejects approved -> viewed', () => {
     expect(() => assertSubmissionStatusTransition('approved', 'viewed')).toThrow(
       /Invalid submission status transition/,

@@ -47,7 +47,7 @@ export type DeliverableProjection = {
   secondaryActions: StageAction[];
 };
 
-const STAGE_LABELS: Record<DealStageId, string> = {
+export const STAGE_LABELS: Record<DealStageId, string> = {
   agreement: 'Agreement',
   work_in_progress: 'Work in Progress',
   review_revisions: 'Review & Revisions',

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Check, FileEdit, History, XCircle } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, FileEdit, Search, XCircle } from 'lucide-react';
 import { DashboardPageHeader } from '@/components/dashboard/DashboardPageHeader';
 import { authFetch } from '@/lib/authFetch';
 import { ImageWithFallback } from '@/components/dashboard/ImageWithFallback';
@@ -15,10 +15,6 @@ import {
 
 type ApplicationStatus = CanonicalApplicationStatus;
 
-type ApplicationTab =
-  | 'all'
-  | 'active'
-  | 'closed';
 type ApplicationSort = 'newest' | 'oldest' | 'campaign_az';
 type RowActionError = {
   applicationId: string;
@@ -29,6 +25,13 @@ type RowActionError = {
 };
 
 const PLACEHOLDER_IMAGE = '/brands_images/brand-01.svg';
+/** Muted row actions: slight button shape without strong CTA emphasis */
+const APP_ROW_GHOST =
+  'inline-flex items-center justify-center gap-1 rounded-md border border-transparent bg-gray-50/80 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:border-gray-200 hover:bg-gray-100/90 hover:text-gray-900';
+const APP_ROW_GHOST_DANGER =
+  'inline-flex items-center justify-center gap-1 rounded-md border border-transparent bg-red-50/50 px-2.5 py-1 text-xs font-medium text-red-700/90 transition-colors hover:border-red-200/70 hover:bg-red-50 hover:text-red-800';
+const APP_ROW_GHOST_ACCENT =
+  'inline-flex items-center justify-center gap-1 rounded-md border border-transparent bg-emerald-50/50 px-2.5 py-1 text-xs font-medium text-emerald-800/90 transition-colors hover:border-emerald-200/70 hover:bg-emerald-50';
 const PIPELINE_STEPS = ['Applied', 'Review', 'Shortlist', 'Offer'] as const;
 const EDIT_PITCH_RECOMMENDED_MIN = 80;
 const EDIT_PITCH_MAX_LENGTH = 1000;
@@ -41,17 +44,41 @@ const EDIT_PROMPT_TEXTS = EDIT_PROMPT_CHIPS.map((chip) => chip.text);
 const UPDATE_ERROR_MESSAGE = 'Update failed. Check your connection and try again.';
 const WITHDRAW_ERROR_MESSAGE = 'Withdraw failed. Check your connection and try again.';
 const REAPPLY_ERROR_MESSAGE = 'Re-apply failed. Check your connection and try again.';
-const TAB_ORDER: ApplicationTab[] = [
-  'all',
-  'active',
-  'closed',
-];
+/** Still in the campaign application pipeline (before an offer is sent). */
+function isApplicationPipelineActive(status: ApplicationStatus): boolean {
+  return (
+    status === 'pending' ||
+    status === 'under_review' ||
+    status === 'shortlisted' ||
+    status === 'offer_drafted'
+  );
+}
 
-function tabLabel(tab: ApplicationTab): string {
-  if (tab === 'all') return 'All';
-  if (tab === 'active') return 'Active';
-  if (tab === 'closed') return 'Closed';
-  return 'All';
+const TERMINAL_DEAL_STATUSES = new Set(['closed', 'paid', 'cancelled', 'disputed']);
+
+function isDealTerminal(dealStatus: string | null | undefined): boolean {
+  return dealStatus != null && TERMINAL_DEAL_STATUSES.has(dealStatus);
+}
+
+type HandoffInfo = NonNullable<ApplicationWithCampaign['handoff']>;
+
+function compactPastSummary(status: ApplicationStatus, handoff: HandoffInfo | null | undefined): string {
+  if (status === 'withdrawn') return 'You withdrew this application.';
+  if (status === 'declined') return 'The brand did not move forward with this application.';
+  if (status === 'offer_declined') return 'You declined the offer.';
+  if (status === 'offer_sent') {
+    if (handoff?.dealId && handoff.dealStatus && !isDealTerminal(handoff.dealStatus)) {
+      return 'Collaboration is active in Deals.';
+    }
+    if (handoff?.dealId && handoff.dealStatus && isDealTerminal(handoff.dealStatus)) {
+      return 'This collaboration has ended.';
+    }
+    if (!handoff?.dealId && handoff?.offerStatus === 'sent') {
+      return 'Respond in your Offers tab.';
+    }
+    return 'Offer activity continues in Deals or Offers.';
+  }
+  return '';
 }
 
 function normalizeStatus(row: ApplicationWithCampaign['application']): ApplicationStatus {
@@ -103,8 +130,68 @@ function pipelineIndex(status: ApplicationStatus): number | null {
   if (status === 'pending') return 0;
   if (status === 'under_review') return 1;
   if (status === 'shortlisted') return 2;
-  /** Past shortlist: offer step in progress (draft) or delivered. */
-  if (status === 'offer_drafted' || status === 'offer_sent') return 3;
+  /** Offer drafted only — once sent, the recruit pipeline is complete (see `isPastRecruitStage`). */
+  if (status === 'offer_drafted') return 3;
+  return null;
+}
+
+/** No longer in the application / recruit flow — follow-up is Offers or Deals. */
+function isPastRecruitStage(status: ApplicationStatus): boolean {
+  return (
+    status === 'offer_sent' ||
+    status === 'offer_declined' ||
+    status === 'declined' ||
+    status === 'withdrawn'
+  );
+}
+
+function compactApplicationCta(row: ApplicationWithCampaign, status: ApplicationStatus) {
+  const h = row.handoff;
+  const ctaClass =
+    'inline-flex items-center gap-0.5 text-xs font-semibold text-nilink-accent hover:underline';
+
+  if (status === 'offer_sent') {
+    if (h?.offerStatus === 'accepted') {
+      if (h.dealId) {
+        const terminal = isDealTerminal(h.dealStatus);
+        return (
+          <Link href={`/dashboard/deals/${encodeURIComponent(h.dealId)}`} className={ctaClass}>
+            {terminal ? 'View deal' : 'Open deal'}
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          </Link>
+        );
+      }
+      return (
+        <Link href="/dashboard/deals" className={ctaClass}>
+          Open deals
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </Link>
+      );
+    }
+    if (h?.offerId && h.offerId.trim()) {
+      return (
+        <Link href={`/dashboard/offers?offer=${encodeURIComponent(h.offerId)}`} className={ctaClass}>
+          View offer
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </Link>
+      );
+    }
+    return (
+      <Link href="/dashboard/offers" className={ctaClass}>
+        View offers
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      </Link>
+    );
+  }
+  if (status === 'offer_declined') {
+    return <span className="text-xs text-gray-500">Offer declined</span>;
+  }
+  if (status === 'declined') {
+    return <span className="text-xs text-gray-500">Not selected</span>;
+  }
+  if (status === 'withdrawn') {
+    return <span className="text-xs text-gray-500">Withdrawn</span>;
+  }
   return null;
 }
 
@@ -165,7 +252,8 @@ export function AthleteApplications() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [editAppId, setEditAppId] = useState<string | null>(null);
   const [editPitch, setEditPitch] = useState('');
-  const [activeTab, setActiveTab] = useState<ApplicationTab>('all');
+  const [activeSectionOpen, setActiveSectionOpen] = useState(true);
+  const [pastSectionOpen, setPastSectionOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<ApplicationSort>('newest');
   const [rowActionError, setRowActionError] = useState<RowActionError | null>(null);
@@ -186,75 +274,29 @@ export function AthleteApplications() {
     });
   }, [applications]);
 
-  const tabCounts = useMemo<Record<ApplicationTab, number>>(() => {
-    const counts: Record<ApplicationTab, number> = {
-      all: sorted.length,
-      active: 0,
-      closed: 0,
-    };
-    for (const row of sorted) {
-      const status = normalizeStatus(row.application);
-      if (
-        status === 'pending' ||
-        status === 'under_review' ||
-        status === 'shortlisted' ||
-        status === 'offer_drafted' ||
-        status === 'offer_sent'
-      ) {
-        counts.active += 1;
-      } else {
-        counts.closed += 1;
-      }
-    }
-    return counts;
-  }, [sorted]);
-
   const metrics = useMemo(() => {
     let inReview = 0;
     let offersSent = 0;
-    let closed = 0;
     for (const row of sorted) {
       const status = normalizeStatus(row.application);
       if (status === 'under_review') inReview += 1;
       if (status === 'offer_sent') offersSent += 1;
-      if (status === 'offer_declined' || status === 'declined' || status === 'withdrawn') {
-        closed += 1;
-      }
     }
     return {
-      total: sorted.length,
       inReview,
-      closed,
       offersSent,
     };
   }, [sorted]);
 
-  const filteredByTab = useMemo(() => {
-    if (activeTab === 'all') return sorted;
-    return sorted.filter((row) => {
-      const status = normalizeStatus(row.application);
-      if (activeTab === 'active') {
-        return (
-          status === 'pending' ||
-          status === 'under_review' ||
-          status === 'shortlisted' ||
-          status === 'offer_drafted' ||
-          status === 'offer_sent'
-        );
-      }
-      return status === 'offer_declined' || status === 'declined' || status === 'withdrawn';
-    });
-  }, [activeTab, sorted]);
-
   const filtered = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return filteredByTab;
-    return filteredByTab.filter((row) => {
+    if (!query) return sorted;
+    return sorted.filter((row) => {
       const campaignName = (row.campaign?.name ?? '').toLowerCase();
       const brandName = (row.campaign?.brandDisplayName ?? '').toLowerCase();
       return campaignName.includes(query) || brandName.includes(query);
     });
-  }, [filteredByTab, searchQuery]);
+  }, [sorted, searchQuery]);
 
   const displayRows = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -276,6 +318,291 @@ export function AthleteApplications() {
       return String(a.application.id).localeCompare(String(b.application.id));
     });
   }, [filtered, sortBy]);
+
+  const activeRows = useMemo(
+    () =>
+      displayRows.filter((row) => isApplicationPipelineActive(normalizeStatus(row.application))),
+    [displayRows]
+  );
+
+  const pastRows = useMemo(
+    () => displayRows.filter((row) => isPastRecruitStage(normalizeStatus(row.application))),
+    [displayRows]
+  );
+
+  function renderApplicationListItem(row: ApplicationWithCampaign) {
+    const status = normalizeStatus(row.application);
+    const canEdit = status === 'pending';
+    const canWithdraw = status === 'pending';
+    const reapplyBlockedByDeadline =
+      status === 'withdrawn' && row.campaign?.applicationDeadlinePassed === true;
+    const canReapply =
+      status === 'withdrawn' &&
+      Boolean(row.campaign?.id) &&
+      row.campaign?.applicationDeadlinePassed !== true;
+    const active = pipelineIndex(status);
+    const image =
+      typeof row.campaign?.image === 'string' && row.campaign.image.trim()
+        ? row.campaign.image
+        : PLACEHOLDER_IMAGE;
+
+    if (isPastRecruitStage(status)) {
+      const pastSummary = compactPastSummary(status, row.handoff);
+      return (
+        <li
+          key={row.application.id}
+          className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm"
+        >
+          <div className="min-w-0">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-base font-semibold leading-snug tracking-tight text-gray-900">
+                    {row.campaign?.name ?? 'Campaign unavailable'}
+                  </p>
+                  <p className="truncate text-sm font-medium leading-tight text-gray-600">
+                    {row.campaign?.brandDisplayName ?? 'Brand'}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 self-start rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide ${statusClass(status)}`}
+                >
+                  {statusLabel(status)}
+                </span>
+              </div>
+              {pastSummary ? (
+                <p className="line-clamp-2 text-xs leading-snug text-gray-500">{pastSummary}</p>
+              ) : null}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-gray-100 pt-2">
+              <p className="text-[11px] leading-tight text-gray-400">
+                <span className="font-medium uppercase tracking-wide text-gray-400">Applied</span>{' '}
+                <time
+                  dateTime={row.application.createdAt}
+                  className="font-normal tabular-nums text-gray-600"
+                >
+                  {formatDate(row.application.createdAt)}
+                </time>
+              </p>
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                {row.applicationMessaging?.canViewThread ? (
+                  <Link
+                    href={`/dashboard/messages?application=${encodeURIComponent(row.application.id)}`}
+                    className="text-xs font-semibold text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline"
+                  >
+                    Messages
+                  </Link>
+                ) : null}
+                {compactApplicationCta(row, status)}
+              </div>
+            </div>
+          </div>
+          {rowActionError?.applicationId === row.application.id ? (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="text-xs text-amber-900">{rowActionError.message}</p>
+              <p className="mt-1 text-[11px] text-amber-900/90">
+                Retry now, or check your connection and try again in a moment.
+              </p>
+              <button
+                type="button"
+                className="mt-2 text-xs font-semibold text-amber-900 underline underline-offset-2"
+                onClick={() => void retryRowAction()}
+              >
+                Retry action
+              </button>
+            </div>
+          ) : null}
+        </li>
+      );
+    }
+
+    return (
+      <li key={row.application.id} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+            <ImageWithFallback
+              src={image}
+              alt={row.campaign?.name ?? 'Campaign'}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-gray-900">
+                {row.campaign?.name ?? 'Campaign unavailable'}
+              </p>
+              <p className="truncate text-xs text-gray-500">
+                {row.campaign?.brandDisplayName ?? 'Brand'}
+              </p>
+            </div>
+
+            <p className="mt-2 text-xs leading-relaxed text-gray-600">{statusHelperCopy(status)}</p>
+
+            <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-2.5">
+              <div className="grid grid-cols-4 gap-2">
+                {PIPELINE_STEPS.map((step, i) => {
+                  const isComplete = active != null && i < active;
+                  const isCurrent = active != null && i === active;
+                  return (
+                    <div key={step} className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] ${
+                          isComplete
+                            ? 'border-nilink-accent bg-nilink-accent text-white'
+                            : isCurrent
+                              ? 'border-nilink-accent bg-white text-nilink-accent'
+                              : 'border-gray-300 bg-white text-gray-400'
+                        }`}
+                      >
+                        {isComplete ? <Check className="h-3 w-3" /> : i + 1}
+                      </span>
+                      <span
+                        className={`truncate text-[11px] ${
+                          isComplete || isCurrent ? 'font-semibold text-gray-800' : 'text-gray-500'
+                        }`}
+                      >
+                        {step}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {(() => {
+              const timeline = sortedStatusHistory(row.application.statusHistory);
+              if (timeline.length === 0) {
+                return (
+                  <p className="mt-3 text-[11px] text-gray-500">
+                    <span className="font-medium text-gray-600">Applied</span> {formatDateTime(row.application.createdAt)}
+                  </p>
+                );
+              }
+              return (
+                <div className="mt-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Status history</p>
+                  <ul className="ml-0.5 space-y-2 border-l border-gray-200 pl-3">
+                    {timeline.map((entry, idx) => (
+                      <li key={`${entry.at}-${entry.status}-${idx}`} className="relative">
+                        <span className="absolute -left-[17px] top-1.5 h-2 w-2 rounded-full border border-gray-300 bg-white" />
+                        <p className="text-xs font-semibold text-gray-900">{historyEntryLabel(entry.status)}</p>
+                        <p className="text-[11px] text-gray-500">{formatDateTime(entry.at)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+
+            {row.campaign?.id || canEdit || canWithdraw || canReapply || reapplyBlockedByDeadline ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+                {row.campaign?.id ? (
+                  <Link
+                    href={`/dashboard/search?campaignId=${encodeURIComponent(row.campaign.id)}`}
+                    className={APP_ROW_GHOST}
+                  >
+                    Open campaign
+                  </Link>
+                ) : null}
+                {canEdit ? (
+                  <button
+                    type="button"
+                    className={APP_ROW_GHOST}
+                    onClick={() => {
+                      setEditAppId(row.application.id);
+                      setEditPitch(row.application.pitch ?? '');
+                    }}
+                  >
+                    <FileEdit className="h-3.5 w-3.5 opacity-70" />
+                    Edit
+                  </button>
+                ) : null}
+                {canWithdraw ? (
+                  <button type="button" className={APP_ROW_GHOST_DANGER} onClick={() => void withdraw(row.application.id)}>
+                    <XCircle className="h-3.5 w-3.5 opacity-70" />
+                    Withdraw
+                  </button>
+                ) : null}
+                {reapplyBlockedByDeadline ? (
+                  <p className="text-xs text-gray-600">
+                    You can&apos;t re-apply because the application deadline has passed.
+                  </p>
+                ) : null}
+                {canReapply ? (
+                  <button
+                    type="button"
+                    className={APP_ROW_GHOST_ACCENT}
+                    onClick={async () => {
+                      const campaignId = row.campaign?.id;
+                      if (!campaignId) return;
+                      const res = await authFetch(`/api/campaigns/${campaignId}/applications`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          pitch: row.application.pitch ?? '',
+                          athleteSnapshot: {},
+                          status: 'pending',
+                        }),
+                      });
+                      const data = (await res.json()) as { error?: string };
+                      if (!res.ok) {
+                        setError(data.error || REAPPLY_ERROR_MESSAGE);
+                        setRowActionError({
+                          applicationId: row.application.id,
+                          action: 'reapply',
+                          message: data.error || REAPPLY_ERROR_MESSAGE,
+                          retryCampaignId: campaignId,
+                          retryPitch: row.application.pitch ?? '',
+                        });
+                        return;
+                      }
+                      if (rowActionError?.applicationId === row.application.id) {
+                        setRowActionError(null);
+                      }
+                      await mutateApplications();
+                    }}
+                  >
+                    Re-apply
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="mt-3 border-t border-gray-100 pt-3">
+              {row.applicationMessaging?.canViewThread ? (
+                <Link
+                  href={`/dashboard/messages?application=${encodeURIComponent(row.application.id)}`}
+                  className={APP_ROW_GHOST}
+                >
+                  Open messages
+                </Link>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  Messaging opens once the brand moves your application forward or starts the conversation.
+                </p>
+              )}
+            </div>
+
+            {rowActionError?.applicationId === row.application.id ? (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-xs text-amber-900">{rowActionError.message}</p>
+                <p className="mt-1 text-[11px] text-amber-900/90">
+                  Retry now, or check your connection and try again in a moment.
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 text-xs font-semibold text-amber-900 underline underline-offset-2"
+                  onClick={() => void retryRowAction()}
+                >
+                  Retry action
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </li>
+    );
+  }
 
   const submitEdit = useCallback(async () => {
     if (!editAppId) return;
@@ -444,82 +771,73 @@ export function AthleteApplications() {
       <div className="dash-main-gutter-x shrink-0 border-b border-gray-100 pb-4 pt-5">
         <DashboardPageHeader
           title="Applications"
-          subtitle="Track every submission in one compact pipeline view."
+          subtitle="Active applications are on top. Open Past to see offers, outcomes, and reference."
         />
       </div>
 
       <div className="dash-main-gutter-x min-h-0 flex-1 overflow-auto py-6">
         {!loading ? (
-          <div className="mb-4 space-y-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-xl border border-gray-200 bg-white px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Total</p>
-                <p className="mt-1 text-lg font-bold text-gray-900">{metrics.total}</p>
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">In review</p>
+                <p
+                  className="mt-2 text-4xl font-black text-nilink-ink"
+                  style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                >
+                  {metrics.inReview}
+                </p>
               </div>
-              <div className="rounded-xl border border-blue-200 bg-blue-50/60 px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">In review</p>
-                <p className="mt-1 text-lg font-bold text-blue-900">{metrics.inReview}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">Closed</p>
-                <p className="mt-1 text-lg font-bold text-slate-900">{metrics.closed}</p>
-              </div>
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Offers sent</p>
-                <p className="mt-1 text-lg font-bold text-emerald-900">{metrics.offersSent}</p>
+              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Offers sent</p>
+                <p
+                  className="mt-2 text-4xl font-black text-nilink-ink"
+                  style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                >
+                  {metrics.offersSent}
+                </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {TAB_ORDER.map((tab) => {
-                const active = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      active
-                        ? 'border-nilink-accent bg-nilink-accent text-white'
-                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                    }`}
+
+            <div className="mb-4 mt-8 border-t border-gray-100 pt-6">
+              <h2 className="mb-3 text-sm font-semibold text-nilink-ink">Your applications</h2>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="relative min-w-0 flex-1">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                    aria-hidden
+                  />
+                  <input
+                    id="applications-search"
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search applications by campaign or brand"
+                    aria-label="Search applications by campaign or brand"
+                    className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-nilink-accent focus:outline-none focus:ring-2 focus:ring-nilink-accent/20"
+                  />
+                </div>
+                <div className="flex min-h-[42px] shrink-0 items-center gap-2 sm:w-auto sm:border-l sm:border-gray-200 sm:pl-4">
+                  <label
+                    htmlFor="applications-sort"
+                    className="text-xs font-bold uppercase tracking-wider text-gray-400"
                   >
-                    <span>{tabLabel(tab)}</span>
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                        active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {tabCounts[tab]}
-                    </span>
-                  </button>
-                );
-              })}
+                    Sort
+                  </label>
+                  <select
+                    id="applications-sort"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as ApplicationSort)}
+                    className="min-w-[10.5rem] flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-nilink-accent focus:outline-none focus:ring-2 focus:ring-nilink-accent/20 sm:flex-initial"
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="campaign_az">Campaign A-Z</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search campaigns or brands"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-nilink-accent focus:outline-none focus:ring-2 focus:ring-nilink-accent/20"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="applications-sort" className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Sort
-              </label>
-              <select
-                id="applications-sort"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as ApplicationSort)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-nilink-accent focus:outline-none focus:ring-2 focus:ring-nilink-accent/20"
-              >
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-                <option value="campaign_az">Campaign A-Z</option>
-              </select>
-            </div>
-          </div>
+          </>
         ) : null}
 
         {(appError ?? error) ? (
@@ -552,257 +870,90 @@ export function AthleteApplications() {
         ) : null}
 
         {!loading ? (
-          displayRows.length === 0 ? (
+          sorted.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center">
-              {tabCounts.all === 0 ? (
-                <div className="mx-auto max-w-md">
-                  <p className="text-sm font-semibold text-gray-900">No applications yet</p>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Start applying to brand campaigns to track progress here.
-                  </p>
-                  <Link
-                    href="/dashboard/search"
-                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-nilink-accent px-4 py-2 text-sm font-semibold text-white hover:bg-nilink-accent-hover"
-                  >
-                    Explore campaigns
-                  </Link>
-                </div>
-              ) : searchQuery.trim() ? (
-                <div className="mx-auto max-w-md">
-                  <p className="text-sm font-semibold text-gray-900">No search results</p>
-                  <p className="mt-1 text-sm text-gray-600">
-                    No applications match your current search. Try another campaign or brand term.
-                  </p>
-                </div>
-              ) : (
-                <div className="mx-auto max-w-md">
-                  <p className="text-sm font-semibold text-gray-900">Nothing in this view</p>
-                  <p className="mt-1 text-sm text-gray-600">
-                    No applications are currently in {tabLabel(activeTab)}.
-                  </p>
-                </div>
-              )}
+              <div className="mx-auto max-w-md">
+                <p className="text-sm font-semibold text-gray-900">No applications yet</p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Start applying to brand campaigns to track progress here.
+                </p>
+                <Link
+                  href="/dashboard/search"
+                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-nilink-accent px-4 py-2 text-sm font-semibold text-white hover:bg-nilink-accent-hover"
+                >
+                  Explore campaigns
+                </Link>
+              </div>
+            </div>
+          ) : displayRows.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center">
+              <div className="mx-auto max-w-md">
+                <p className="text-sm font-semibold text-gray-900">No search results</p>
+                <p className="mt-1 text-sm text-gray-600">
+                  No applications match your current search. Try another campaign or brand term.
+                </p>
+              </div>
             </div>
           ) : (
-            <ul className="space-y-3">
-              {displayRows.map((row) => {
-                const status = normalizeStatus(row.application);
-                const canEdit = status === 'pending';
-                const canWithdraw = status === 'pending';
-                const reapplyBlockedByDeadline =
-                  status === 'withdrawn' && row.campaign?.applicationDeadlinePassed === true;
-                const canReapply =
-                  status === 'withdrawn' &&
-                  Boolean(row.campaign?.id) &&
-                  row.campaign?.applicationDeadlinePassed !== true;
-                const active = pipelineIndex(status);
-                const image =
-                  typeof row.campaign?.image === 'string' && row.campaign.image.trim()
-                    ? row.campaign.image
-                    : PLACEHOLDER_IMAGE;
-                return (
-                  <li key={row.application.id} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
-                        <ImageWithFallback
-                          src={image}
-                          alt={row.campaign?.name ?? 'Campaign'}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-gray-900">
-                              {row.campaign?.name ?? 'Campaign unavailable'}
-                            </p>
-                            <p className="truncate text-xs text-gray-500">
-                              {row.campaign?.brandDisplayName ?? 'Brand'}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {row.campaign?.id ? (
-                              <Link
-                                href={`/dashboard/search?campaignId=${encodeURIComponent(row.campaign.id)}`}
-                                className="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
-                              >
-                                Open campaign
-                              </Link>
-                            ) : null}
-                            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase ${statusClass(status)}`}>
-                              {statusLabel(status)}
-                            </span>
-                          </div>
-                        </div>
+            <div className="w-full divide-y divide-gray-200">
+              <div className="py-1">
+                <button
+                  type="button"
+                  id="applications-active-trigger"
+                  aria-expanded={activeSectionOpen}
+                  aria-controls="applications-active-panel"
+                  onClick={() => setActiveSectionOpen((o) => !o)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-3 text-left transition-colors hover:bg-gray-50 sm:px-0"
+                >
+                  <span className="text-sm font-semibold text-gray-700">
+                    Active applications{' '}
+                    <span className="font-normal text-gray-500">({activeRows.length})</span>
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${activeSectionOpen ? 'rotate-180' : ''}`}
+                    aria-hidden
+                  />
+                </button>
+                {activeSectionOpen ? (
+                  <div id="applications-active-panel" role="region" aria-labelledby="applications-active-trigger">
+                    {activeRows.length === 0 ? (
+                      <p className="pb-2 pt-1 text-sm text-gray-500">No active applications…</p>
+                    ) : (
+                      <ul className="space-y-3 pb-2 pt-1">{activeRows.map((row) => renderApplicationListItem(row))}</ul>
+                    )}
+                  </div>
+                ) : null}
+              </div>
 
-                        <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-600">
-                          <Calendar className="h-3.5 w-3.5" />
-                          Applied {formatDate(row.application.createdAt)}
-                        </div>
-
-                        <p className="mt-2 text-xs leading-relaxed text-gray-600">
-                          {statusHelperCopy(status)}
-                        </p>
-
-                        <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-2.5">
-                          <div className="grid grid-cols-4 gap-2">
-                            {PIPELINE_STEPS.map((step, i) => {
-                              const isComplete = active != null && i < active;
-                              const isCurrent = active != null && i === active;
-                              return (
-                                <div key={step} className="flex min-w-0 items-center gap-1.5">
-                                  <span
-                                    className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] ${
-                                      isComplete
-                                        ? 'border-nilink-accent bg-nilink-accent text-white'
-                                        : isCurrent
-                                          ? 'border-nilink-accent bg-white text-nilink-accent'
-                                          : 'border-gray-300 bg-white text-gray-400'
-                                    }`}
-                                  >
-                                    {isComplete ? <Check className="h-3 w-3" /> : i + 1}
-                                  </span>
-                                  <span
-                                    className={`truncate text-[11px] ${
-                                      isComplete || isCurrent ? 'font-semibold text-gray-800' : 'text-gray-500'
-                                    }`}
-                                  >
-                                    {step}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {(() => {
-                          const timeline = sortedStatusHistory(row.application.statusHistory);
-                          if (timeline.length === 0) return null;
-                          return (
-                            <div className="mt-3 rounded-lg border border-gray-100 bg-white p-2.5">
-                              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                <History className="h-3.5 w-3.5" />
-                                Status history
-                              </div>
-                              <ul className="space-y-2 border-l border-gray-200 pl-3">
-                                {timeline.map((entry, idx) => (
-                                  <li key={`${entry.at}-${entry.status}-${idx}`} className="relative">
-                                    <span className="absolute -left-[17px] top-1.5 h-2 w-2 rounded-full border border-gray-300 bg-white" />
-                                    <p className="text-xs font-semibold text-gray-900">{historyEntryLabel(entry.status)}</p>
-                                    <p className="text-[11px] text-gray-500">{formatDateTime(entry.at)}</p>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          );
-                        })()}
-
-                        {(canEdit || canWithdraw || canReapply || reapplyBlockedByDeadline) ? (
-                          <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-                            {canEdit ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700"
-                                onClick={() => {
-                                  setEditAppId(row.application.id);
-                                  setEditPitch(row.application.pitch ?? '');
-                                }}
-                              >
-                                <FileEdit className="h-3.5 w-3.5" />
-                                Edit
-                              </button>
-                            ) : null}
-                            {canWithdraw ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700"
-                                onClick={() => void withdraw(row.application.id)}
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                                Withdraw
-                              </button>
-                            ) : null}
-                            {reapplyBlockedByDeadline ? (
-                              <p className="text-xs text-gray-600">
-                                You can&apos;t re-apply because the application deadline has passed.
-                              </p>
-                            ) : null}
-                            {canReapply ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700"
-                                onClick={async () => {
-                                  const campaignId = row.campaign?.id;
-                                  if (!campaignId) return;
-                                  const res = await authFetch(`/api/campaigns/${campaignId}/applications`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      pitch: row.application.pitch ?? '',
-                                      athleteSnapshot: {},
-                                      status: 'pending',
-                                    }),
-                                  });
-                                  const data = (await res.json()) as { error?: string };
-                                  if (!res.ok) {
-                                    setError(data.error || REAPPLY_ERROR_MESSAGE);
-                                    setRowActionError({
-                                      applicationId: row.application.id,
-                                      action: 'reapply',
-                                      message: data.error || REAPPLY_ERROR_MESSAGE,
-                                      retryCampaignId: campaignId,
-                                      retryPitch: row.application.pitch ?? '',
-                                    });
-                                    return;
-                                  }
-                                  if (rowActionError?.applicationId === row.application.id) {
-                                    setRowActionError(null);
-                                  }
-                                  await mutateApplications();
-                                }}
-                              >
-                                Re-apply
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-3 border-t border-gray-100 pt-3">
-                          {row.applicationMessaging?.canViewThread ? (
-                            <Link
-                              href={`/dashboard/messages?application=${encodeURIComponent(row.application.id)}`}
-                              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                            >
-                              Open messages
-                            </Link>
-                          ) : (
-                            <p className="text-xs text-gray-500">
-                              Messaging opens once the brand moves your application forward or starts the conversation.
-                            </p>
-                          )}
-                        </div>
-
-                        {rowActionError?.applicationId === row.application.id ? (
-                          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <p className="text-xs text-amber-900">{rowActionError.message}</p>
-                            <p className="mt-1 text-[11px] text-amber-900/90">
-                              Retry now, or check your connection and try again in a moment.
-                            </p>
-                            <button
-                              type="button"
-                              className="mt-2 text-xs font-semibold text-amber-900 underline underline-offset-2"
-                              onClick={() => void retryRowAction()}
-                            >
-                              Retry action
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+              <div className="py-1">
+                <button
+                  type="button"
+                  id="applications-past-trigger"
+                  aria-expanded={pastSectionOpen}
+                  aria-controls="applications-past-panel"
+                  onClick={() => setPastSectionOpen((o) => !o)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-3 text-left transition-colors hover:bg-gray-50 sm:px-0"
+                >
+                  <span className="text-sm font-semibold text-gray-700">
+                    Past applications{' '}
+                    <span className="font-normal text-gray-500">({pastRows.length})</span>
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${pastSectionOpen ? 'rotate-180' : ''}`}
+                    aria-hidden
+                  />
+                </button>
+                {pastSectionOpen ? (
+                  <div id="applications-past-panel" role="region" aria-labelledby="applications-past-trigger">
+                    {pastRows.length === 0 ? (
+                      <p className="pb-2 pt-1 text-sm text-gray-500">No past applications yet.</p>
+                    ) : (
+                      <ul className="space-y-3 pb-2 pt-1">{pastRows.map((row) => renderApplicationListItem(row))}</ul>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </div>
           )
         ) : null}
       </div>

@@ -1092,6 +1092,20 @@ export async function updateContractStatus(
     throw new Error('Only the brand on this deal can update the contract status');
   }
 
+  // Guardrail: never advance to signature states unless the contract document
+  // is actually present and resolvable. This prevents athlete-side "sent for
+  // signature but no file" dead-ends.
+  if (to === 'sent_for_signature' || to === 'signed') {
+    const storedFileRef = typeof currentRow.file_url === 'string' ? currentRow.file_url.trim() : '';
+    if (!storedFileRef) {
+      throw new Error('Contract document is required before sending for signature');
+    }
+    const resolved = await resolveContractFileUrlForDownload(supabase, storedFileRef);
+    if (!resolved) {
+      throw new Error('Contract document is unavailable. Re-upload the contract before sending for signature');
+    }
+  }
+
   assertContractStatusTransition(currentRow.status as ContractStatus, to);
 
   const patch: Record<string, unknown> = { status: to };
@@ -1570,7 +1584,7 @@ export async function updateSubmission(
     status: to,
     feedback: feedback ?? currentRow.feedback,
   };
-  if (to === 'viewed' || to === 'approved' || to === 'revision_requested' || to === 'rejected') {
+  if (to === 'approved' || to === 'revision_requested' || to === 'rejected') {
     patch.reviewed_by_profile_id = reviewerProfileId ?? currentRow.reviewed_by_profile_id;
     patch.reviewed_at = new Date().toISOString();
   }
@@ -1594,14 +1608,7 @@ export async function updateSubmission(
   if (deliverable) {
     const d = deliverable as unknown as DbDeliverableRow;
     const deliverablePatch: Record<string, unknown> = {};
-    if (to === 'viewed') {
-      try {
-        assertDeliverableStatusTransition(d.status as DeliverableStatus, 'under_review');
-        deliverablePatch.status = 'under_review';
-      } catch {
-        /* no-op */
-      }
-    } else if (to === 'revision_requested') {
+    if (to === 'revision_requested') {
       if (d.revision_count_used >= d.revision_limit) {
         notifyDealPlaceholder('deal_revision_blocked', {
           dealId: currentRow.deal_id,

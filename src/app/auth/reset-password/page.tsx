@@ -16,15 +16,31 @@ function ResetPasswordContent() {
   const supabase = createClient();
 
   useEffect(() => {
-    // Supabase redirects here with a session already established
-    // via the recovery link. We just need to check the session exists.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setReady(true);
-      } else {
-        setError('Invalid or expired reset link. Please request a new one.');
+    // Normal path: user lands here after /auth/callback exchanged the
+    // recovery code, so a session cookie already exists.
+    // Belt-and-suspenders: if the page is hit directly with `?code=...`
+    // (older email link, or a tweaked redirect), exchange it inline
+    // before falling back to "invalid link".
+    let cancelled = false;
+    (async () => {
+      try {
+        const code = new URLSearchParams(window.location.search).get('code');
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            if (!cancelled) setError('Invalid or expired reset link. Please request a new one.');
+            return;
+          }
+        }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (session) setReady(true);
+        else setError('Invalid or expired reset link. Please request a new one.');
+      } catch {
+        if (!cancelled) setError('Invalid or expired reset link. Please request a new one.');
       }
-    });
+    })();
+    return () => { cancelled = true; };
   }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,8 +67,12 @@ function ResetPasswordContent() {
       if (updateError) {
         setError(updateError.message);
       } else {
+        // End the short-lived recovery session so the user must
+        // sign in with the new password (defense-in-depth: avoids
+        // a long-lived session minted from a recovery token).
+        try { await supabase.auth.signOut(); } catch { /* ignore */ }
         setSuccess(true);
-        setTimeout(() => router.push('/dashboard'), 3000);
+        setTimeout(() => router.push('/auth?reset=success'), 2500);
       }
     } catch {
       setError('Network error. Please try again.');
@@ -92,8 +112,8 @@ function ResetPasswordContent() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Password Reset!</h2>
           <p className="text-gray-600 mb-2">Your password has been updated successfully.</p>
-          <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
-          <Link href="/dashboard" className="mt-4 inline-block text-blue-600 hover:underline">Go to Dashboard</Link>
+          <p className="text-sm text-gray-500">Redirecting to sign in...</p>
+          <Link href="/auth?reset=success" className="mt-4 inline-block text-blue-600 hover:underline">Go to Sign In</Link>
         </div>
       </div>
     );

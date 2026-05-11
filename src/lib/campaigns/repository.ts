@@ -1030,6 +1030,18 @@ export async function listOffersForAthlete(athleteUserId: string): Promise<Store
   return (data ?? []).map((r) => dbOfferToStored(r as unknown as DbOfferRow));
 }
 
+/**
+ * When multiple offers reference the same application (resends / drafts), prefer one that already
+ * has an associated deal so list APIs can link to the athlete workspace reliably.
+ */
+export function pickOfferForApplication(offers: StoredOffer[], applicationId: string): StoredOffer | null {
+  const id = String(applicationId);
+  const matches = offers.filter((o) => o.applicationId != null && String(o.applicationId) === id);
+  if (matches.length === 0) return null;
+  const withDeal = matches.find((o) => o.dealId != null && String(o.dealId).trim() !== '');
+  return withDeal ?? matches[0];
+}
+
 export async function listOffersForBrand(brandUserId: string): Promise<StoredOffer[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

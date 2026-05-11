@@ -10,13 +10,14 @@ import {
   fetchDealsList,
   formatIsoDate,
   formatShortId,
-  humanizeDealStatus,
   compensationAmountFromDealSnapshot,
   parseTermsSnapshot,
   type ApiDeal,
 } from '@/lib/deals/dashboardDealsClient';
 import {
+  dealStatusCopy,
   stageProgress,
+  STAGE_LABELS,
   STAGE_ORDER,
 } from '@/lib/deals/stageProjection';
 import { useDealsRealtimeRefresh } from '@/lib/deals/useDealsRealtimeRefresh';
@@ -67,18 +68,32 @@ function submissionTierLabel(notes: string): string {
 }
 
 function athleteDealCardTitle(deal: ApiDeal): string {
-  const t = parseTermsSnapshot(deal.termsSnapshot);
-  const line = (t?.compensationLine ?? '').trim();
-  if (line) return line;
-  const notes = (t?.notes ?? '').trim();
-  if (notes) return notes.length > 56 ? `${notes.slice(0, 56)}…` : notes;
-  return 'NIL partnership';
+  const brand = deal.brandName?.trim();
+  if (brand) return brand;
+  return `Brand ${formatShortId(deal.brandUserId)}`;
 }
 
 function athleteDealCardSubtitle(deal: ApiDeal): string {
-  const brand = deal.brandName?.trim() || `Brand ${formatShortId(deal.brandUserId)}`;
   const campaign = deal.campaignName?.trim();
-  return campaign ? `${brand} · ${campaign}` : brand;
+  if (campaign) return campaign;
+  return 'Campaign';
+}
+
+function dealAmountCopy(deal: ApiDeal): string {
+  const amount = compensationAmountFromDealSnapshot(deal.termsSnapshot);
+  if (amount > 0) return `$${amount.toLocaleString()}`;
+
+  const terms = parseTermsSnapshot(deal.termsSnapshot);
+  const line = (terms?.compensationLine ?? '').trim();
+  if (line) return line;
+
+  return 'Compensation TBD';
+}
+
+function dealAmountLabel(deal: ApiDeal): string {
+  if (deal.status === 'paid') return 'Paid out';
+  if (deal.status === 'closed' || deal.status === 'cancelled') return 'Final value';
+  return 'Deal value';
 }
 
 function urgencyMetaForDeal(deal: ApiDeal): { level: UrgencyLevel; nearestDueAt: string | null } {
@@ -124,42 +139,12 @@ function cardPrimaryCta(deal: ApiDeal, urgency: UrgencyLevel): string {
   return 'Open deal';
 }
 
-function cardStageMeta(deal: ApiDeal): { label: string; value: string } {
-  const terms = parseTermsSnapshot(deal.termsSnapshot);
-  const label = (deal.nextActionLabel || '').toLowerCase();
-  if (label.includes('sign') || (label.includes('contract') && (label.includes('agree') || label.includes('signature')))) {
-    return { label: 'Stage', value: 'Agreement & signature' };
-  }
-  if (deal.status === 'under_review' || label.includes('review')) {
-    return { label: 'Stage', value: 'Review & Revisions' };
-  }
-  if (deal.status === 'paid' || deal.status === 'closed') {
-    return { label: 'Stage', value: 'Payout Complete' };
-  }
-  if (deal.status === 'payment_pending') {
-    return { label: 'Stage', value: 'Payout Processing' };
-  }
-  return { label: 'Compensation', value: terms?.compensationLine ?? 'Sponsorship deal' };
-}
-
 function cardProgressIndex(deal: ApiDeal): number {
   const label = (deal.nextActionLabel || '').toLowerCase();
   if (deal.status === 'created' || deal.status === 'contract_pending' || label.includes('sign')) return 0;
   if (deal.status === 'under_review' || label.includes('review') || label.includes('revision')) return 2;
   if (deal.status === 'payment_pending' || deal.status === 'paid' || deal.status === 'closed') return 3;
   return 1;
-}
-
-function stageStepLabel(step: (typeof STAGE_ORDER)[number]): string {
-  const map: Record<(typeof STAGE_ORDER)[number], string> = {
-    agreement: 'AGREEMENT',
-    work_in_progress: 'WORK IN PROGRESS',
-    review_revisions: 'REVIEW REVISIONS',
-    completed: 'DELIVERABLES DONE',
-    payment: 'PAYOUT',
-    closed: 'CLOSED',
-  };
-  return map[step];
 }
 
 function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] }) {
@@ -183,7 +168,7 @@ function ProgressTracker({ stageId }: { stageId: (typeof STAGE_ORDER)[number] })
               {done ? '✓' : i + 1}
             </span>
             <span className={`text-[11px] font-bold uppercase leading-tight tracking-wide ${current ? 'text-nilink-ink' : done ? 'text-emerald-700' : 'text-gray-500'}`}>
-              {stageStepLabel(step)}
+              {STAGE_LABELS[step]}
             </span>
           </li>
         );
@@ -356,10 +341,11 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
               type="button"
               onClick={() => void loadList()}
               disabled={loading}
+              aria-label="Refresh deals"
+              title="Refresh deals"
               className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden />
-              Refresh
             </button>
           </div>
         </div>
@@ -415,7 +401,6 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
               </p>
             ) : null}
             {filteredDeals.map((deal) => {
-              const stageMeta = cardStageMeta(deal);
               const progressIndex = cardProgressIndex(deal);
               return (
                 <motion.div
@@ -433,25 +418,13 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                         {athleteDealCardTitle(deal)}
                       </h3>
                       <p className="mt-1 text-xs font-medium text-gray-500">{athleteDealCardSubtitle(deal)}</p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-semibold text-gray-700">{stageMeta.label}:</span> {stageMeta.value}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold text-gray-400">{dealStatusCopy(deal.status)}</span>
+                      <p className="mt-1 text-sm font-semibold text-nilink-ink">
+                        {dealAmountLabel(deal)}: {dealAmountCopy(deal)}
                       </p>
                     </div>
-                    <span className="text-xs font-semibold text-gray-400">{humanizeDealStatus(deal.status)}</span>
-                  </div>
-                  <p className="text-sm text-gray-600">Next step: {deal.nextActionLabel}</p>
-                  <div className="mt-3 grid grid-cols-4 gap-1.5">
-                    {['Agreement', 'Execution', 'Review', 'Payout'].map((step, i) => {
-                      const active = i <= progressIndex;
-                      return (
-                        <div key={step} className="space-y-1">
-                          <div className={`h-1.5 rounded-full ${active ? 'bg-nilink-accent' : 'bg-gray-200'}`} />
-                          <p className={`text-[10px] font-semibold uppercase tracking-wide ${active ? 'text-gray-700' : 'text-gray-400'}`}>
-                            {step}
-                          </p>
-                        </div>
-                      );
-                    })}
                   </div>
                   <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
                     <span className="flex items-center gap-2">
@@ -480,7 +453,6 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                     {groupedOpenDeals[key].map((deal) => {
                       const urgency = urgencyMetaForDeal(deal);
                       const ctaLabel = cardPrimaryCta(deal, urgency.level);
-                      const stageMeta = cardStageMeta(deal);
                       const progressIndex = cardProgressIndex(deal);
                       return (
                         <motion.div
@@ -498,8 +470,8 @@ export function DealManagement({ initialDealId = null }: { initialDealId?: strin
                                 {athleteDealCardTitle(deal)}
                               </h3>
                               <p className="mt-1 text-xs font-medium text-gray-500">{athleteDealCardSubtitle(deal)}</p>
-                              <p className="text-sm text-gray-600">
-                                <span className="font-semibold text-gray-700">{stageMeta.label}:</span> {stageMeta.value}
+                              <p className="mt-1 text-sm font-semibold text-nilink-ink">
+                                {dealAmountLabel(deal)}: {dealAmountCopy(deal)}
                               </p>
                             </div>
                             <div className="text-right">

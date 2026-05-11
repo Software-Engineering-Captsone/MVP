@@ -32,6 +32,12 @@ export default function AuthForm() {
     const [successMessage, setSuccessMessage] = useState('');
     const [forgotEmail, setForgotEmail] = useState('');
     const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [forgotStep, setForgotStep] = useState<'email' | 'otp'>('email');
+    const [forgotOtp, setForgotOtp] = useState('');
+    const [forgotNewPassword, setForgotNewPassword] = useState('');
+    const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+    const [forgotCooldownUntil, setForgotCooldownUntil] = useState<number>(0);
+    const [forgotCooldownRemaining, setForgotCooldownRemaining] = useState<number>(0);
     const [resendEmail, setResendEmail] = useState('');
     const [showResendVerification, setShowResendVerification] = useState(false);
 
@@ -43,6 +49,7 @@ export default function AuthForm() {
         const error = searchParams.get('error');
         const verified = searchParams.get('verified');
         const mode = searchParams.get('mode');
+        const reset = searchParams.get('reset');
 
         if (mode === 'signup') setActiveTab('signup');
         if (mode === 'signin') setActiveTab('signin');
@@ -51,7 +58,26 @@ export default function AuthForm() {
         else if (error === 'google_failed') setFormError('Google sign-in failed. Please try again.');
         else if (error === 'auth_callback_failed') setFormError('Authentication failed. Please try again.');
         if (verified === 'true') setSuccessMessage('Email verified! You can now sign in.');
+        if (reset === 'success') setSuccessMessage('Password updated. Please sign in with your new password.');
     }, [searchParams]);
+
+    // Tick down the forgot-password cooldown so the button label
+    // updates once per second while the timer is active. Avoids
+    // burning Supabase's per-project recovery email rate limit.
+    useEffect(() => {
+        if (!forgotCooldownUntil) {
+            setForgotCooldownRemaining(0);
+            return;
+        }
+        const update = () => {
+            const remaining = Math.max(0, Math.ceil((forgotCooldownUntil - Date.now()) / 1000));
+            setForgotCooldownRemaining(remaining);
+            if (remaining <= 0) setForgotCooldownUntil(0);
+        };
+        update();
+        const id = setInterval(update, 1000);
+        return () => clearInterval(id);
+    }, [forgotCooldownUntil]);
 
     const clearMessages = () => {
         setFormError('');
@@ -171,24 +197,101 @@ export default function AuthForm() {
         }
     };
 
-    /* ────────────── Forgot Password ────────────── */
-    const handleForgotPassword = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const resetForgotModalState = () => {
+        setForgotStep('email');
+        setForgotEmail('');
+        setForgotOtp('');
+        setForgotNewPassword('');
+        setForgotConfirmPassword('');
+    };
+
+    const closeForgotModal = () => {
+        setShowForgotPassword(false);
+        setFormError('');
+        resetForgotModalState();
+    };
+
+    const sendForgotPasswordCode = async () => {
+        if (loading || forgotCooldownRemaining > 0) return;
+        const email = forgotEmail.trim();
+        if (!email) {
+            setFormError('Please enter your email address.');
+            return;
+        }
         setLoading(true);
         clearMessages();
 
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-                redirectTo: `${window.location.origin}/auth/reset-password`,
-            });
-
+            const { error } = await supabase.auth.resetPasswordForEmail(email);
             if (error) {
                 setFormError(error.message);
-            } else {
-                setSuccessMessage('Password reset link sent to your email.');
-                setShowForgotPassword(false);
-                setForgotEmail('');
+                return;
             }
+            setSuccessMessage(
+                "If an account exists for that email, we've sent a password reset code. Check your inbox and spam folder."
+            );
+            setForgotStep('otp');
+            setForgotOtp('');
+            setForgotCooldownUntil(Date.now() + 60_000);
+        } catch {
+            setFormError('Network error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /* ────────────── Forgot Password (OTP) ────────────── */
+    const handleForgotPasswordRequestCode = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await sendForgotPasswordCode();
+    };
+
+    const handleForgotPasswordReset = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (loading) return;
+        clearMessages();
+
+        const token = forgotOtp.trim();
+        if (!token) {
+            setFormError('Enter the 6-digit reset code from your email.');
+            return;
+        }
+        if (forgotNewPassword !== forgotConfirmPassword) {
+            setFormError('Passwords do not match.');
+            return;
+        }
+        if (forgotNewPassword.length < 8) {
+            setFormError('Password must be at least 8 characters.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+                email: forgotEmail.trim(),
+                token,
+                type: 'recovery',
+            });
+            if (verifyError) {
+                setFormError(verifyError.message);
+                return;
+            }
+
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: forgotNewPassword,
+            });
+            if (updateError) {
+                setFormError(updateError.message);
+                return;
+            }
+
+            try {
+                await supabase.auth.signOut();
+            } catch {
+                // Best effort. We still continue to the signed-out auth view.
+            }
+            closeForgotModal();
+            setSuccessMessage('Password updated. Please sign in with your new password.');
         } catch {
             setFormError('Network error');
         } finally {
@@ -295,7 +398,21 @@ export default function AuthForm() {
                                 <label className="form-checkbox">
                                     <input type="checkbox" /> Remember me
                                 </label>
-                                <a href="#" className="form-link" onClick={(e) => { e.preventDefault(); setShowForgotPassword(true); }}>Forgot password?</a>
+                                <a
+                                    href="#"
+                                    className="form-link"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setFormError('');
+                                        setForgotStep('email');
+                                        setForgotOtp('');
+                                        setForgotNewPassword('');
+                                        setForgotConfirmPassword('');
+                                        setShowForgotPassword(true);
+                                    }}
+                                >
+                                    Forgot password?
+                                </a>
                             </div>
                             {formError && <p className="error-message">{formError}</p>}
                             <button type="submit" className="btn-submit" disabled={loading}>
@@ -428,34 +545,115 @@ export default function AuthForm() {
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
                             <h2 className="text-xl font-bold mb-4">Reset Password</h2>
-                            <p className="text-gray-600 mb-4">Enter your email address and we&apos;ll send you a link to reset your password.</p>
-
-                            <form onSubmit={handleForgotPassword}>
-                                <div className="form-group">
-                                    <label htmlFor="forgot-email">Email</label>
-                                    <input
-                                        type="email"
-                                        id="forgot-email"
-                                        placeholder="you@example.com"
-                                        value={forgotEmail}
-                                        onChange={(e) => setForgotEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                {formError && <p className="error-message">{formError}</p>}
-                                <div className="flex space-x-3 mt-4">
-                                    <button type="submit" className="btn-submit flex-1" disabled={loading}>
-                                        {loading ? 'Sending...' : 'Send Reset Link'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowForgotPassword(false); setFormError(''); setForgotEmail(''); }}
-                                        className="btn-secondary flex-1"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
+                            {forgotStep === 'email' ? (
+                                <>
+                                    <p className="text-gray-600 mb-4">
+                                        Enter your account email and we&apos;ll send you a 6-digit password reset code.
+                                    </p>
+                                    <form onSubmit={handleForgotPasswordRequestCode}>
+                                        <div className="form-group">
+                                            <label htmlFor="forgot-email">Email</label>
+                                            <input
+                                                type="email"
+                                                id="forgot-email"
+                                                placeholder="you@example.com"
+                                                value={forgotEmail}
+                                                onChange={(e) => setForgotEmail(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                        {formError && <p className="error-message">{formError}</p>}
+                                        <div className="flex space-x-3 mt-4">
+                                            <button
+                                                type="submit"
+                                                className="btn-submit flex-1"
+                                                disabled={loading || forgotCooldownRemaining > 0}
+                                            >
+                                                {loading
+                                                    ? 'Sending...'
+                                                    : forgotCooldownRemaining > 0
+                                                        ? `Resend in ${forgotCooldownRemaining}s`
+                                                        : 'Send Reset Code'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={closeForgotModal}
+                                                className="btn-secondary flex-1"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </form>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-gray-600 mb-4">
+                                        Enter the 6-digit code from your email and choose a new password.
+                                    </p>
+                                    <form onSubmit={handleForgotPasswordReset}>
+                                        <div className="form-group">
+                                            <label htmlFor="forgot-code">Reset Code</label>
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                id="forgot-code"
+                                                placeholder="123456"
+                                                value={forgotOtp}
+                                                onChange={(e) => setForgotOtp(e.target.value)}
+                                                autoComplete="one-time-code"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="forgot-new-password">New Password</label>
+                                            <input
+                                                type="password"
+                                                id="forgot-new-password"
+                                                placeholder="Min. 8 characters"
+                                                value={forgotNewPassword}
+                                                onChange={(e) => setForgotNewPassword(e.target.value)}
+                                                minLength={8}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="forgot-confirm-password">Confirm Password</label>
+                                            <input
+                                                type="password"
+                                                id="forgot-confirm-password"
+                                                placeholder="Re-enter your new password"
+                                                value={forgotConfirmPassword}
+                                                onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                                                minLength={8}
+                                                required
+                                            />
+                                        </div>
+                                        {formError && <p className="error-message">{formError}</p>}
+                                        <div className="flex space-x-3 mt-4">
+                                            <button type="submit" className="btn-submit flex-1" disabled={loading}>
+                                                {loading ? 'Resetting...' : 'Reset Password'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={closeForgotModal}
+                                                className="btn-secondary flex-1"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="form-link mt-3"
+                                            disabled={loading || forgotCooldownRemaining > 0}
+                                            onClick={sendForgotPasswordCode}
+                                        >
+                                            {forgotCooldownRemaining > 0
+                                                ? `Resend code in ${forgotCooldownRemaining}s`
+                                                : 'Resend code'}
+                                        </button>
+                                    </form>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
