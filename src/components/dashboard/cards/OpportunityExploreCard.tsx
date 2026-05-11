@@ -137,7 +137,7 @@ export function OpportunityExploreCard({
   interactiveSurfaceClassName = '',
 }: OpportunityCardProps) {
   const focusRing = focusRingClassName;
-  const ctaLabel = content.ctaLabel ?? 'View Deal';
+  const ctaLabel = content.ctaLabel ?? 'View';
   const saveAria = state.isSaved ? 'Remove saved campaign' : 'Save campaign';
 
   const rootClassName = [

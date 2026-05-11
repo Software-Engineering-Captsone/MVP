@@ -148,7 +148,7 @@ function condensedDeliverableChips(campaign: ApiCampaignRow): DeliverableChipsRe
 }
 
 function detailSectionTitle(text: string) {
-  return <h4 className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{text}</h4>;
+  return <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{text}</h4>;
 }
 
 /** Phase 6: shared explore typography (presentation only). */
@@ -156,6 +156,7 @@ const exploreSectionTitle = 'text-lg font-bold tracking-tight text-gray-900';
 const exploreSectionSubtitle = 'mt-1 text-sm leading-relaxed text-gray-500';
 const exploreSectionMeta = 'text-xs font-semibold uppercase tracking-wider text-gray-500';
 const explorePanelLabel = 'text-[11px] font-bold uppercase tracking-wider text-gray-500';
+const explorePanelLabelDark = 'text-[11px] font-bold uppercase tracking-wider text-slate-400';
 const exploreCardTitle = 'text-[15px] font-semibold leading-snug text-gray-900';
 const exploreCardMeta = 'text-xs text-gray-500';
 const exploreInteractiveSurface =
@@ -228,11 +229,32 @@ export function AthleteExploreMarketplace() {
   const [opportunityGridCols, setOpportunityGridCols] = useState(1);
 
   const [selectedCampaign, setSelectedCampaign] = useState<ApiCampaignRow | null>(null);
+  const [isCampaignPanelOpen, setIsCampaignPanelOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
+  const [isBrandPanelOpen, setIsBrandPanelOpen] = useState(false);
 
   const [applyTargetCampaignId, setApplyTargetCampaignId] = useState<string | null>(null);
   const [savedCampaignIds, setSavedCampaignIds] = useState<string[]>([]);
   const [consumedCampaignParam, setConsumedCampaignParam] = useState<string | null>(null);
+
+  const openCampaignPanel = useCallback((campaign: ApiCampaignRow) => {
+    setSelectedCampaign(campaign);
+    setIsCampaignPanelOpen(false);
+  }, []);
+
+  const closeCampaignPanel = useCallback(() => {
+    setIsCampaignPanelOpen(false);
+  }, []);
+
+  const openBrandPanel = useCallback((brand: Brand) => {
+    setSelectedBrand(brand);
+    setBrandProfileTab('overview');
+    setIsBrandPanelOpen(false);
+  }, []);
+
+  const closeBrandPanel = useCallback(() => {
+    setIsBrandPanelOpen(false);
+  }, []);
 
   const appendAthleteCampaignFilters = useCallback((sp: URLSearchParams) => {
     if (opportunitySport.trim()) sp.set('sport', opportunitySport.trim());
@@ -615,6 +637,26 @@ export function AthleteExploreMarketplace() {
     setConsumedCampaignParam(campaignIdParam);
   }, [searchParams, campaigns, consumedCampaignParam]);
 
+  useEffect(() => {
+    if (!selectedCampaign) return;
+    // Mount first in the off-screen state, then open on next frame for reliable slide-in.
+    setIsCampaignPanelOpen(false);
+    const frame = window.requestAnimationFrame(() => {
+      setIsCampaignPanelOpen(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedCampaign]);
+
+  useEffect(() => {
+    if (!selectedBrand) return;
+    // Mount first in the off-screen state, then open on next frame for reliable slide-in.
+    setIsBrandPanelOpen(false);
+    const frame = window.requestAnimationFrame(() => {
+      setIsBrandPanelOpen(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedBrand]);
+
   const savedCampaigns = useMemo(() => {
     const set = new Set(savedCampaignIds);
     return campaigns.filter((campaign) => set.has(String(campaign.id)));
@@ -900,11 +942,11 @@ export function AthleteExploreMarketplace() {
                                   chips: chipObjects,
                                   deadline,
                                   compensation,
-                                  ctaLabel: 'View Deal',
+                                  ctaLabel: 'View',
                                 }}
                                 state={{ isSaved, isWithdrawn }}
                                 callbacks={{
-                                  onOpen: () => setSelectedCampaign(campaign),
+                                  onOpen: () => openCampaignPanel(campaign),
                                   onToggleSave: () => void toggleSaveCampaign(String(campaign.id)),
                                 }}
                               />
@@ -1008,11 +1050,11 @@ export function AthleteExploreMarketplace() {
                         chips: chipObjects,
                         deadline,
                         compensation,
-                        ctaLabel: 'View Deal',
+                        ctaLabel: 'View',
                       }}
                       state={{ isSaved: true }}
                       callbacks={{
-                        onOpen: () => setSelectedCampaign(campaign),
+                        onOpen: () => openCampaignPanel(campaign),
                         onToggleSave: () => void toggleSaveCampaign(String(campaign.id)),
                       }}
                     />
@@ -1044,8 +1086,7 @@ export function AthleteExploreMarketplace() {
                   key={brand.id}
                   type="button"
                   onClick={() => {
-                    setSelectedBrand(brand);
-                    setBrandProfileTab('overview');
+                    openBrandPanel(brand);
                   }}
                   className={brandDirectoryCardTokens.root}
                 >
@@ -1079,24 +1120,39 @@ export function AthleteExploreMarketplace() {
       </div>
 
       {selectedCampaign ? (
-        <div className="fixed inset-0 z-[70] flex items-stretch justify-end bg-black/40">
-          <div className="h-full w-full max-w-[825px] overflow-hidden rounded-l-3xl border-l border-gray-100 bg-white shadow-2xl">
-            <div className="flex items-center justify-end border-b border-gray-100 px-6 py-4">
+        <div
+          className={`fixed inset-0 z-[70] flex items-stretch justify-end bg-black/40 transition-opacity duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            isCampaignPanelOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+        >
+          <div
+            className={`relative h-full w-full max-w-[825px] overflow-hidden rounded-l-3xl border-l border-white/10 bg-nilink-sidebar text-slate-100 shadow-2xl transform-gpu will-change-transform transition-transform duration-[500ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+              isCampaignPanelOpen ? 'translate-x-0' : 'translate-x-[102%]'
+            }`}
+            onTransitionEnd={(event) => {
+              if (event.target === event.currentTarget && !isCampaignPanelOpen) {
+                setSelectedCampaign(null);
+              }
+            }}
+          >
+            <div className="pointer-events-none absolute -left-16 top-12 h-44 w-44 rounded-full bg-nilink-accent-bright/20 blur-3xl" />
+            <div className="pointer-events-none absolute -right-10 bottom-16 h-52 w-52 rounded-full bg-indigo-500/15 blur-3xl" />
+            <div className="relative flex items-center justify-end border-b border-white/10 px-6 py-4">
               <button
                 type="button"
-                className={`rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors duration-200 ease-out hover:bg-gray-50 active:bg-gray-100 ${exploreFocusRing}`}
-                onClick={() => setSelectedCampaign(null)}
+                className={`rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-slate-100 shadow-sm transition-colors duration-200 ease-out hover:bg-white/20 active:bg-white/15 ${exploreFocusRing}`}
+                onClick={closeCampaignPanel}
               >
                 Close
               </button>
             </div>
 
-            <div className="h-[calc(100vh-73px)] overflow-y-auto px-6 py-6">
+            <div className="relative h-[calc(100vh-73px)] overflow-y-auto px-6 py-6">
               <div className="w-full">
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm ring-1 ring-black/[0.04] sm:p-6">
+                <div className="rounded-2xl border border-white/15 bg-slate-900/45 p-5 shadow-lg ring-1 ring-white/10 backdrop-blur-sm sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+                      <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-slate-800">
                         <ImageWithFallback
                           src={campaignImageForCard(selectedCampaign) || PLACEHOLDER_IMAGE}
                           alt={String(selectedCampaign.name ?? 'Campaign')}
@@ -1104,31 +1160,31 @@ export function AthleteExploreMarketplace() {
                         />
                       </div>
                       <div className="min-w-0 pt-0.5">
-                        <h2 className="line-clamp-2 text-2xl font-bold leading-snug tracking-tight text-gray-900 sm:text-[30px] sm:leading-[1.08]">
+                        <h2 className="line-clamp-2 text-2xl font-bold leading-snug tracking-tight text-white sm:text-[30px] sm:leading-[1.08]">
                           {String(selectedCampaign.name ?? 'Campaign')}
                         </h2>
                         {findBrandForCampaign(selectedCampaign) ? (
                           <button
                             type="button"
-                            className={`mt-2 block truncate text-left text-[13px] font-semibold leading-snug text-gray-700 underline-offset-2 transition-colors duration-200 ease-out hover:text-nilink-accent hover:underline ${exploreFocusRing} rounded-sm`}
+                            className={`mt-2 block truncate rounded-sm text-left text-[13px] font-semibold leading-snug text-slate-300 underline-offset-2 transition-colors duration-200 ease-out hover:text-nilink-accent-bright hover:underline ${exploreFocusRing}`}
                             onClick={() => {
                               const brand = findBrandForCampaign(selectedCampaign);
                               if (brand) {
-                                setSelectedBrand(brand);
-                                setBrandProfileTab('overview');
+                                openBrandPanel(brand);
                                 setActiveTab('brands');
                                 setSelectedCampaign(null);
+                                setIsCampaignPanelOpen(false);
                               }
                             }}
                           >
                             {String(selectedCampaign.brandDisplayName ?? 'Brand')}
                           </button>
                         ) : (
-                          <p className="mt-2 truncate text-[13px] font-semibold leading-snug text-gray-700">
+                          <p className="mt-2 truncate text-[13px] font-semibold leading-snug text-slate-300">
                             {String(selectedCampaign.brandDisplayName ?? 'Brand')}
                           </p>
                         )}
-                        <span className="mt-2 inline-flex min-w-0 items-center gap-2 text-[13px] font-medium text-gray-500">
+                        <span className="mt-2 inline-flex min-w-0 items-center gap-2 text-[13px] font-medium text-slate-400">
                           <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
                           {selectedCampaignPostedLabel}
                         </span>
@@ -1137,7 +1193,7 @@ export function AthleteExploreMarketplace() {
                     {selectedCampaignHasBlockingApplication ? (
                       <Link
                         href="/dashboard/applications"
-                        className={`shrink-0 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors duration-200 ease-out hover:bg-gray-50 ${exploreFocusRing}`}
+                        className={`shrink-0 rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-slate-100 shadow-sm transition-colors duration-200 ease-out hover:bg-white/20 ${exploreFocusRing}`}
                       >
                         View Application
                       </Link>
@@ -1155,16 +1211,16 @@ export function AthleteExploreMarketplace() {
                     )}
                   </div>
 
-                  <div className="mt-6 grid grid-cols-2 gap-6 border-t border-gray-100 pt-5 text-sm">
+                  <div className="mt-6 grid grid-cols-2 gap-6 border-t border-white/10 pt-5 text-sm">
                     <div>
-                      <p className={explorePanelLabel}>Compensation</p>
-                      <p className="mt-1.5 font-semibold text-gray-800">
+                      <p className={explorePanelLabelDark}>Compensation</p>
+                      <p className="mt-1.5 font-semibold text-slate-100">
                         {String(selectedCampaign.budgetHint || selectedCampaign.budget || 'Shared if selected')}
                       </p>
                     </div>
                     <div>
-                      <p className={explorePanelLabel}>Deadline</p>
-                      <p className="mt-1.5 font-semibold text-gray-800">
+                      <p className={explorePanelLabelDark}>Deadline</p>
+                      <p className="mt-1.5 font-semibold text-slate-100">
                         {formatDate(selectedCampaign.endDate || selectedCampaign.createdAt)}
                       </p>
                     </div>
@@ -1172,45 +1228,45 @@ export function AthleteExploreMarketplace() {
                 </div>
 
                 {selectedCampaignHasBlockingApplication ? (
-                  <div className="mt-4 rounded-xl border border-gray-200/90 bg-gray-50/90 px-4 py-3 text-sm leading-relaxed text-gray-700">
+                  <div className="mt-4 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm leading-relaxed text-slate-200">
                     You already have an active application for this campaign. Track updates from the{' '}
-                    <Link href="/dashboard/applications" className="font-medium text-nilink-accent underline-offset-2 hover:underline">
+                    <Link href="/dashboard/applications" className="font-medium text-nilink-accent-bright underline-offset-2 hover:underline">
                       Applications
                     </Link>{' '}
                     page.
                   </div>
                 ) : null}
 
-                <div className="mt-8 space-y-10 border-t border-gray-100 pt-8">
+                <div className="mt-8 space-y-10 border-t border-white/10 pt-8">
                   <section>
                     {detailSectionTitle('Description')}
-                    <p className="mt-3 max-w-prose text-sm leading-relaxed text-gray-700">
+                    <p className="mt-3 max-w-prose text-sm leading-relaxed text-slate-200">
                       {String(selectedCampaign.brief || 'No description provided.')}
                     </p>
                   </section>
-                  <section className="border-t border-gray-100 pt-8">
+                  <section className="border-t border-white/10 pt-8">
                     {detailSectionTitle('Requirements')}
-                    <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+                    <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-200 marker:text-slate-400">
                       <li>Sport: {String(selectedCampaign.sport || 'All sports')}</li>
                       <li>Minimum followers: {selectedCampaign.followerMin ? String(selectedCampaign.followerMin) : 'Not specified'}</li>
                       <li>Minimum engagement: {selectedCampaign.engagementMinPct ? `${selectedCampaign.engagementMinPct}%` : 'Not specified'}</li>
                     </ul>
                   </section>
-                  <section className="border-t border-gray-100 pt-8">
+                  <section className="border-t border-white/10 pt-8">
                     {detailSectionTitle('Deliverables')}
                     {Array.isArray(selectedCampaign.packageDetails) && selectedCampaign.packageDetails.length > 0 ? (
-                      <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+                      <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-200 marker:text-slate-400">
                         {selectedCampaign.packageDetails.slice(0, 5).map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="mt-3 text-sm text-gray-600">Deliverables are finalized after offer acceptance.</p>
+                      <p className="mt-3 text-sm text-slate-300">Deliverables are finalized after offer acceptance.</p>
                     )}
                   </section>
-                  <section className="border-t border-gray-100 pt-8">
+                  <section className="border-t border-white/10 pt-8">
                     {detailSectionTitle('Timeline')}
-                    <p className="mt-3 text-sm text-gray-700">
+                    <p className="mt-3 text-sm text-slate-200">
                       {formatDate(selectedCampaign.startDate)} – {formatDate(selectedCampaign.endDate)}
                     </p>
                   </section>
@@ -1222,35 +1278,37 @@ export function AthleteExploreMarketplace() {
       ) : null}
 
       {selectedBrand ? (
-        <div className="fixed inset-0 z-[70] flex items-stretch justify-end bg-black/40">
+        <div
+          className={`fixed inset-0 z-[70] flex items-stretch justify-end bg-black/40 transition-opacity duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            isBrandPanelOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+        >
           <div
-            className="flex h-full w-full max-w-[1000px] flex-col overflow-hidden bg-slate-50 shadow-2xl"
+            className={`relative flex h-full w-full max-w-[825px] flex-col overflow-hidden rounded-l-3xl border-l border-white/10 bg-nilink-sidebar text-slate-100 shadow-2xl transform-gpu will-change-transform transition-transform duration-[500ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+              isBrandPanelOpen ? 'translate-x-0' : 'translate-x-[102%]'
+            }`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="explore-brand-profile-title"
+            onTransitionEnd={(event) => {
+              if (event.target === event.currentTarget && !isBrandPanelOpen) {
+                setSelectedBrand(null);
+              }
+            }}
           >
-            <header className="relative shrink-0 bg-slate-900 text-white">
-              <div className="relative aspect-[5/3] max-h-[220px] min-h-[160px] w-full overflow-hidden bg-slate-800 sm:aspect-[21/9] sm:max-h-[240px]">
-                <ImageWithFallback
-                  src={brandBannerSrc(selectedBrand)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-                <div
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/35 to-transparent"
-                  aria-hidden
-                />
-              </div>
+            <div className="pointer-events-none absolute -left-16 top-12 h-44 w-44 rounded-full bg-nilink-accent-bright/20 blur-3xl" />
+            <div className="pointer-events-none absolute -right-10 bottom-16 h-52 w-52 rounded-full bg-indigo-500/15 blur-3xl" />
+            <header className="relative shrink-0 bg-gradient-to-b from-slate-900/90 via-slate-900/70 to-transparent text-white">
               <button
                 type="button"
-                className={`absolute right-4 top-4 z-10 rounded-lg border border-white/30 bg-white/95 px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm backdrop-blur-sm transition-colors duration-200 ease-out hover:bg-white active:bg-white/90 ${exploreFocusRing}`}
-                onClick={() => setSelectedBrand(null)}
+                className={`absolute right-4 top-4 z-10 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 shadow-sm backdrop-blur-sm transition-colors duration-200 ease-out hover:bg-white/20 active:bg-white/15 ${exploreFocusRing}`}
+                onClick={closeBrandPanel}
               >
                 Close
               </button>
 
-              <div className="relative border-t border-white/10 px-6 pb-6 pt-0">
-                <div className="-mt-12 flex flex-col gap-5 sm:-mt-14 sm:flex-row sm:items-end sm:gap-6">
+              <div className="relative border-t border-white/10 px-6 pb-6 pt-16 sm:pt-14">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
                   <div className="flex shrink-0 justify-center sm:justify-start">
                     <div className="h-[88px] w-[88px] overflow-hidden rounded-2xl border-4 border-slate-900 bg-white shadow-xl ring-1 ring-white/25 sm:h-24 sm:w-24">
                       <ImageWithFallback
@@ -1289,10 +1347,10 @@ export function AthleteExploreMarketplace() {
             </header>
 
             <nav
-              className="shrink-0 border-b border-gray-200 bg-white px-6 py-4"
+              className="shrink-0 border-b border-white/10 bg-slate-900/40 px-6 py-4"
               aria-label="Brand profile sections"
             >
-              <div className="flex max-w-4xl gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1" role="tablist">
+              <div className="mx-auto flex w-full max-w-4xl gap-1 rounded-xl border border-white/10 bg-slate-900/50 p-1" role="tablist">
                 <button
                   type="button"
                   role="tab"
@@ -1300,7 +1358,7 @@ export function AthleteExploreMarketplace() {
                   aria-selected={brandProfileTab === 'overview'}
                   aria-controls="explore-brand-panel-overview"
                   className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-200 ease-out active:scale-[0.99] motion-reduce:active:scale-100 ${exploreFocusRing} ${
-                    brandProfileTab === 'overview' ? 'bg-white text-nilink-ink shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    brandProfileTab === 'overview' ? 'bg-white/15 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
                   }`}
                   onClick={() => setBrandProfileTab('overview')}
                 >
@@ -1313,7 +1371,7 @@ export function AthleteExploreMarketplace() {
                   aria-selected={brandProfileTab === 'campaigns'}
                   aria-controls="explore-brand-panel-campaigns"
                   className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-200 ease-out active:scale-[0.99] motion-reduce:active:scale-100 ${exploreFocusRing} ${
-                    brandProfileTab === 'campaigns' ? 'bg-white text-nilink-ink shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    brandProfileTab === 'campaigns' ? 'bg-white/15 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
                   }`}
                   onClick={() => setBrandProfileTab('campaigns')}
                 >
@@ -1331,41 +1389,43 @@ export function AthleteExploreMarketplace() {
                   className="mx-auto max-w-4xl space-y-8"
                 >
                   <section
-                    className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7"
+                    className="rounded-2xl border border-white/10 bg-slate-900/45 p-6 shadow-sm ring-1 ring-white/10 backdrop-blur-sm sm:p-7"
                     aria-labelledby="explore-brand-about-heading"
                   >
-                    <h3 id="explore-brand-about-heading" className={explorePanelLabel}>
+                    <h3 id="explore-brand-about-heading" className={explorePanelLabelDark}>
                       About
                     </h3>
-                    <p className="mt-4 text-sm leading-relaxed text-gray-700">
+                    <p className="mt-4 text-sm leading-relaxed text-slate-200">
                       {selectedBrand.bio || 'No overview available for this brand yet.'}
                     </p>
+                    <dl className="mt-4 flex flex-col gap-3 text-sm sm:flex-row sm:flex-wrap sm:gap-x-14 sm:gap-y-2">
+                      <div className="flex flex-col gap-0.5">
+                        <dt className={explorePanelLabelDark}>Category</dt>
+                        <dd className="font-semibold text-slate-100">{selectedBrand.industry}</dd>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <dt className={explorePanelLabelDark}>Location</dt>
+                        <dd className="font-semibold text-slate-100">{selectedBrand.location}</dd>
+                      </div>
+                    </dl>
                   </section>
 
                   <section
-                    className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white via-white to-emerald-50/50 p-6 shadow-sm sm:p-7"
+                    className="rounded-2xl border border-emerald-300/20 bg-gradient-to-br from-emerald-950/35 via-slate-900/45 to-slate-900/50 p-6 shadow-sm ring-1 ring-white/10 sm:p-7"
                     aria-labelledby="explore-brand-trust-heading"
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
                         <ShieldCheck className="h-5 w-5" aria-hidden />
                       </div>
-                      <h3 id="explore-brand-trust-heading" className="text-lg font-bold tracking-tight text-gray-900">
-                        Trust & verification
+                      <h3 id="explore-brand-trust-heading" className="text-lg font-bold tracking-tight text-slate-100">
+                        Verification
                       </h3>
                     </div>
                     <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-1">
-                      <div className="flex flex-col rounded-xl border border-gray-100 bg-white/80 px-4 py-3 transition-shadow duration-200 ease-out hover:shadow-sm">
-                        <dt className={explorePanelLabel}>Category</dt>
-                        <dd className="mt-1 font-semibold text-gray-900">{selectedBrand.industry}</dd>
-                      </div>
-                      <div className="flex flex-col rounded-xl border border-gray-100 bg-white/80 px-4 py-3 transition-shadow duration-200 ease-out hover:shadow-sm">
-                        <dt className={explorePanelLabel}>Location</dt>
-                        <dd className="mt-1 font-semibold text-gray-900">{selectedBrand.location}</dd>
-                      </div>
-                      <div className="flex flex-col rounded-xl border border-gray-100 bg-white/80 px-4 py-3 transition-shadow duration-200 ease-out hover:shadow-sm">
-                        <dt className={explorePanelLabel}>Verified status</dt>
-                        <dd className="mt-1 font-semibold text-gray-900">
+                      <div className="flex flex-col rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition-shadow duration-200 ease-out hover:bg-white/10">
+                        <dt className={explorePanelLabelDark}>Verified status</dt>
+                        <dd className="mt-1 font-semibold text-slate-100">
                           {selectedBrand.verified ? 'Verified on NILINK' : 'Not verified'}
                         </dd>
                       </div>
@@ -1379,19 +1439,19 @@ export function AthleteExploreMarketplace() {
                   aria-labelledby="explore-brand-tab-campaigns"
                   className="mx-auto max-w-4xl space-y-8"
                 >
-                  <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
-                    <div className="flex flex-col gap-2 border-b border-gray-100 pb-5 sm:flex-row sm:items-end sm:justify-between">
+                  <section className="rounded-2xl border border-white/10 bg-slate-900/45 p-6 shadow-sm ring-1 ring-white/10 backdrop-blur-sm sm:p-7">
+                    <div className="flex flex-col gap-2 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
                       <div className="min-w-0">
-                        <h3 className={exploreSectionTitle}>Active campaigns</h3>
-                        <p className={exploreSectionSubtitle}>
+                        <h3 className="text-lg font-bold tracking-tight text-slate-100">Active campaigns</h3>
+                        <p className="mt-1 text-sm leading-relaxed text-slate-300">
                           Open roles from this brand—open details to review requirements and apply.
                         </p>
                       </div>
                     </div>
                     {selectedBrandCampaigns.length === 0 ? (
-                      <div className="mt-8 rounded-xl border border-dashed border-gray-200/90 bg-gray-50/80 px-5 py-12 text-center sm:py-14">
-                        <p className="text-sm font-medium text-gray-900">No active listings right now</p>
-                        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-500">
+                      <div className="mt-8 rounded-xl border border-dashed border-white/20 bg-white/5 px-5 py-12 text-center sm:py-14">
+                        <p className="text-sm font-medium text-slate-100">No active listings right now</p>
+                        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-300">
                           This brand does not have open campaigns in your current feed. Check Explore opportunities for the
                           latest marketplace additions.
                         </p>
@@ -1404,12 +1464,12 @@ export function AthleteExploreMarketplace() {
                           return (
                             <li key={String(c.id)}>
                               <div
-                                className={`rounded-xl border border-gray-200 bg-gray-50/80 p-4 sm:p-5 ${exploreInteractiveSurface} hover:border-gray-300/90 hover:bg-white hover:shadow-sm`}
+                                className={`rounded-xl border border-white/10 bg-white/5 p-4 sm:p-5 ${exploreInteractiveSurface} hover:border-white/20 hover:bg-white/10 hover:shadow-sm`}
                               >
                                 <div className="flex items-center justify-between gap-4">
                                   <div className="min-w-0">
-                                    <p className={`truncate ${exploreCardTitle}`}>{String(c.name || 'Campaign')}</p>
-                                    <p className={`mt-1 truncate ${exploreCardMeta}`}>
+                                    <p className="truncate text-[15px] font-semibold leading-snug text-slate-100">{String(c.name || 'Campaign')}</p>
+                                    <p className="mt-1 truncate text-xs text-slate-400">
                                       {String(c.budgetHint || c.budget || 'Compensation shared in detail')}
                                     </p>
                                   </div>
@@ -1417,7 +1477,7 @@ export function AthleteExploreMarketplace() {
                                     type="button"
                                     onClick={() => {
                                       setSelectedBrand(null);
-                                      setSelectedCampaign(c);
+                                      openCampaignPanel(c);
                                     }}
                                     className={`shrink-0 rounded-lg bg-nilink-accent px-3 py-2 text-xs font-bold text-white shadow-sm transition-[filter,transform] duration-200 ease-out hover:brightness-105 active:brightness-95 active:scale-[0.98] motion-reduce:active:scale-100 ${exploreFocusRing}`}
                                   >
@@ -1432,16 +1492,6 @@ export function AthleteExploreMarketplace() {
                     )}
                   </section>
 
-                  <details className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow duration-200 ease-out open:ring-1 open:ring-gray-200">
-                    <summary
-                      className={`cursor-pointer list-none text-sm font-semibold text-gray-800 marker:hidden outline-none [&::-webkit-details-marker]:hidden ${exploreFocusRing} rounded-md px-0.5 py-0.5`}
-                    >
-                      Past campaigns
-                    </summary>
-                    <p className="mt-4 text-sm leading-relaxed text-gray-500">
-                      Historical campaign performance will appear here in a future release.
-                    </p>
-                  </details>
                 </div>
               )}
             </div>

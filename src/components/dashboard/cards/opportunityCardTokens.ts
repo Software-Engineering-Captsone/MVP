@@ -87,7 +87,7 @@ export const opportunityCardTokens = {
    */
   compensationNote:
     'min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-gray-500',
-  cta: 'inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#4F93E6] px-5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#3D83D9]',
+  cta: 'inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-nilink-accent px-5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-nilink-accent/90',
 } as const;
 
 /** Shared focus ring for nested controls (matches contract root ring token). */
