@@ -97,6 +97,7 @@ interface Props {
   onCreateOfferDrafts?: (applicationIds: string[]) => Promise<Record<string, string> | void>;
   initialOfferByApplicationId?: Record<string, string>;
   onApplicationsUpdated?: () => void | Promise<void>;
+  onEditCampaign?: () => void;
 }
 
 export function CampaignDetail({
@@ -107,6 +108,7 @@ export function CampaignDetail({
   onCreateOfferDrafts,
   initialOfferByApplicationId = {},
   onApplicationsUpdated,
+  onEditCampaign,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>(() =>
     brandReviewMode && campaign.candidates.length > 0 ? 'candidates' : 'overview'
@@ -380,7 +382,11 @@ export function CampaignDetail({
                 <li className="truncate font-semibold text-nilink-ink" aria-current="page">{campaign.name}</li>
               </ol>
             </nav>
-            <button className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+            <button
+              type="button"
+              onClick={onEditCampaign}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+            >
               <Edit3 className="h-3.5 w-3.5" />
               Edit Campaign
             </button>

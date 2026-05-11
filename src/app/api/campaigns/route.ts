@@ -8,7 +8,7 @@ import {
   type StoredCampaign,
 } from '@/lib/campaigns/repository';
 import { deriveCampaignStatusFromSubmission } from '@/lib/campaigns/campaignStatusDerivation';
-import { campaignBriefV2ToLegacy } from '@/lib/campaigns/campaignBriefV2Mapper';
+import { campaignBriefV2ToLegacy, normalizeCampaignBriefV2 } from '@/lib/campaigns/campaignBriefV2Mapper';
 import { campaignToJSON } from '@/lib/campaigns/serialization';
 import { createClient } from '@/lib/supabase/server';
 import { enrichApplicationsForBrandCampaigns } from '@/lib/campaigns/applicationEnrichment';
@@ -39,8 +39,9 @@ function normalizeCampaignCreatePayload(
   body: Record<string, unknown>,
   brandUserId: string,
 ): Record<string, unknown> {
-  const legacyFromBrief = isRecord(body.campaignBriefV2)
-    ? campaignBriefV2ToLegacy(body.campaignBriefV2 as Parameters<typeof campaignBriefV2ToLegacy>[0])
+  const normalizedBrief = isRecord(body.campaignBriefV2) ? normalizeCampaignBriefV2(body.campaignBriefV2) : null;
+  const legacyFromBrief = normalizedBrief
+    ? campaignBriefV2ToLegacy(normalizedBrief)
     : {};
   const merged = { ...legacyFromBrief, ...body };
   const acceptApplications = merged.acceptApplications !== false;
@@ -71,7 +72,7 @@ function normalizeCampaignCreatePayload(
     packageDetails: Array.isArray(merged.packageDetails) ? merged.packageDetails : [],
     platforms: Array.isArray(merged.platforms) ? merged.platforms : [],
     image: typeof merged.image === 'string' && merged.image.trim() ? merged.image.trim() : '',
-    campaignBriefV2: isRecord(body.campaignBriefV2) ? body.campaignBriefV2 : null,
+    campaignBriefV2: normalizedBrief,
     status: deriveCampaignStatusFromSubmission({ ...body, ...legacyFromBrief }, { intent }),
   };
 }
@@ -219,25 +220,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const payload = normalizeCampaignCreatePayload(body, user.userId);
-
-  // Guarantee the brand_profiles row exists before inserting the campaign.
-  // Without it, the FK campaigns.brand_id → brand_profiles.brand_id fails.
-  const brandProfileErr = await ensureBrandProfile(
-    user.userId,
-    String(payload.brandDisplayName ?? '')
-  );
-  if (brandProfileErr) {
-    return NextResponse.json(
-      {
-        error: `Could not initialise brand profile: ${brandProfileErr}`,
-        hint: 'Complete brand onboarding from Profile settings, then retry.',
-      },
-      { status: 400 }
-    );
-  }
-
   try {
+    const payload = normalizeCampaignCreatePayload(body, user.userId);
+
+    // Guarantee the brand_profiles row exists before inserting the campaign.
+    // Without it, the FK campaigns.brand_id → brand_profiles.brand_id fails.
+    const brandProfileErr = await ensureBrandProfile(
+      user.userId,
+      String(payload.brandDisplayName ?? '')
+    );
+    if (brandProfileErr) {
+      return NextResponse.json(
+        {
+          error: `Could not initialise brand profile: ${brandProfileErr}`,
+          hint: 'Complete brand onboarding from Profile settings, then retry.',
+        },
+        { status: 400 }
+      );
+    }
+
     const row = await createCampaign(payload);
     return NextResponse.json({ campaign: campaignToJSON(row) }, { status: 201 });
   } catch (e) {

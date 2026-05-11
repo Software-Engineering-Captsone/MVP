@@ -371,6 +371,7 @@ export type SubmitCampaignArgs = {
 export type DraftResumeSession = {
   campaignId: string;
   prefill: CampaignDraftOverlayPrefill;
+  resumeMode?: 'draft' | 'campaign';
 };
 
 interface Props {
@@ -406,6 +407,7 @@ export function CreateCampaignOverlay({
   onPersistedCampaignIdChange,
 }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const isCampaignEdit = draftResume?.resumeMode === 'campaign';
   const [step, setStep] = useState(() => clampWizardStep(initialStep));
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [submitKind, setSubmitKind] = useState<null | 'draft' | 'publish'>(null);
@@ -933,13 +935,18 @@ export function CreateCampaignOverlay({
 
   const handleSaveDraft = async () => {
     if (!canSaveDraft || busy) return;
-    const result = await runSubmit('draft');
+    const result = await runSubmit(isCampaignEdit ? 'publish' : 'draft');
     if (result) setSaveDraftButtonState('saved');
   };
 
   const handleDiscardOrAbandon = useCallback(async () => {
     const persistedId = campaignId;
     const title = campaignName.trim() || 'Untitled campaign';
+    if (isCampaignEdit) {
+      const ok = window.confirm(`Close campaign editor for "${title}"? Unsaved changes will be lost.`);
+      if (ok) onClose();
+      return;
+    }
     const message = persistedId
       ? `Discard draft "${title}"? It will be permanently removed from your account.`
       : 'Leave campaign creation? Nothing has been saved yet and your entries will be lost.';
@@ -963,7 +970,7 @@ export function CreateCampaignOverlay({
       return;
     }
     onClose();
-  }, [campaignId, campaignName, onClose, onDiscardPersistedDraft]);
+  }, [campaignId, campaignName, isCampaignEdit, onClose, onDiscardPersistedDraft]);
 
   const handleLaunch = () => {
     if (!canPublish || busy) return;
@@ -971,6 +978,7 @@ export function CreateCampaignOverlay({
   };
 
   useEffect(() => {
+    if (isCampaignEdit) return;
     if (!campaignName.trim()) return;
     const id = window.setTimeout(() => {
       void (async () => {
@@ -983,7 +991,7 @@ export function CreateCampaignOverlay({
       })();
     }, 3000);
     return () => window.clearTimeout(id);
-  }, [campaignName, runSubmit]);
+  }, [campaignName, isCampaignEdit, runSubmit]);
 
   useEffect(() => {
     if (saveDraftButtonState !== 'saved') return;
@@ -1235,7 +1243,7 @@ export function CreateCampaignOverlay({
           >
             {draftResume && (
               <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-nilink-accent">
-                Editing saved draft
+                {isCampaignEdit ? 'Editing campaign' : 'Editing saved draft'}
               </p>
             )}
             <h2
@@ -1243,13 +1251,15 @@ export function CreateCampaignOverlay({
               className="text-2xl font-black uppercase tracking-wide sm:text-3xl"
               style={{ fontFamily: "'Bebas Neue', sans-serif" }}
             >
-              Create campaign
+              {isCampaignEdit ? 'Edit campaign' : 'Create campaign'}
             </h2>
             <p
               id="campaign-wizard-subtitle"
               className="mb-6 mt-3 text-sm leading-relaxed text-gray-500 sm:mb-7 sm:mt-4"
             >
-              Guided setup — save anytime as a draft. Use the checklist to see what is left before launch.
+              {isCampaignEdit
+                ? 'Update campaign details and save changes when ready.'
+                : 'Guided setup — save anytime as a draft. Use the checklist to see what is left before launch.'}
             </p>
             <WizardStepChecklistRail currentStep={step} steps={STEPS} />
           </aside>
@@ -2088,7 +2098,7 @@ export function CreateCampaignOverlay({
                     )}
                     {v2ReviewRiskFlags.length > 0 && (
                       <div className="mt-4 border-t border-amber-100 pt-4">
-                        <p className="text-sm font-bold text-amber-950/90">Campaign quality signals</p>
+                        <p className="text-sm font-bold text-amber-950/90">Match Quality Notes</p>
                         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-950/85">
                           {v2ReviewRiskFlags.map((msg) => (
                             <li key={msg}>{msg}</li>
@@ -2225,7 +2235,9 @@ export function CreateCampaignOverlay({
                   ? 'Saving…'
                   : saveDraftButtonState === 'saved'
                     ? 'Saved'
-                    : 'Save draft'}
+                    : isCampaignEdit
+                      ? 'Save changes'
+                      : 'Save draft'}
               </button>
               <button
                 type="button"
@@ -2237,7 +2249,7 @@ export function CreateCampaignOverlay({
                     : 'cursor-not-allowed border-gray-100 text-gray-300'
                 }`}
               >
-                {discardBusy ? 'Discarding…' : campaignId ? 'Discard draft' : 'Discard'}
+                {discardBusy ? 'Discarding…' : isCampaignEdit ? 'Close editor' : campaignId ? 'Discard draft' : 'Discard'}
               </button>
             </div>
 
@@ -2268,7 +2280,7 @@ export function CreateCampaignOverlay({
                   }`}
                 >
                   <Zap className="h-4 w-4 shrink-0" aria-hidden />
-                  {submitKind === 'publish' ? 'Publishing…' : 'Launch campaign'}
+                  {submitKind === 'publish' ? (isCampaignEdit ? 'Saving…' : 'Publishing…') : isCampaignEdit ? 'Save and close' : 'Launch campaign'}
                 </button>
               )}
             </div>
