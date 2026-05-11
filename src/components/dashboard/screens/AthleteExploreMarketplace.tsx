@@ -230,7 +230,6 @@ export function AthleteExploreMarketplace() {
   const [selectedCampaign, setSelectedCampaign] = useState<ApiCampaignRow | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
 
-  const [applyPitch, setApplyPitch] = useState('');
   const [applyTargetCampaignId, setApplyTargetCampaignId] = useState<string | null>(null);
   const [savedCampaignIds, setSavedCampaignIds] = useState<string[]>([]);
   const [consumedCampaignParam, setConsumedCampaignParam] = useState<string | null>(null);
@@ -633,6 +632,15 @@ export function AthleteExploreMarketplace() {
       );
     });
   }, [savedCampaigns, search]);
+
+  const selectedCampaignApplication = selectedCampaign
+    ? applicationByCampaignId.get(String(selectedCampaign.id))
+    : null;
+  const selectedCampaignHasBlockingApplication =
+    selectedCampaignApplication != null && !isWithdrawnApplication(selectedCampaignApplication);
+  const selectedCampaignPostedLabel = selectedCampaign
+    ? (formatPostedRecency(selectedCampaign.createdAt) ?? 'Posted recently')
+    : 'Posted recently';
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white text-nilink-ink">
@@ -1072,7 +1080,7 @@ export function AthleteExploreMarketplace() {
 
       {selectedCampaign ? (
         <div className="fixed inset-0 z-[70] flex items-stretch justify-end bg-black/40">
-          <div className="h-full w-full max-w-[1100px] overflow-hidden bg-white shadow-2xl">
+          <div className="h-full w-full max-w-[825px] overflow-hidden rounded-l-3xl border-l border-gray-100 bg-white shadow-2xl">
             <div className="flex items-center justify-end border-b border-gray-100 px-6 py-4">
               <button
                 type="button"
@@ -1083,37 +1091,95 @@ export function AthleteExploreMarketplace() {
               </button>
             </div>
 
-            <div className="grid h-[calc(100vh-73px)] grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-[1fr_360px] lg:gap-0">
-              <div className="min-w-0 border-gray-100 bg-white px-6 py-6 lg:border-r lg:pr-8">
-                <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-                  {String(selectedCampaign.name ?? 'Campaign')}
-                </h2>
-                {findBrandForCampaign(selectedCampaign) ? (
-                  <button
-                    type="button"
-                    className={`mt-2 block text-left text-sm font-medium text-gray-500 underline-offset-2 transition-colors duration-200 ease-out hover:text-nilink-accent hover:underline ${exploreFocusRing} rounded-sm`}
-                    onClick={() => {
-                      const brand = findBrandForCampaign(selectedCampaign);
-                      if (brand) {
-                        setSelectedBrand(brand);
-                        setBrandProfileTab('overview');
-                        setActiveTab('brands');
-                        setSelectedCampaign(null);
-                      }
-                    }}
-                  >
-                    {String(selectedCampaign.brandDisplayName ?? 'Brand')}
-                  </button>
-                ) : (
-                  <p className="mt-2 text-sm font-medium text-gray-500">{String(selectedCampaign.brandDisplayName ?? 'Brand')}</p>
-                )}
-                <div className="mt-4 h-48 overflow-hidden rounded-xl border border-gray-100 bg-gray-100 sm:h-52">
-                  <ImageWithFallback
-                    src={campaignImageForCard(selectedCampaign) || PLACEHOLDER_IMAGE}
-                    alt={String(selectedCampaign.name ?? 'Campaign')}
-                    className="h-full w-full object-cover"
-                  />
+            <div className="h-[calc(100vh-73px)] overflow-y-auto px-6 py-6">
+              <div className="w-full">
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm ring-1 ring-black/[0.04] sm:p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+                        <ImageWithFallback
+                          src={campaignImageForCard(selectedCampaign) || PLACEHOLDER_IMAGE}
+                          alt={String(selectedCampaign.name ?? 'Campaign')}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 pt-0.5">
+                        <h2 className="line-clamp-2 text-2xl font-bold leading-snug tracking-tight text-gray-900 sm:text-[30px] sm:leading-[1.08]">
+                          {String(selectedCampaign.name ?? 'Campaign')}
+                        </h2>
+                        {findBrandForCampaign(selectedCampaign) ? (
+                          <button
+                            type="button"
+                            className={`mt-2 block truncate text-left text-[13px] font-semibold leading-snug text-gray-700 underline-offset-2 transition-colors duration-200 ease-out hover:text-nilink-accent hover:underline ${exploreFocusRing} rounded-sm`}
+                            onClick={() => {
+                              const brand = findBrandForCampaign(selectedCampaign);
+                              if (brand) {
+                                setSelectedBrand(brand);
+                                setBrandProfileTab('overview');
+                                setActiveTab('brands');
+                                setSelectedCampaign(null);
+                              }
+                            }}
+                          >
+                            {String(selectedCampaign.brandDisplayName ?? 'Brand')}
+                          </button>
+                        ) : (
+                          <p className="mt-2 truncate text-[13px] font-semibold leading-snug text-gray-700">
+                            {String(selectedCampaign.brandDisplayName ?? 'Brand')}
+                          </p>
+                        )}
+                        <span className="mt-2 inline-flex min-w-0 items-center gap-2 text-[13px] font-medium text-gray-500">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
+                          {selectedCampaignPostedLabel}
+                        </span>
+                      </div>
+                    </div>
+                    {selectedCampaignHasBlockingApplication ? (
+                      <Link
+                        href="/dashboard/applications"
+                        className={`shrink-0 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors duration-200 ease-out hover:bg-gray-50 ${exploreFocusRing}`}
+                      >
+                        View Application
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={applyTargetCampaignId === String(selectedCampaign.id)}
+                        onClick={async () => {
+                          await submitApplyForCampaign(selectedCampaign, '');
+                        }}
+                        className={`shrink-0 rounded-lg bg-nilink-accent px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-[opacity,transform,filter] duration-200 ease-out hover:brightness-105 active:brightness-95 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60 motion-reduce:active:scale-100 ${exploreFocusRing}`}
+                      >
+                        {applyTargetCampaignId === String(selectedCampaign.id) ? 'Applying...' : 'Apply to Campaign'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-2 gap-6 border-t border-gray-100 pt-5 text-sm">
+                    <div>
+                      <p className={explorePanelLabel}>Compensation</p>
+                      <p className="mt-1.5 font-semibold text-gray-800">
+                        {String(selectedCampaign.budgetHint || selectedCampaign.budget || 'Shared if selected')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className={explorePanelLabel}>Deadline</p>
+                      <p className="mt-1.5 font-semibold text-gray-800">
+                        {formatDate(selectedCampaign.endDate || selectedCampaign.createdAt)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+
+                {selectedCampaignHasBlockingApplication ? (
+                  <div className="mt-4 rounded-xl border border-gray-200/90 bg-gray-50/90 px-4 py-3 text-sm leading-relaxed text-gray-700">
+                    You already have an active application for this campaign. Track updates from the{' '}
+                    <Link href="/dashboard/applications" className="font-medium text-nilink-accent underline-offset-2 hover:underline">
+                      Applications
+                    </Link>{' '}
+                    page.
+                  </div>
+                ) : null}
 
                 <div className="mt-8 space-y-10 border-t border-gray-100 pt-8">
                   <section>
@@ -1148,74 +1214,6 @@ export function AthleteExploreMarketplace() {
                       {formatDate(selectedCampaign.startDate)} – {formatDate(selectedCampaign.endDate)}
                     </p>
                   </section>
-                  <section className="border-t border-gray-100 pt-8">
-                    {detailSectionTitle('Compensation')}
-                    <p className="mt-3 text-sm font-medium text-gray-800">
-                      {String(selectedCampaign.budgetHint || selectedCampaign.budget || 'Shared if selected')}
-                    </p>
-                  </section>
-                </div>
-              </div>
-
-              <div className="lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-73px)] lg:overflow-y-auto lg:bg-gray-50/80 lg:px-6 lg:py-6">
-                <div className="mx-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-md ring-1 ring-black/[0.04] transition-shadow duration-200 ease-out">
-                  <h3 className="text-lg font-bold tracking-tight text-gray-900">Apply to campaign</h3>
-                  <div className="mt-6 space-y-5 text-sm">
-                    <div>
-                      <p className={explorePanelLabel}>Compensation</p>
-                      <p className="mt-2 font-medium text-gray-800">
-                        {String(selectedCampaign.budgetHint || selectedCampaign.budget || 'Shared if selected')}
-                      </p>
-                    </div>
-                    <div>
-                      <p className={explorePanelLabel}>Deadline</p>
-                      <p className="mt-2 font-medium text-gray-800">
-                        {formatDate(selectedCampaign.endDate || selectedCampaign.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                  {(() => {
-                    const app = applicationByCampaignId.get(String(selectedCampaign.id));
-                    const hasBlockingApplication = app != null && !isWithdrawnApplication(app);
-                    if (hasBlockingApplication) {
-                      return (
-                        <div className="mt-6 rounded-xl border border-gray-200/90 bg-gray-50/90 px-4 py-3 text-sm leading-relaxed text-gray-700">
-                          You already have an active application for this campaign. Track updates from the{' '}
-                          <Link href="/dashboard/applications" className="font-medium text-nilink-accent underline-offset-2 hover:underline">
-                            Applications
-                          </Link>{' '}
-                          page.
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="mt-6 space-y-4 border-t border-gray-100 pt-6">
-                        <label className="sr-only" htmlFor="athlete-explore-apply-pitch">
-                          Application pitch (optional)
-                        </label>
-                        <textarea
-                          id="athlete-explore-apply-pitch"
-                          value={applyPitch}
-                          onChange={(e) => setApplyPitch(e.target.value)}
-                          rows={5}
-                          className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-[border-color,box-shadow] duration-200 ease-out focus:border-nilink-accent/40 focus:outline-none focus:ring-2 focus:ring-nilink-accent/15 focus:ring-offset-0"
-                          placeholder="Application pitch (optional)"
-                          aria-label="Application pitch (optional)"
-                        />
-                        <button
-                          type="button"
-                          disabled={applyTargetCampaignId === String(selectedCampaign.id)}
-                          onClick={async () => {
-                            const ok = await submitApplyForCampaign(selectedCampaign, applyPitch);
-                            if (ok) setApplyPitch('');
-                          }}
-                          className={`w-full rounded-lg bg-nilink-accent px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-[opacity,transform,filter] duration-200 ease-out hover:brightness-105 active:brightness-95 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60 motion-reduce:active:scale-100 ${exploreFocusRing}`}
-                        >
-                          {applyTargetCampaignId === String(selectedCampaign.id) ? 'Applying...' : 'Apply to Campaign'}
-                        </button>
-                      </div>
-                    );
-                  })()}
                 </div>
               </div>
             </div>
