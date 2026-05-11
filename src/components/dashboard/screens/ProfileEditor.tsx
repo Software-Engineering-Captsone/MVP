@@ -448,7 +448,7 @@ export function ProfileEditor() {
     } catch {
       try { localStorage.removeItem('athlete_onboarding_draft'); } catch { /* ignore */ }
     }
-    router.push('/onboarding');
+    router.push('/dashboard/onboarding');
   };
 
   const avatarSrc =

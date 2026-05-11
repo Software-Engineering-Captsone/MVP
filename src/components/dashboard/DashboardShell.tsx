@@ -26,6 +26,7 @@ export type DashboardUser = {
   name: string;
   role: 'athlete' | 'brand';
   avatarUrl?: string;
+  onboardingCompletedAt?: string | null;
 };
 
 interface DashboardContextValue {
@@ -113,38 +114,48 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     };
   }, []);
 
-  const hydrateAvatarFromProfile = useCallback(async (userId: string) => {
+  const hydrateFromProfile = useCallback(async (user: DashboardUser) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('avatar_url')
-      .eq('id', userId)
-      .maybeSingle<{ avatar_url: string | null }>();
-    if (error) return;
+      .select('full_name, role, avatar_url, onboarding_completed_at')
+      .eq('id', user.id)
+      .maybeSingle<{
+        full_name: string | null;
+        role: 'athlete' | 'brand' | null;
+        avatar_url: string | null;
+        onboarding_completed_at: string | null;
+      }>();
+
+    if (error || !data) return user;
+
     const avatarUrl =
       typeof data?.avatar_url === 'string' && data.avatar_url.trim().length > 0
         ? data.avatar_url.trim()
         : undefined;
-    setSessionUser((prev) => {
-      if (!prev || prev.id !== userId) return prev;
-      if (prev.avatarUrl === avatarUrl) return prev;
-      return { ...prev, avatarUrl };
-    });
+
+    return {
+      ...user,
+      name: data.full_name?.trim() || user.name,
+      role: data.role === 'brand' || data.role === 'athlete' ? data.role : user.role,
+      avatarUrl,
+      onboardingCompletedAt: data.onboarding_completed_at,
+    };
   }, [supabase]);
 
   const refreshUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      setSessionUser(mapSupabaseUser(user));
-      void hydrateAvatarFromProfile(user.id);
+      const mappedUser = mapSupabaseUser(user);
+      setSessionUser(await hydrateFromProfile(mappedUser));
     }
-  }, [supabase, mapSupabaseUser, hydrateAvatarFromProfile]);
+  }, [supabase, mapSupabaseUser, hydrateFromProfile]);
 
   useEffect(() => {
     // Get initial session
     void supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
-        setSessionUser(mapSupabaseUser(user));
-        void hydrateAvatarFromProfile(user.id);
+        const mappedUser = mapSupabaseUser(user);
+        setSessionUser(await hydrateFromProfile(mappedUser));
       } else {
         router.replace('/auth');
       }
@@ -155,8 +166,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session?.user) {
-          setSessionUser(mapSupabaseUser(session.user));
-          void hydrateAvatarFromProfile(session.user.id);
+          const mappedUser = mapSupabaseUser(session.user);
+          void hydrateFromProfile(mappedUser).then(setSessionUser);
         } else {
           setSessionUser(null);
           router.replace('/auth');
@@ -167,30 +178,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, mapSupabaseUser, hydrateAvatarFromProfile]);
+  }, [supabase, router, mapSupabaseUser, hydrateFromProfile]);
 
   useEffect(() => {
     if (booting || !sessionUser) return;
     dashboardPrefetchPaths.forEach((path) => router.prefetch(path));
   }, [booting, sessionUser, router]);
 
-  /* ── Onboarding gate for athletes ── */
+  /* ── Onboarding gate for first-time athletes and brands ── */
   useEffect(() => {
     if (booting || !sessionUser) return;
-    if (sessionUser.role !== 'athlete') return;
-
-    try {
-      const raw = localStorage.getItem('athlete_onboarding_draft');
-      if (raw) {
-        const draft = JSON.parse(raw) as { completedAt?: string };
-        if (draft.completedAt) return; // already onboarded
-      }
-      // No draft or no completedAt → redirect to dedicated onboarding
-      router.replace('/onboarding');
-    } catch {
-      // Malformed JSON — treat as not onboarded
-      router.replace('/onboarding');
-    }
+    if (sessionUser.onboardingCompletedAt) return;
+    if (pathname === '/dashboard/onboarding') return;
+    router.replace('/dashboard/onboarding');
   }, [booting, sessionUser, pathname, router]);
 
   const offersKey = sessionUser?.role === 'athlete' ? '/api/offers' : null;

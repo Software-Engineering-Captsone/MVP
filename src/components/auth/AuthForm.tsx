@@ -39,6 +39,20 @@ export default function AuthForm() {
     const searchParams = useSearchParams();
     const supabase = createClient();
 
+    const resolvePostAuthPath = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return '/dashboard';
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('onboarding_completed_at')
+            .eq('id', user.id)
+            .maybeSingle<{ onboarding_completed_at: string | null }>();
+
+        if (error) return '/dashboard';
+        return data?.onboarding_completed_at ? '/dashboard' : '/dashboard/onboarding';
+    };
+
     useEffect(() => {
         const error = searchParams.get('error');
         const verified = searchParams.get('verified');
@@ -71,7 +85,7 @@ export default function AuthForm() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+                redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/onboarding&role=${role}`,
                 queryParams: {
                     access_type: 'offline',
                     prompt: 'consent',
@@ -110,8 +124,8 @@ export default function AuthForm() {
                 }
             } else {
                 setSuccessMessage('Sign in successful! Redirecting...');
-                setTimeout(() => {
-                    router.push('/dashboard');
+                setTimeout(async () => {
+                    router.push(await resolvePostAuthPath());
                     router.refresh();
                 }, 600);
             }
@@ -207,7 +221,7 @@ export default function AuthForm() {
                 type: 'signup',
                 email: resendEmail,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard/onboarding`,
                 },
             });
 
