@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useSWR from 'swr';
 import type { OffersListResponse } from '@/hooks/api/useOffersList';
 import { apiFetcher } from '@/hooks/api/fetcher';
+import type { ChatInboxItem } from '@/lib/chat/types';
 import {
   Home, Search, FileText, MessageSquare,
   CreditCard, Megaphone, BarChart3, MoreVertical, Handshake,
@@ -48,6 +49,10 @@ export function useDashboard() {
 
 type NavItem = { href: string; icon: LucideIcon; label: string; badge?: string };
 
+type ChatInboxResponse = {
+  items?: ChatInboxItem[];
+};
+
 const athleteNavigation: NavItem[] = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   { href: '/dashboard/search', icon: Search, label: 'Explore' },
@@ -77,6 +82,11 @@ const dashboardPrefetchPaths = [
   '/dashboard/messages',
   '/dashboard/profile',
 ];
+
+function formatNavBadgeCount(count: number): string | undefined {
+  if (count <= 0) return undefined;
+  return count > 99 ? '99+' : String(count);
+}
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -237,6 +247,16 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const pendingOfferCount = offersData?.offers.filter(
     (o) => o.athleteOfferStatus === 'pending'
   ).length ?? 0;
+  const inboxKey = sessionUser ? '/api/chat/inbox' : null;
+  const { data: inboxData } = useSWR<ChatInboxResponse>(inboxKey, apiFetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 30000,
+    shouldRetryOnError: false,
+  });
+  const unreadInboxCount = inboxData?.items?.reduce(
+    (sum, item) => sum + Math.max(0, item.unreadCount || 0),
+    0
+  ) ?? 0;
 
   if (booting) {
     return (
@@ -275,7 +295,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     <DashboardContext.Provider value={{ accountType, user: sessionUser, refreshUser }}>
       <div className="flex h-screen bg-nilink-page text-nilink-ink">
         <aside
-          className="group relative z-50 flex h-screen w-20 shrink-0 flex-col overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]"
+          className="group group/sidebar relative z-50 flex h-screen w-20 shrink-0 flex-col overflow-hidden border-r border-nilink-sidebar-muted bg-nilink-sidebar shadow-xl transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:w-[260px]"
           onMouseLeave={() => setIsProfileMenuOpen(false)}
         >
           <div className="shrink-0 px-3 pb-4 pt-6">
@@ -305,12 +325,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     : pathname.startsWith(item.href);
                 const badge =
                   accountType === 'athlete' && item.href === '/dashboard/offers'
-                    ? pendingOfferCount > 0
-                      ? pendingOfferCount > 99
-                        ? '99+'
-                        : String(pendingOfferCount)
-                      : undefined
-                    : item.badge;
+                    ? formatNavBadgeCount(pendingOfferCount)
+                    : item.href === '/dashboard/messages'
+                      ? formatNavBadgeCount(unreadInboxCount)
+                      : item.badge;
 
                 return (
                   <li key={item.href + item.label}>
@@ -329,11 +347,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                         whileTap={{ scale: 0.99 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                       >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+                        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
                           <item.icon
                             className={`h-5 w-5 ${isActive ? 'text-zinc-700' : 'text-current'}`}
                             strokeWidth={isActive ? 2.25 : 2}
                           />
+                          {badge && (
+                            <span
+                              className="absolute right-0.5 top-0.5 flex min-w-[16px] translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full bg-nilink-accent px-1 text-[9px] font-bold leading-4 text-white ring-2 ring-nilink-sidebar transition-opacity duration-200 group-hover/sidebar:opacity-0"
+                              aria-hidden
+                            >
+                              {badge}
+                            </span>
+                          )}
                         </span>
                         <div className="relative flex min-w-0 max-w-0 flex-1 items-center justify-between overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[min(200px,calc(100vw-6rem))] group-hover:opacity-100 whitespace-nowrap">
                           <span
