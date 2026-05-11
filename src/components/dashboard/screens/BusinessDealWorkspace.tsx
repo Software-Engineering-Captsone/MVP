@@ -430,7 +430,9 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                           </button>
                         </div>
                         <div className="rounded-lg border border-dashed border-white/25 bg-white/5 px-3 py-2">
-                          <p className="text-[11px] text-white/70">Or upload PDF / Word (Supabase storage).</p>
+                          <p className="text-[11px] text-white/70">
+                            Or upload PDF / Word — stored securely in Supabase (max 50 MB).
+                          </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <input
                               ref={contractFilePrimaryRef}
@@ -452,9 +454,17 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                               }
                               className="cursor-pointer rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-nilink-ink hover:bg-white/90 disabled:opacity-50"
                             >
-                              Upload file
+                              {pendingAction === 'contract-file' ? 'Uploading…' : 'Upload file'}
                             </button>
                           </div>
+                          {contractFile ? (
+                            <p className="mt-2 truncate text-[11px] text-white/80">
+                              Selected: <span className="font-semibold">{contractFile.name}</span>{' '}
+                              <span className="text-white/60">
+                                ({(contractFile.size / 1024 / 1024).toFixed(2)} MB)
+                              </span>
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     ) : null}

@@ -413,24 +413,86 @@ export async function requestDealContractUploadUrl(
   return { path: j.path, signedUrl: j.signedUrl, token: j.token ?? '' };
 }
 
-/** PUT file bytes to the signed URL returned by `requestDealContractUploadUrl`. */
-export async function putFileToContractSignedUploadUrl(signedUrl: string, file: File): Promise<void> {
+/** Max contract size in bytes — must match the storage bucket's `file_size_limit` (50MB). */
+export const DEAL_CONTRACT_MAX_BYTES = 50 * 1024 * 1024;
+
+const ALLOWED_CONTRACT_MIME = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+const ALLOWED_CONTRACT_EXT = ['.pdf', '.doc', '.docx'];
+
+function validateContractFile(file: File): void {
+  if (!file || file.size === 0) {
+    throw new Error('Selected file is empty');
+  }
+  if (file.size > DEAL_CONTRACT_MAX_BYTES) {
+    throw new Error(
+      `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 50 MB.`,
+    );
+  }
+  const name = (file.name || '').toLowerCase();
+  const extOk = ALLOWED_CONTRACT_EXT.some((ext) => name.endsWith(ext));
+  const mimeOk = file.type ? ALLOWED_CONTRACT_MIME.has(file.type) : false;
+  if (!extOk && !mimeOk) {
+    throw new Error('Only PDF or Word documents (.pdf, .doc, .docx) are allowed');
+  }
+}
+
+/**
+ * Upload bytes against a Supabase signed upload URL.
+ *
+ * Prefers the Supabase JS SDK's `uploadToSignedUrl(path, token, file)` because it sets
+ * the headers Supabase Storage expects (`x-upsert`, content-type, auth). Falls back to a
+ * raw PUT for non-browser callers (which is fine for tests/server contexts).
+ */
+export async function putFileToContractSignedUploadUrl(
+  signedUrl: string,
+  file: File,
+  opts?: { path?: string; token?: string },
+): Promise<void> {
+  if (typeof window !== 'undefined' && opts?.path && opts?.token) {
+    const { createClient } = await import('@/lib/supabase/client');
+    const supabase = createClient();
+    const { error } = await supabase.storage
+      .from('deal-contracts')
+      .uploadToSignedUrl(opts.path, opts.token, file, {
+        upsert: true,
+        contentType: file.type || 'application/octet-stream',
+      });
+    if (error) {
+      throw new Error(error.message || 'Upload failed');
+    }
+    return;
+  }
+
+  // Fallback: raw PUT. Supabase Storage needs x-upsert when upsert was set at creation.
   const ct = file.type || 'application/octet-stream';
   const put = await fetch(signedUrl, {
     method: 'PUT',
     body: file,
-    headers: { 'Content-Type': ct },
+    headers: {
+      'Content-Type': ct,
+      'x-upsert': 'true',
+      'cache-control': '3600',
+    },
   });
-  if (!put.ok) throw new Error(put.statusText || 'Upload failed');
+  if (!put.ok) {
+    const text = await put.text().catch(() => '');
+    throw new Error(text || put.statusText || `Upload failed (${put.status})`);
+  }
 }
 
-/** Full flow: signed upload URL → PUT file → persist storage path on the contract row. */
+/** Full flow: signed upload URL → upload bytes → persist storage path on the contract row. */
 export async function uploadDealContractFromFile(dealId: string, file: File): Promise<ApiContract> {
-  const { signedUrl, path } = await requestDealContractUploadUrl(dealId, {
+  validateContractFile(file);
+  const { signedUrl, path, token } = await requestDealContractUploadUrl(dealId, {
     filename: file.name || 'contract.pdf',
     contentType: file.type || undefined,
   });
-  await putFileToContractSignedUploadUrl(signedUrl, file);
+  await putFileToContractSignedUploadUrl(signedUrl, file, { path, token });
   return postDealContract(dealId, undefined, undefined, path);
 }
 
