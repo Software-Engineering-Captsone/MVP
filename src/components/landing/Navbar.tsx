@@ -23,8 +23,8 @@ export default function Navbar() {
             <Link href="/auth" className="landing-nav-ghost">
               Log in
             </Link>
-            <Link href="/auth" className="landing-nav-ghost">
-              Sign in
+            <Link href="/auth?mode=signup" className="landing-nav-ghost">
+              Try MVP
             </Link>
           </div>
         </div>

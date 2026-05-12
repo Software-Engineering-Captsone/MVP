@@ -12,7 +12,7 @@ const TIERS = [
       "Deal inbox & basic contract tracking",
       "Email support",
     ],
-    cta: "Sign up free",
+    cta: "Try MVP",
     href: "/auth?mode=signup",
     variant: "default" as const,
   },
@@ -28,7 +28,7 @@ const TIERS = [
       "Team seats (up to 5)",
       "Priority chat support",
     ],
-    cta: "Start free trial",
+    cta: "Try MVP",
     href: "/auth?mode=signup",
     variant: "featured" as const,
   },
@@ -55,10 +55,10 @@ export default function Pricing() {
       <div className="pricing-inner">
         <div className="pricing-header fade-up">
           <div className="section-eyebrow">Pricing</div>
-          <h2 className="section-heading">Simple plans that scale with you</h2>
+          <h2 className="section-heading">Prototype pricing model</h2>
           <p>
-            Athletes join free. Brands choose a plan when they&apos;re ready to run
-            campaigns at scale.
+            These tiers show the intended business model for the MVP; production
+            billing is not active in the prototype.
           </p>
         </div>
         <div className="pricing-grid">

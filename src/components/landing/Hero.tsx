@@ -61,7 +61,7 @@ export default function Hero() {
         <div className="hero-content">
 
           <div className="hero-badge">
-            Built for the next era of NIL partnerships
+            Capstone MVP prototype for NIL partnerships
           </div>
 
           <h1 className="hero-title">
@@ -73,21 +73,21 @@ export default function Hero() {
           </h1>
 
           <p className="hero-lede">
-            Discover partners and manage NIL deals in one place.
+            Explore how athletes and brands could discover partners and manage NIL deals in one place.
           </p>
 
           <div className="hero-ctas">
-            <Link href="/auth" className="btn-pill btn-nilink-primary">
-              Get started free
+            <Link href="/auth?mode=signup" className="btn-pill btn-nilink-primary">
+              Try the MVP
             </Link>
 
-            <button type="button" className="btn-pill btn-outline">
-              Watch demo
-            </button>
+            <Link href="/waitlist" className="btn-pill btn-outline">
+              Join waitlist
+            </Link>
           </div>
 
           <p className="hero-note">
-            No credit card required. Free for athletes.
+            Prototype access for testing and capstone review - not a launched commercial service.
           </p>
 
         </div>

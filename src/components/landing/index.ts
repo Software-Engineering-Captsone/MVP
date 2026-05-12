@@ -11,3 +11,4 @@ export { default as Footer } from './Footer';
 export { default as FadeUpObserver } from './FadeUpObserver';
 export { default as TalkToSalesForm } from './TalkToSalesForm';
 export { default as DemoVideoSection } from './DemoVideoSection';
+export { default as WaitlistForm } from './WaitlistForm';

@@ -49,8 +49,8 @@ export default function WatchDemoPage() {
         </section>
 
         <div className="watch-demo-cta">
-          <Link href="/auth" className="btn-pill btn-nilink-primary">
-            Get started free
+          <Link href="/auth?mode=signup" className="btn-pill btn-nilink-primary">
+            Try the MVP
           </Link>
         </div>
       </main>
