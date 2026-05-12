@@ -38,7 +38,7 @@ export default function AuthForm() {
     const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
     const [forgotCooldownUntil, setForgotCooldownUntil] = useState<number>(0);
     const [forgotCooldownRemaining, setForgotCooldownRemaining] = useState<number>(0);
-    const [resendEmail, setResendEmail] = useState('');
+    const [verificationEmail, setVerificationEmail] = useState('');
     const [showResendVerification, setShowResendVerification] = useState(false);
 
     const router = useRouter();
@@ -322,7 +322,7 @@ export default function AuthForm() {
         try {
             const { error } = await supabase.auth.resend({
                 type: 'signup',
-                email: resendEmail,
+                email: verificationEmail,
                 options: {
                     emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard/onboarding`,
                 },
@@ -333,7 +333,7 @@ export default function AuthForm() {
             } else {
                 setSuccessMessage('Verification email sent! Please check your inbox.');
                 setShowResendVerification(false);
-                setResendEmail('');
+                setVerificationEmail('');
             }
         } catch {
             setFormError('Network error');
@@ -686,8 +686,8 @@ export default function AuthForm() {
                                         type="email"
                                         id="resend-email"
                                         placeholder="you@example.com"
-                                        value={resendEmail}
-                                        onChange={(e) => setResendEmail(e.target.value)}
+                                        value={verificationEmail}
+                                        onChange={(e) => setVerificationEmail(e.target.value)}
                                         required
                                     />
                                 </div>
@@ -698,7 +698,7 @@ export default function AuthForm() {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => { setShowResendVerification(false); setFormError(''); setResendEmail(''); }}
+                                        onClick={() => { setShowResendVerification(false); setFormError(''); setVerificationEmail(''); }}
                                         className="btn-secondary flex-1"
                                     >
                                         Cancel

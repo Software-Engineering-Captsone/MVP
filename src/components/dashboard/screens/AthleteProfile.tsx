@@ -77,6 +77,11 @@ function socialProfileUrl(platform: 'instagram' | 'tiktok', handle: string | und
     : `https://www.tiktok.com/@${encodeURIComponent(username)}`;
 }
 
+function displaySocialCount(value: string | undefined): string {
+  const count = value?.trim();
+  return count && count !== '—' ? count : '—';
+}
+
 type ProfileTab = 'overview' | 'content';
 type ContentFilter = 'all' | 'photos' | 'videos';
 
@@ -799,6 +804,8 @@ export function AthleteProfile() {
 
   const instagramUrl = socialProfileUrl('instagram', athlete.socialHandles.instagram);
   const tiktokUrl = socialProfileUrl('tiktok', athlete.socialHandles.tiktok);
+  const instagramFollowers = displaySocialCount(athlete.platformMetrics.instagram.followers || athlete.stats.instagram);
+  const tiktokFollowers = displaySocialCount(athlete.platformMetrics.tiktok.followers || athlete.stats.tiktok);
 
   return (
     <div className="min-h-full bg-nilink-surface pb-16">
@@ -864,7 +871,7 @@ export function AthleteProfile() {
                         className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-700"
                       >
                         <Instagram className="h-3.5 w-3.5 text-pink-600" />
-                        <span className="tabular-nums">{athlete.stats.instagram}</span>
+                        <span className="tabular-nums">{instagramFollowers}</span>
                       </a>
                     )}
                     {tiktokUrl && (
@@ -876,7 +883,7 @@ export function AthleteProfile() {
                         className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-nilink-ink"
                       >
                         <TiktokIcon className="h-3.5 w-3.5 text-nilink-ink" />
-                        <span className="tabular-nums">{athlete.stats.tiktok}</span>
+                        <span className="tabular-nums">{tiktokFollowers}</span>
                       </a>
                     )}
                   </div>

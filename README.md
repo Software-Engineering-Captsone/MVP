@@ -143,7 +143,7 @@ The backend is implemented with Next.js route handlers. Major API groups include
 - Node.js 20 or newer
 - npm
 - Supabase project credentials
-- Optional Resend API key for transactional email flows
+- SMTP credentials for school-email OTP delivery
 
 ### Setup
 
@@ -168,11 +168,21 @@ The backend is implemented with Next.js route handlers. Major API groups include
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
 
-4. Add optional integrations if needed:
+4. Add SMTP credentials for athlete school-email OTP delivery:
 
    ```bash
-   RESEND_API_KEY=
-   RESEND_FROM_EMAIL=
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your-email@gmail.com
+   SMTP_PASS=your-google-app-password
+   SMTP_FROM="NILINK <your-email@gmail.com>"
+   ```
+
+   For Gmail SMTP, enable 2-Step Verification on the Google account and create a Google App Password. Use the full Gmail address as `SMTP_USER`; do not use the normal Google password.
+
+5. Add optional social integrations if needed:
+
+   ```bash
    INSTAGRAM_APP_ID=
    INSTAGRAM_APP_SECRET=
    TIKTOK_CLIENT_KEY=
@@ -181,13 +191,13 @@ The backend is implemented with Next.js route handlers. Major API groups include
    YOUTUBE_CLIENT_SECRET=
    ```
 
-5. Run the development server:
+6. Run the development server:
 
    ```bash
    npm run dev
    ```
 
-6. Open [http://localhost:3000](http://localhost:3000).
+7. Open [http://localhost:3000](http://localhost:3000).
 
 ## Supabase Setup
 
@@ -202,6 +212,15 @@ For a fresh Supabase environment:
 5. Configure auth redirect URLs for local development and production:
    - `http://localhost:3000/auth/callback`
    - `https://mvp-inky-eta.vercel.app/auth/callback`
+6. Configure Supabase Auth SMTP for signup verification, verification resends, and forgot-password emails. For the current MVP Gmail setup:
+   - Sender email address: the full Gmail address used for SMTP
+   - Sender name: `NILINK`
+   - Host: `smtp.gmail.com`
+   - Port: `587`
+   - Username: the full Gmail address
+   - Password: the Google App Password
+
+The app also uses SMTP directly for athlete `.edu` OTP codes through `/api/verify/school-email/send`; configure the same `SMTP_*` variables in Vercel.
 
 Demo athlete accounts can be seeded into the configured Supabase project with:
 
@@ -231,8 +250,11 @@ npm run seed:demo-athletes   # Seed demo athlete profiles into Supabase
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase public anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-only Supabase service role key for privileged API/script actions |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical app URL for redirects |
-| `RESEND_API_KEY` | Optional | Email delivery for verification/contact flows |
-| `RESEND_FROM_EMAIL` | Optional | Sender address for Resend |
+| `SMTP_HOST` | Yes | SMTP server for athlete school-email OTP delivery |
+| `SMTP_PORT` | Yes | SMTP server port, usually `587` for Gmail STARTTLS |
+| `SMTP_USER` | Yes | SMTP username, usually the full sender email address |
+| `SMTP_PASS` | Yes | SMTP password or provider app password |
+| `SMTP_FROM` | Recommended | Display sender for app-generated OTP email, for example `NILINK <name@gmail.com>` |
 | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Optional | Instagram OAuth integration |
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | Optional | TikTok OAuth integration |
 | `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` | Optional | YouTube OAuth integration |

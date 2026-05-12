@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/serviceClient';
-import { sendSchoolVerificationEmail } from '@/lib/resendEmail';
+import { sendSchoolVerificationEmail } from '@/lib/smtpEmail';
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();

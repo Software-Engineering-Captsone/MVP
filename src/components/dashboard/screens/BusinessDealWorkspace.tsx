@@ -7,18 +7,14 @@ import {
   ArrowLeft,
   Calendar,
   CheckCircle,
-  CheckSquare,
   Clock,
-  DollarSign,
   Ellipsis,
   ExternalLink,
   FileText,
   Image as ImageIcon,
-  Lock,
   Loader2,
   Mic,
   Package,
-  Pencil,
   Send,
   Upload,
   Users,
@@ -210,16 +206,22 @@ function ProgressTracker({ stageId, cancelled }: { stageId: DealStageId; cancell
   );
 }
 
-function stageIconFor(id: DealStageId): React.ReactNode {
-  const icons: Record<DealStageId, React.ReactNode> = {
-    agreement: <FileText className="h-5 w-5" />,
-    work_in_progress: <Pencil className="h-5 w-5" />,
-    review_revisions: <CheckSquare className="h-5 w-5" />,
-    completed: <Package className="h-5 w-5" />,
-    payment: <DollarSign className="h-5 w-5" />,
-    closed: <Lock className="h-5 w-5" />,
-  };
-  return icons[id] ?? <FileText className="h-5 w-5" />;
+function formatPaymentAmount(payment: ApiPayment): string {
+  return `${payment.currency} ${payment.amount.toLocaleString()}`;
+}
+
+function PaidPayoutState({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      role="status"
+      className={`inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 font-semibold text-emerald-800 ${
+        compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2.5 text-sm'
+      }`}
+    >
+      <CheckCircle className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} aria-hidden />
+      Paid
+    </span>
+  );
 }
 
 type BusinessDealWorkspaceProps = {
@@ -1169,23 +1171,14 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                 onClick={() => setShowPayModal(true)}
                 className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                Mark As Paid
+                Pay
               </button>
             </div>
           ) : null}
           {stageProjection?.primaryAction?.key === 'close_deal' ? (
-            <button
-              type="button"
-              disabled={pendingAction === 'deal-close'}
-              onClick={() =>
-                void runAction('deal-close', async () => {
-                  await patchDealStatus(detail.deal.id, 'closed');
-                })
-              }
-              className="mt-3 cursor-pointer rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
-            >
-              Close Deal
-            </button>
+            <div className="mt-3">
+              <PaidPayoutState compact />
+            </div>
           ) : null}
         </>
       )}
@@ -1623,16 +1616,12 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
               </div>
             ) : stageProjection?.stageId === 'payment' ? (
               <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-base font-bold text-nilink-ink">Send payout</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Mark the payment as sent to complete the deal.
-                </p>
+                <h3 className="text-base font-bold text-nilink-ink">
+                  {detail.payment?.status === 'paid' || detail.deal.status === 'paid' ? 'Payout complete' : 'Send payout'}
+                </h3>
                 {detail.payment && (
                   <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-nilink-ink">
-                      {detail.payment.currency} {detail.payment.amount.toLocaleString()} ·{' '}
-                      {detail.payment.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                    </p>
+                    <p className="text-sm font-semibold text-nilink-ink">{formatPaymentAmount(detail.payment)}</p>
                   </div>
                 )}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -1643,22 +1632,11 @@ export function BusinessDealWorkspace({ dealId }: BusinessDealWorkspaceProps) {
                       onClick={() => setShowPayModal(true)}
                       className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
-                      Mark As Paid
+                      Pay
                     </button>
                   ) : null}
                   {stageProjection.primaryAction?.key === 'close_deal' ? (
-                    <button
-                      type="button"
-                      disabled={pendingAction === 'deal-close'}
-                      onClick={() =>
-                        void runAction('deal-close', async () => {
-                          await patchDealStatus(detail.deal.id, 'closed');
-                        })
-                      }
-                      className="cursor-pointer rounded-lg bg-nilink-ink px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      Close Deal
-                    </button>
+                    <PaidPayoutState />
                   ) : null}
                 </div>
               </div>
