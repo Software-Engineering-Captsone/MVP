@@ -84,9 +84,9 @@ function humanizeToken(value: string): string {
 
 function readableOrigin(value: ApiOfferRow['offerOrigin'] | undefined): string {
   if (!value) return 'Offer draft';
-  if (value === 'campaign_handoff') return 'Campaign handoff';
-  if (value === 'direct_profile') return 'Direct profile outreach';
-  return 'Chat-negotiated offer';
+  if (value === 'campaign_handoff') return 'Campaign offer';
+  if (value === 'direct_profile') return 'Standalone offer';
+  return 'Message-based offer';
 }
 
 function FieldRow({ label, value }: { label: string; value: string | number | boolean | null | undefined }) {

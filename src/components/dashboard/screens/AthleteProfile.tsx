@@ -35,7 +35,6 @@ const OfferWizard = dynamic(
 import { trackAnalyticsEvent } from '@/lib/analytics';
 import {
   COPY_INVITE_TO_CAMPAIGN,
-  COPY_REFERRAL,
   COPY_SEND_OFFER,
 } from '@/lib/productCopy';
 
@@ -211,16 +210,13 @@ function SendOfferButton({
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [inviteNote, setInviteNote] = useState('');
   const [directLoading, setDirectLoading] = useState(false);
-  const [chatLoading, setChatLoading] = useState(false);
   const [referralLoading, setReferralLoading] = useState(false);
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
   const [directError, setDirectError] = useState<string | null>(null);
   const [referralError, setReferralError] = useState<string | null>(null);
-  const [chatError, setChatError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [wizardOfferId, setWizardOfferId] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const router = useRouter();
 
   const eligibleCampaigns = campaignRows.filter(isCampaignEligibleForReferralInvite);
 
@@ -232,7 +228,7 @@ function SendOfferButton({
       const data = (await res.json()) as { campaigns?: ApiCampaignRow[]; error?: string };
       if (!res.ok) {
         setCampaignRows([]);
-        setCampaignsError(data.error || 'Could not load your campaigns');
+        setCampaignsError('Could not load your campaigns. Please try again.');
         return;
       }
       setCampaignRows(data.campaigns ?? []);
@@ -250,7 +246,6 @@ function SendOfferButton({
     setCampaignsError(null);
     setDirectError(null);
     setReferralError(null);
-    setChatError(null);
   }, []);
 
   useEffect(() => {
@@ -259,7 +254,6 @@ function SendOfferButton({
     setCampaignsError(null);
     setDirectError(null);
     setReferralError(null);
-    setChatError(null);
     setInviteNote('');
     setSelectedCampaignId('');
     void loadCampaigns();
@@ -304,7 +298,7 @@ function SendOfferButton({
       });
       const data = (await res.json()) as { error?: string; offer?: { id: string }; threadId?: string };
       if (!res.ok) {
-        setDirectError(data.error || 'Could not create offer draft');
+        setDirectError('Could not start this offer. Please try again.');
         return;
       }
       trackAnalyticsEvent('direct_draft_create', {
@@ -315,7 +309,7 @@ function SendOfferButton({
       if (data.offer?.id) {
         setWizardOfferId(data.offer.id);
       } else {
-        setSuccessMessage(`${COPY_SEND_OFFER}: draft created.`);
+        setSuccessMessage('Offer draft created.');
       }
     } catch {
       setDirectError('Network error');
@@ -324,44 +318,9 @@ function SendOfferButton({
     }
   };
 
-  const createChatLinkedDraft = async () => {
-    setChatLoading(true);
-    setChatError(null);
-    setSuccessMessage(null);
-    try {
-      const res = await authFetch('/api/offers/from-chat-drafts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          athleteUserId,
-          athleteName,
-          contextNote: '',
-        }),
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        offer?: { id: string };
-        threadId?: string;
-      };
-      if (!res.ok) {
-        setChatError(data.error || 'Could not create chat-linked draft');
-        return;
-      }
-      setOpen(false);
-      if (data.threadId) {
-        router.push(`/dashboard/messages?thread=${encodeURIComponent(data.threadId)}`);
-      }
-      if (data.offer?.id) setWizardOfferId(data.offer.id);
-    } catch {
-      setChatError('Network error');
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
   const sendCampaignReferral = async () => {
     if (!selectedCampaignId) {
-      setReferralError(`Select a campaign for ${COPY_INVITE_TO_CAMPAIGN} (${COPY_REFERRAL}).`);
+      setReferralError('Select a campaign before sending the invite.');
       return;
     }
     setReferralLoading(true);
@@ -379,7 +338,7 @@ function SendOfferButton({
       });
       const data = (await res.json()) as { error?: string; created?: boolean };
       if (!res.ok) {
-        setReferralError(data.error || `Could not add ${COPY_REFERRAL} to campaign`);
+        setReferralError('Could not invite this athlete to the campaign. Please try again.');
         return;
       }
       trackAnalyticsEvent('referral_invite_create', {
@@ -389,8 +348,8 @@ function SendOfferButton({
       });
       setSuccessMessage(
         data.created
-          ? `${COPY_REFERRAL} invite added to that campaign’s application queue.`
-          : 'This athlete already has an application on that campaign; nothing changed.'
+          ? 'Campaign invite sent to this athlete.'
+          : 'This athlete is already connected to that campaign.'
       );
     } catch {
       setReferralError('Network error');
@@ -436,7 +395,7 @@ function SendOfferButton({
                   {COPY_SEND_OFFER}
                 </h2>
                 <p id="send-offer-desc" className="mt-1 text-sm text-gray-500">
-                  Choose how you want to engage {athleteName}. Actions use your brand account.
+                  Choose the offer path that best fits this athlete.
                 </p>
               </div>
               <button
@@ -469,10 +428,9 @@ function SendOfferButton({
                     <FileText className="h-5 w-5" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900">{COPY_SEND_OFFER} — direct draft</p>
+                    <p className="font-semibold text-gray-900">Create standalone offer</p>
                     <p className="mt-0.5 text-xs text-gray-500">
-                      Start a campaign-free offer draft for this athlete (POST{' '}
-                      <code className="break-all text-[11px] sm:break-normal">/api/offers/direct-drafts</code>).
+                      Build a one-to-one offer for {athleteName} without attaching it to a campaign.
                     </p>
                     {directError ? (
                       <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
@@ -481,12 +439,12 @@ function SendOfferButton({
                     ) : null}
                     {!directLoading && !directError ? (
                       <p className="mt-2 text-xs text-gray-400">
-                        Idle — creates a private draft, then opens {COPY_SEND_OFFER}.
+                        You can review details before anything is sent.
                       </p>
                     ) : null}
                     {directLoading ? (
                       <p className="sr-only" role="status" aria-live="polite">
-                        Creating direct draft
+                        Starting offer
                       </p>
                     ) : null}
                     <button
@@ -496,7 +454,7 @@ function SendOfferButton({
                       className="mt-3 inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-nilink-accent px-4 py-2 text-sm font-semibold text-white outline-none ring-offset-2 transition hover:bg-nilink-accent-hover focus-visible:ring-2 focus-visible:ring-nilink-accent disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       {directLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                      {directLoading ? 'Creating…' : 'Create draft'}
+                      {directLoading ? 'Starting…' : 'Start offer'}
                     </button>
                   </div>
                 </div>
@@ -513,9 +471,7 @@ function SendOfferButton({
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-gray-900">{COPY_INVITE_TO_CAMPAIGN}</p>
                     <p className="mt-0.5 text-xs text-gray-500">
-                      Adds a {COPY_REFERRAL} application on the campaign you pick (POST{' '}
-                      <code className="text-[11px]">/api/campaigns/[id]/referrals</code>). Only public campaigns that are
-                      accepting applications are listed.
+                      Invite {athleteName} to one of your public campaigns that is currently accepting applications.
                     </p>
                     {campaignsLoading ? (
                       <div className="mt-3 animate-pulse space-y-2" role="status" aria-live="polite">
@@ -539,7 +495,7 @@ function SendOfferButton({
                         <p className="font-medium text-gray-800">No campaigns for {COPY_INVITE_TO_CAMPAIGN}</p>
                         <p className="mt-1 text-gray-500">
                           No eligible campaigns right now. Publish a public campaign that accepts applications, or use{' '}
-                          {COPY_SEND_OFFER} — direct draft instead.
+                          a standalone offer instead.
                         </p>
                       </div>
                     ) : (
@@ -561,7 +517,7 @@ function SendOfferButton({
                           ))}
                         </select>
                         <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-gray-400" htmlFor="send-offer-invite-note">
-                          {COPY_INVITE_TO_CAMPAIGN} note (optional)
+                          Invite note (optional)
                         </label>
                         <textarea
                           id="send-offer-invite-note"
@@ -578,7 +534,7 @@ function SendOfferButton({
                         ) : null}
                         {referralLoading ? (
                           <p className="sr-only" role="status" aria-live="polite">
-                            Sending {COPY_REFERRAL} invite
+                            Sending campaign invite
                           </p>
                         ) : null}
                         <button
@@ -588,45 +544,10 @@ function SendOfferButton({
                           className="mt-3 inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-nilink-accent px-4 py-2 text-sm font-semibold text-white outline-none ring-offset-2 transition hover:bg-nilink-accent-hover focus-visible:ring-2 focus-visible:ring-nilink-accent disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
                           {referralLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                          {referralLoading ? 'Sending…' : `${COPY_INVITE_TO_CAMPAIGN} (${COPY_REFERRAL})`}
+                          {referralLoading ? 'Sending…' : 'Send campaign invite'}
                         </button>
                       </>
                     )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-nilink-accent">
-                    <MessageSquare className="h-5 w-5" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900">Chat-negotiated offer</p>
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      Opens (or creates) a brand outreach thread with this athlete, starts a{' '}
-                      <code className="text-[11px]">chat_negotiated</code> offer draft, sends you to Messages for that
-                      thread, and opens the offer wizard when a draft is returned.
-                    </p>
-                    {chatError ? (
-                      <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
-                        {chatError}
-                      </p>
-                    ) : null}
-                    {chatLoading ? (
-                      <p className="sr-only" role="status" aria-live="polite">
-                        Creating chat-linked draft
-                      </p>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={chatLoading}
-                      onClick={() => void createChatLinkedDraft()}
-                      className="mt-3 inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 outline-none transition hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-nilink-accent disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                    >
-                      {chatLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                      {chatLoading ? 'Creating…' : 'Create chat-linked draft'}
-                    </button>
                   </div>
                 </div>
               </div>
