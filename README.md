@@ -1,8 +1,35 @@
 # NILINK
 
+> A two-sided NIL (Name, Image, Likeness) marketplace connecting verified college athletes with brands.
+
 NILINK is a marketplace platform for college athletes and brands to manage NIL partnerships from discovery through completed deal work. Athletes can create verified profiles, showcase social reach and content samples, discover campaigns, apply to opportunities, review offers, and manage deliverables. Brands can create campaigns, search athletes, review applications, send offers, upload contracts, track submissions, and manage payouts from a role-aware dashboard.
 
 **Live site:** [https://mvp-inky-eta.vercel.app/](https://mvp-inky-eta.vercel.app/)
+
+---
+
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [Core Features](#core-features)
+3. [User Documentation](#user-documentation)
+4. [Technical Documentation](#technical-documentation)
+   - [Tech Stack](#tech-stack)
+   - [Architecture Overview](#architecture-overview)
+   - [Repository Structure](#repository-structure)
+   - [Important Routes](#important-routes)
+   - [API Surface](#api-surface)
+   - [Data Model](#data-model)
+5. [Local Development](#local-development)
+6. [Supabase Setup](#supabase-setup)
+7. [Available Scripts](#available-scripts)
+8. [Environment Variables](#environment-variables)
+9. [Testing & Quality Gates](#testing--quality-gates)
+10. [Deployment Notes](#deployment-notes)
+11. [Current MVP Scope](#current-mvp-scope)
+12. [Credits](#credits)
+
+---
 
 ## Project Overview
 
@@ -74,29 +101,59 @@ The app is designed around a shared partnership lifecycle:
 
 ### Tech Stack
 
-- **Framework:** Next.js 16 App Router
+- **Framework:** Next.js 16 App Router (React Compiler enabled)
 - **UI:** React 19, TypeScript, Tailwind CSS 4, custom CSS tokens
 - **Backend:** Next.js route handlers under `src/app/api`
-- **Database/Auth/Storage:** Supabase
-- **Data fetching:** SWR and Supabase clients
-- **Charts/visuals:** Recharts, Framer Motion, Lucide React
+- **Database / Auth / Storage / Realtime:** Supabase (via `@supabase/ssr`)
+- **Data fetching:** SWR + Supabase clients
+- **Charts / visuals:** Recharts, Framer Motion, Lucide React
+- **Email:** Nodemailer SMTP (Gmail App Password in the current MVP), with Resend support retained for future use
 - **Testing:** Vitest
 - **Deployment:** Vercel
+
+### Architecture Overview
+
+NILINK is a single Next.js App-Router application that talks directly to Supabase for both data and auth. There is no separate backend server — server-side logic lives in Route Handlers under `src/app/api/**`.
+
+```
+Browser ──► Next.js (App Router)
+             ├─ Server Components ── Supabase SSR client (cookies)
+             ├─ Route Handlers /api ── Supabase service-role client
+             └─ Client Components ── SWR ──► /api/* ──► Supabase
+                                                       (Postgres + RLS + Realtime + Storage)
+```
+
+**Auth flow.** Cookies are managed by `@supabase/ssr` via middleware in `src/lib/middleware.ts`. Athlete onboarding requires a `.edu` email; verification codes are sent via SMTP (`/api/verify/school-email/send`). University selection uses an upstream list with a bundled fallback when the source is unavailable.
+
+**Authorization.** Every domain table has Row Level Security policies; helper functions are locked to the `authenticated` role. Service-role access is restricted to server routes (`SUPABASE_SERVICE_ROLE_KEY` is never bundled to the client).
+
+**Realtime.** Chat (`conversations`, `messages`) and deal activity feeds use Supabase Realtime publications (`supabase-chat-realtime-publication.sql`, `supabase-deals-realtime-publication.sql`).
+
+**Storage.** Avatars, banners, and signed deal contracts use Supabase Storage buckets configured in `supabase-storage-setup.sql` and `supabase-storage-deal-contracts.sql`.
+
+**Toggleable data sources** (for local dev / demos):
+- `NEXT_PUBLIC_MARKETPLACE_DATA_SOURCE=mock` — serve bundled fixtures from `src/lib/mockData.ts` instead of live Supabase.
+- `NEXT_PUBLIC_SAVED_DATA_SOURCE=local` — persist saved lists to `localStorage` instead of the DB.
 
 ### Repository Structure
 
 ```text
 src/app/                         Next.js pages, layouts, loading states, and API routes
-src/app/api/                     Server-side route handlers for auth, campaigns, offers, deals, chat, and dashboards
+src/app/api/                     Server-side route handlers for auth, campaigns, offers, deals, chat, dashboards
 src/components/auth/             Authentication UI
 src/components/landing/          Public marketing and product overview pages
 src/components/onboarding/       Shared onboarding shell
 src/components/dashboard/        Dashboard layout, cards, and role-specific screens
 src/components/offers/           Offer wizard and offer review UI
-src/lib/                         Supabase clients, repositories, validators, adapters, mock data, and business logic
+src/lib/                         Supabase clients, repositories, validators, adapters, mock data, business logic
+src/hooks/                       Shared React hooks
+src/styles/                      Tailwind layers + globals
 scripts/                         Utility scripts such as demo athlete seeding
-supabase/migrations/             Supabase migration files
-*.sql                            Supabase setup, RLS, storage, RPC, chat, campaign, application, offer, and deal scripts
+supabase/                        Supabase CLI project (config, generated types, migrations)
+supabase-*.sql                   ~25 root-level setup, RLS, storage, RPC, chat, campaign, application, offer, and deal scripts
+tests/                           Vitest suites
+public/                          Static assets
+data/                            Local JSON stores for legacy/mock paths
 ```
 
 ### Important Routes
@@ -135,6 +192,56 @@ The backend is implemented with Next.js route handlers. Major API groups include
 - `src/app/api/deliverables/*`, `src/app/api/submissions/*`, and `src/app/api/payment/*` for deal execution.
 - `src/app/api/chat/*` for outreach, inbox, threads, messages, and read state.
 - `src/app/api/social/*` for optional social OAuth/token integrations.
+
+### Data Model
+
+All tables live in the `public` schema. The full DDL is split across ~25 SQL migration files at the repo root (`supabase-*.sql`); the foundational file is `supabase-setup.sql`.
+
+#### Core identity
+| Table | Purpose |
+|---|---|
+| `profiles` | Universal fields for every user (email, role, location, gender, avatar/banner, availability, verification). Linked 1:1 to `auth.users`. |
+
+#### Athlete side
+| Table | Purpose |
+|---|---|
+| `athlete_sports` | Sport(s), position, school team, season. |
+| `athlete_academics` | University, major, graduation year, GPA. |
+| `athlete_socials` | Instagram / TikTok / YouTube handles + follower metrics ingested via OAuth. |
+| `athlete_achievements` | Awards, stats, milestones (free-form list). |
+
+#### Brand side
+| Table | Purpose |
+|---|---|
+| `brand_profiles` | Company name, industry, website, contacts. |
+| `campaigns` | Campaign briefs (title, description, budget, filters, status). |
+| `applications` | Athlete → campaign applications, with `status` lifecycle (`pending` → `under_review` → `offer_sent` / `rejected`). |
+| `saved_athletes` | Brand shortlists / saved-search results. |
+| `saved_campaigns` | Athlete-side saved campaigns. |
+| `campaign_templates` | Reusable starter briefs. |
+| `offers` | Direct (off-campaign) offers from brand to athlete. |
+
+#### Deals (phased lifecycle)
+| Table | Purpose |
+|---|---|
+| `deals` | Contracted engagement between athlete and brand (Phase 3: setup). |
+| `deal_deliverables` | Per-deliverable spec, status, published URL (Phase 4). |
+| `deal_activities` | Audit / activity feed for the deal (Phase 5). |
+
+Deal lifecycle phases are documented in `supabase-deals-phase{3,4,5}-setup.sql`.
+
+#### Messaging
+| Table | Purpose |
+|---|---|
+| `conversations` | A 1:1 thread between a brand and an athlete. |
+| `messages` | Individual messages with realtime delivery. |
+
+#### Auxiliary
+| Table | Purpose |
+|---|---|
+| `referrals` | Referral tracking. |
+
+> **Migration run-order:** apply `supabase-setup.sql` and `supabase-business-setup.sql` first, then the domain files (campaigns, applications, deals phases, chat, storage), and finally the hardening / patch files (`supabase-rls-hardening.sql`, `supabase-rls-recursion-fix.sql`, and any `*-patch.sql`). See the comments at the top of each file for prerequisites.
 
 ## Local Development
 
@@ -199,6 +306,8 @@ The backend is implemented with Next.js route handlers. Major API groups include
 
 7. Open [http://localhost:3000](http://localhost:3000).
 
+> The dev server uses Webpack (not Turbopack) — this is intentional and configured in `next.config.ts`.
+
 ## Supabase Setup
 
 The project uses Supabase for authentication, database tables, storage, RPC functions, and Row Level Security. SQL setup files are included in the repository root and in `supabase/migrations/`.
@@ -207,7 +316,7 @@ For a fresh Supabase environment:
 
 1. Create a Supabase project.
 2. Add the project URL, anon key, and service role key to `.env.local` and Vercel environment variables.
-3. Apply the schema/setup SQL files for profiles, athlete data, brand data, campaigns, applications, offers, deals, chat, storage, social OAuth, RPC helpers, and RLS policies.
+3. Apply the schema/setup SQL files in the order described under [Data Model](#data-model) — profiles, athlete data, brand data, campaigns, applications, offers, deals, chat, storage, social OAuth, RPC helpers, and finally the RLS hardening files.
 4. Confirm the `deal-contracts` storage bucket and storage policies are present if testing contract uploads.
 5. Configure auth redirect URLs for local development and production:
    - `http://localhost:3000/auth/callback`
@@ -263,6 +372,19 @@ npm run seed:demo-athletes   # Seed demo athlete profiles into Supabase
 | `NEXT_PUBLIC_DEMO_VIDEO_EMBED_URL` | Optional | Hosted demo video embed URL |
 | `NEXT_PUBLIC_DEMO_VIDEO_URL` | Optional | Direct demo MP4 URL |
 | `NEXT_PUBLIC_DEMO_VIDEO_POSTER_URL` | Optional | Demo video poster image |
+| `CONTACT_SALES_TO` | Optional | Inbox for the `/talk-to-sales` form |
+
+## Testing & Quality Gates
+
+Before pushing, the project expects all three to pass:
+
+```bash
+npm run lint           # ESLint
+npx tsc --noEmit       # Type-check
+npm run test           # Vitest
+```
+
+CI / pre-merge baseline: **0 type errors, 0 ESLint errors, all tests green.**
 
 ## Deployment Notes
 
@@ -270,10 +392,11 @@ Production is deployed on Vercel at [https://mvp-inky-eta.vercel.app/](https://m
 
 Before deploying a new environment:
 
-1. Add all required environment variables in Vercel.
+1. Add all required environment variables in Vercel (see table above). Set `NEXT_PUBLIC_APP_URL` to the production URL.
 2. Confirm Supabase Auth redirect URLs include the Vercel domain.
-3. Apply the latest Supabase SQL migrations/setup scripts.
-4. Run the quality checks locally:
+3. Configure OAuth redirect URIs in the Instagram / TikTok / YouTube developer consoles using `<NEXT_PUBLIC_APP_URL>/api/social/*/callback`.
+4. Apply the latest Supabase SQL migrations/setup scripts.
+5. Run the quality checks locally:
 
    ```bash
    npm run lint
@@ -284,3 +407,7 @@ Before deploying a new environment:
 ## Current MVP Scope
 
 This repository represents the capstone MVP. It includes the complete user-facing workflow for account creation, onboarding, discovery, campaign/application management, offer handoff, deal workspaces, and dashboard analytics. Payment processing and external social-platform metrics are represented through application data models and integration-ready OAuth surfaces, but real money movement and production social API approval are outside the current MVP scope.
+
+## Credits
+
+Software Engineering capstone project. _Add team members, course, semester here._
