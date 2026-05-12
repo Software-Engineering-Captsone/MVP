@@ -410,4 +410,10 @@ This repository represents the capstone MVP. It includes the complete user-facin
 
 ## Credits
 
-Software Engineering capstone project. _Add team members, course, semester here._
+Software Engineering capstone project. 
+*Samip Udas*
+*Pratuish Karki*
+*Jorge Gonzalez*
+*Diogo Santos*
+*Shanya Poudel*
+*Class of 2026*
