@@ -71,18 +71,6 @@ const businessNavigation: NavItem[] = [
   { href: '/dashboard/messages', icon: MessageSquare, label: 'Inbox' },
 ];
 
-const dashboardPrefetchPaths = [
-  '/dashboard',
-  '/dashboard/search',
-  '/dashboard/applications',
-  '/dashboard/offers',
-  '/dashboard/campaigns',
-  '/dashboard/deals',
-  '/dashboard/analytics',
-  '/dashboard/messages',
-  '/dashboard/profile',
-];
-
 function formatNavBadgeCount(count: number): string | undefined {
   if (count <= 0) return undefined;
   return count > 99 ? '99+' : String(count);
@@ -189,11 +177,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       subscription.unsubscribe();
     };
   }, [supabase, router, mapSupabaseUser, hydrateFromProfile]);
-
-  useEffect(() => {
-    if (booting || !sessionUser) return;
-    dashboardPrefetchPaths.forEach((path) => router.prefetch(path));
-  }, [booting, sessionUser, router]);
 
   /* ── Onboarding gate for first-time athletes and brands ── */
   useEffect(() => {

@@ -142,15 +142,9 @@ type Row = {
   state: string | null;
   hometown: string | null;
   verified: boolean | null;
-  athlete_sports: Array<{ sport: string; position: string; jersey_number: string; is_primary: boolean }>;
-  athlete_academics: Array<{ school: string; major: string; current_year: string }>;
-  athlete_socials: Array<{
-    instagram: string; instagram_followers: number; instagram_engagement: number; instagram_avg_likes: number;
-    tiktok: string; tiktok_followers: number; tiktok_engagement: number; tiktok_avg_views: number;
-    facebook: string; facebook_followers: number;
-    total_followers: number; engagement_rate: number; posts_per_month: number;
-    total_views: number; estimated_impressions: number;
-  }>;
+  athlete_sports: SportRelation[];
+  athlete_academics: AcademicRelation | AcademicRelation[] | null;
+  athlete_socials: SocialRelation | SocialRelation[] | null;
   athlete_achievements: Array<{ title: string; year: number | null; display_order: number }>;
   athlete_content: Array<{
     content_type: string | null;
@@ -165,14 +159,50 @@ type Row = {
   }>;
 };
 
+type SportRelation = {
+  sport: string;
+  position: string;
+  jersey_number: string;
+  is_primary: boolean;
+};
+
+type AcademicRelation = {
+  school: string | null;
+  major: string | null;
+  current_year: string | null;
+};
+
+type SocialRelation = {
+  instagram: string | null;
+  instagram_followers: number | null;
+  instagram_engagement: number | null;
+  instagram_avg_likes: number | null;
+  tiktok: string | null;
+  tiktok_followers: number | null;
+  tiktok_engagement: number | null;
+  tiktok_avg_views: number | null;
+  facebook: string | null;
+  facebook_followers: number | null;
+  total_followers: number | null;
+  engagement_rate: number | null;
+  posts_per_month: number | null;
+  total_views: number | null;
+  estimated_impressions: number | null;
+};
+
+function firstRelated<T>(relation: T | T[] | null | undefined): T | null {
+  if (!relation) return null;
+  return Array.isArray(relation) ? relation[0] ?? null : relation;
+}
+
 function mapRowToAthlete(row: Row): Athlete {
   const primarySport = row.athlete_sports?.find((s) => s.is_primary) ?? row.athlete_sports?.[0];
-  const academics = row.athlete_academics?.[0];
-  const socials = row.athlete_socials?.[0];
+  const academics = firstRelated(row.athlete_academics);
+  const socials = firstRelated(row.athlete_socials);
 
-  const igHandle = socials?.instagram ?? '';
-  const ttHandle = socials?.tiktok ?? '';
-  const fbHandle = socials?.facebook ?? '';
+  const igHandle = socials?.instagram?.trim() ?? '';
+  const ttHandle = socials?.tiktok?.trim() ?? '';
+  const fbHandle = socials?.facebook?.trim() ?? '';
 
   const platformMetrics: { instagram: PlatformMetrics; tiktok: PlatformMetrics; facebook: PlatformMetrics } = {
     instagram: {
