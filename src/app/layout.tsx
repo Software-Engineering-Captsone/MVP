@@ -16,9 +16,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "NILINK — The NIL Marketplace for College Athletes",
+  title: "NILINK",
   description:
-    "NILINK is the marketplace that connects student athletes with the right brand partnerships. Real social data, simple deal management, and profiles that actually showcase who you are.",
+    "A marketplace that connects student athletes with the right brand partnerships. Real social data, simple deal management, and profiles that actually showcase who you are.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [
@@ -26,7 +26,9 @@ export const metadata: Metadata = {
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 
@@ -37,7 +39,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${sora.variable} ${instrumentSerif.variable}`} suppressHydrationWarning>
+      <body
+        className={`${sora.variable} ${instrumentSerif.variable}`}
+        suppressHydrationWarning
+      >
         {children}
       </body>
     </html>
