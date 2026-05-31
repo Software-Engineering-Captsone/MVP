@@ -15,7 +15,6 @@ export default function Navbar() {
               <li><a href="#features">Features</a></li>
               <li><a href="#athletes">For Athletes</a></li>
               <li><a href="#brands">For Brands</a></li>
-              <li><a href="#pricing">Pricing</a></li>
             </ul>
           </nav>
 

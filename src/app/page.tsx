@@ -11,6 +11,8 @@ import {
   CTA,
   Footer,
   FadeUpObserver,
+  WaitlistModal,
+  LandingHashScroll,
 } from '@/components/landing';
 
 export default function Home() {
@@ -29,6 +31,8 @@ export default function Home() {
       <CTA />
       <Footer />
       <FadeUpObserver />
+      <WaitlistModal />
+      <LandingHashScroll />
     </div>
   );
 }

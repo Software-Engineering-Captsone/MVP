@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { heroLandingCollageUrls } from "@/lib/mockData";
+import WaitlistButton from "./WaitlistButton";
 
 const REEL_LEFT = heroLandingCollageUrls.slice(0, 3);
 const REEL_RIGHT = heroLandingCollageUrls.slice(3, 6);
@@ -60,10 +61,6 @@ export default function Hero() {
       <div className="hero-inner">
         <div className="hero-content">
 
-          <div className="hero-badge">
-            Capstone MVP prototype for NIL partnerships
-          </div>
-
           <h1 className="hero-title">
             <span className="hero-title__line">Where</span>
             <span className="hero-title__line">college athletes and brands</span>
@@ -81,14 +78,8 @@ export default function Hero() {
               Try the MVP
             </Link>
 
-            <Link href="/waitlist" className="btn-pill btn-outline">
-              Join waitlist
-            </Link>
+            <WaitlistButton className="btn-pill btn-outline" />
           </div>
-
-          <p className="hero-note">
-            Prototype access for testing and capstone review - not a launched commercial service.
-          </p>
 
         </div>
       </div>

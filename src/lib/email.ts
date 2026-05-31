@@ -6,6 +6,12 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  // Fail fast instead of hanging when SMTP is slow or blocked (common on hosts
+  // that throttle outbound 587/465). Without these, sendMail can hang the
+  // request indefinitely and leave the submit button stuck on "Joining…".
+  connectionTimeout: 8000,
+  greetingTimeout: 8000,
+  socketTimeout: 8000,
 });
 
 export const sendVerificationEmail = async (email: string, token: string) => {

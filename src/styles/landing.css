@@ -959,6 +959,222 @@
   color: var(--nilink-accent);
 }
 
+/* Footer "Join waitlist" trigger — styled to match footer links, not a button */
+.footer-link-button {
+  display: block;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.footer-link-button:hover {
+  color: var(--nilink-accent);
+}
+
+/* Disabled legal links — present but not yet wired */
+.footer-link-disabled {
+  display: block;
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  cursor: default;
+}
+
+.footer-link-disabled em {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-on-dark-muted);
+  margin-left: 6px;
+}
+
+/* ===== WAITLIST MODAL ===== */
+.waitlist-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: rgba(20, 20, 24, 0.55);
+  backdrop-filter: blur(3px);
+  animation: waitlist-fade 0.18s ease;
+}
+
+@media (min-width: 640px) {
+  .waitlist-modal-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+}
+
+.waitlist-modal-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: min(92dvh, 720px);
+  overflow-y: auto;
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-lg);
+  padding: 28px 24px 24px;
+  animation: waitlist-rise 0.22s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+@media (min-width: 640px) {
+  .waitlist-modal-dialog {
+    border-radius: var(--radius-lg);
+    padding: 32px 30px 28px;
+  }
+}
+
+.waitlist-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  appearance: none;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s ease;
+}
+
+.waitlist-modal-close:hover {
+  color: var(--text);
+}
+
+.waitlist-modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 36px 6px 0;
+}
+
+.waitlist-modal-lede {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 20px;
+}
+
+@keyframes waitlist-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes waitlist-rise {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ===== SALES / WAITLIST FORM (shared by modal + /talk-to-sales) ===== */
+.sales-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sales-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sales-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sales-form-required {
+  color: var(--accent);
+}
+
+.sales-form-input,
+.sales-form-textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sales-form-input:focus,
+.sales-form-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.sales-form-input:disabled,
+.sales-form-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sales-form-textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.sales-form-error {
+  font-size: 13px;
+  color: #dc2626;
+  margin: 0;
+}
+
+.sales-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.sales-form-submit {
+  width: 100%;
+}
+
+.sales-form-success {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.sales-form-success__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+
+.sales-form-success__text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 18px;
+}
+
+.sales-form-reset {
+  width: auto;
+}
+
 .footer-bottom {
   display: flex;
   justify-content: space-between;
